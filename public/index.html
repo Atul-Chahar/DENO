@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deno — Founder Go-To-Market Workspace</title>
+  <meta name="description" content="Grounded startup idea validation, 30-day voice-matched content calendar, and real-time Ban Risk scoring.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- App Shell -->
+  <div class="app-layout">
+    <!-- Navigation Header -->
+    <header class="app-header">
+      <div class="brand-area">
+        <div class="logo-icon">D</div>
+        <div class="brand-text">
+          <span class="brand-name">Deno</span>
+          <span class="brand-tag">GTM Workspace</span>
+        </div>
+      </div>
+      
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="intake-tab">1. Idea Intake</button>
+        <button class="nav-tab" data-tab="verdict-tab" id="nav-verdict-tab" disabled>2. Validation Report</button>
+        <button class="nav-tab" data-tab="communities-tab">3. Community Radar</button>
+        <button class="nav-tab" data-tab="voice-tab">4. Voice & Story Bank</button>
+        <button class="nav-tab" data-tab="calendar-tab" id="nav-calendar-tab" disabled>5. Content Calendar</button>
+        <button class="nav-tab" data-tab="auditor-tab">6. Ban Risk Studio</button>
+      </nav>
+
+      <div class="system-status">
+        <span class="status-dot"></span>
+        <span class="status-label" id="status-label">NVIDIA NIM Connected</span>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+      
+      <!-- TAB 1: Intake & Live Pipeline -->
+      <section class="tab-pane active" id="intake-tab">
+        <div class="hero-header">
+          <div class="badge-pill">Stage 1: Multi-Agent Validation · 100% Free</div>
+          <h1>Validate your startup idea with evidence.<br><span class="gradient-text">Then launch safely without getting banned.</span></h1>
+          <p class="hero-subtext">8 autonomous agents stress-test your idea in an adversarial DAG. Grounded in clickable sources with zero typing beyond the idea itself.</p>
+        </div>
+
+        <div class="card glass-card intake-card">
+          <div class="input-group">
+            <div class="input-header">
+              <label for="idea-input">Your Startup Concept or Product URL</label>
+              <button class="btn-ghost" id="sample-idea-btn">✨ Load Sample SaaS Idea</button>
+            </div>
+            <textarea id="idea-input" rows="4" placeholder="Describe your startup concept, target problem, or paste your landing page URL... e.g., An automated code review bot that catches race conditions in Go microservices before PR merge."></textarea>
+          </div>
+
+          <div class="input-row">
+            <div class="input-field">
+              <label for="handle-input">Optional: Public X or Reddit Handle (for Voice Profiling)</label>
+              <input type="text" id="handle-input" placeholder="@yourhandle or u/username">
+            </div>
+            <button class="btn-primary" id="start-validation-btn">
+              <span class="btn-icon">⚡</span> Run 8-Agent Validation
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-Time Pipeline Visualizer -->
+        <div class="card glass-card pipeline-card" id="pipeline-status-card" style="display: none;">
+          <div class="pipeline-header">
+            <h3>Multi-Agent DAG Execution</h3>
+            <span class="pipeline-pct" id="pipeline-pct">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="pipeline-progress-bar" style="width: 0%;"></div>
+          </div>
+          <p class="pipeline-log" id="pipeline-log">Initializing agents...</p>
+
+          <div class="agent-grid">
+            <div class="agent-chip" id="chip-intake"><span>1. Intake Analyst</span></div>
+            <div class="agent-chip" id="chip-market"><span>2. Market Researcher</span></div>
+            <div class="agent-chip" id="chip-sizing"><span>3. Sizing Engine</span></div>
+            <div class="agent-chip" id="chip-risk"><span>4. Risk Assessor</span></div>
+            <div class="agent-chip" id="chip-critic"><span>5. Critic (Adversarial)</span></div>
+            <div class="agent-chip" id="chip-refiner"><span>6. Strategy Refiner</span></div>
+            <div class="agent-chip" id="chip-decision"><span>7. Decision Engine</span></div>
+            <div class="agent-chip" id="chip-community"><span>8. Community Mapper</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Validation Verdict & Grounded Sources -->
+      <section class="tab-pane" id="verdict-tab">
+        <div class="verdict-banner" id="verdict-banner">
+          <div class="verdict-left">
+            <div class="verdict-tag" id="verdict-badge">BUILD</div>
+            <h2 id="verdict-title">Strong Product-Market Opportunity</h2>
+            <p id="verdict-market-desc">Market demand is acute with visible willingness to pay.</p>
+          </div>
+          <div class="verdict-right">
+            <div class="confidence-circle">
+              <span class="confidence-val" id="confidence-val">84%</span>
+              <span class="confidence-lbl">Calibrated Confidence</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <!-- Top 3 Reasons -->
+          <div class="card glass-card">
+            <h3>Top 3 Supporting Arguments</h3>
+            <ul class="reasons-list" id="top-reasons-list"></ul>
+          </div>
+
+          <!-- Bottom-up TAM SAM SOM -->
+          <div class="card glass-card">
+            <h3>Bottom-Up Market Sizing</h3>
+            <div class="tam-grid">
+              <div class="tam-box">
+                <span class="tam-label">TAM</span>
+                <span class="tam-num" id="tam-num">$1.5B</span>
+              </div>
+              <div class="tam-box">
+                <span class="tam-label">SAM</span>
+                <span class="tam-num" id="sam-num">$250M</span>
+              </div>
+              <div class="tam-box">
+                <span class="tam-label">SOM</span>
+                <span class="tam-num" id="som-num">$12M</span>
+              </div>
+            </div>
+            <p class="tam-calc" id="tam-calc"></p>
+          </div>
+        </div>
+
+        <!-- Competitor Intel & Source Ledger -->
+        <div class="two-col-grid">
+          <div class="card glass-card">
+            <h3>Grounded Competitors</h3>
+            <div class="competitor-list" id="competitor-list"></div>
+          </div>
+
+          <div class="card glass-card">
+            <h3>Clickable Source Ledger</h3>
+            <div class="source-list" id="source-ledger-list"></div>
+          </div>
+        </div>
+
+        <div class="action-footer">
+          <button class="btn-secondary" id="open-communities-btn">Explore Community Targets →</button>
+          <button class="btn-primary" id="generate-calendar-btn">⚡ Generate 30-Day Safe Content Plan</button>
+        </div>
+      </section>
+
+      <!-- TAB 3: Community Knowledge Graph -->
+      <section class="tab-pane" id="communities-tab">
+        <div class="section-title">
+          <h2>Target Communities & Rule Radar</h2>
+          <p>Deno cross-checks rules, karma requirements, and posting limits for each channel.</p>
+        </div>
+        <div class="community-grid" id="community-grid"></div>
+      </section>
+
+      <!-- TAB 4: Voice Profiling & Story Bank -->
+      <section class="tab-pane" id="voice-tab">
+        <div class="section-title">
+          <h2>Founder Voice Profile & Story Bank</h2>
+          <p>Voice is measured via computational stylometry. The Story Bank injects real metrics and scars to defeat the Portability Test.</p>
+        </div>
+
+        <div class="two-col-grid">
+          <!-- Stylometric Fingerprint Card -->
+          <div class="card glass-card">
+            <h3>Stylometric Fingerprint</h3>
+            <p class="card-desc">Quantified linguistic signature (Burrows' Delta baseline).</p>
+            <div class="stats-grid" id="stylometry-stats">
+              <div class="stat-item"><span class="stat-num" id="stat-mean-len">14.2</span><span class="stat-lbl">Mean Words/Sentence</span></div>
+              <div class="stat-item"><span class="stat-num" id="stat-ttr">0.68</span><span class="stat-lbl">Type-Token Ratio</span></div>
+              <div class="stat-item"><span class="stat-num" id="stat-yules">84.5</span><span class="stat-lbl">Yule's Characteristic K</span></div>
+              <div class="stat-item"><span class="stat-num" id="stat-variance">22.4</span><span class="stat-lbl">Sentence Variance</span></div>
+            </div>
+            <div class="input-group" style="margin-top: 1.5rem;">
+              <label>Re-calibrate Voice (Paste a writing sample of 50+ words)</label>
+              <textarea id="voice-sample-input" rows="3" placeholder="Paste an email, tweet, or blog paragraph written by you..."></textarea>
+              <button class="btn-secondary btn-sm" id="update-voice-btn" style="margin-top: 0.5rem;">Recalculate Fingerprint</button>
+            </div>
+          </div>
+
+          <!-- Story Bank Entry Form & List -->
+          <div class="card glass-card">
+            <h3>Founder Story Bank</h3>
+            <p class="card-desc">Real receipts prevent your content from sounding like generic AI fluff.</p>
+            <div class="story-bank-input">
+              <select id="sb-category">
+                <option value="SCAR">SCAR (Past Failure/Hard Lesson)</option>
+                <option value="METRIC">METRIC (Verifiable Number)</option>
+                <option value="TURNING_POINT">TURNING POINT (Aha Moment)</option>
+                <option value="DEFENDED_OPINION">DEFENDED OPINION (Contrarian Stance)</option>
+              </select>
+              <input type="text" id="sb-headline" placeholder="Headline: e.g. Spent 4 months building a feature no one used">
+              <input type="text" id="sb-numbers" placeholder="Concrete numbers: e.g. $14,000, 120 hours">
+              <textarea id="sb-details" rows="2" placeholder="Brief story details..."></textarea>
+              <button class="btn-primary btn-sm" id="add-story-entry-btn">Add to Story Bank</button>
+            </div>
+            <div class="story-bank-entries" id="story-bank-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: Content Calendar & Ban Risk Studio -->
+      <section class="tab-pane" id="calendar-tab">
+        <div class="section-title">
+          <h2>30-Day Platform-Safe Content Plan</h2>
+          <p>Generated in your voice, pre-checked against platform rules, and ready for you to manually send.</p>
+        </div>
+
+        <div class="calendar-layout">
+          <!-- Asset Selector Sidebar -->
+          <div class="calendar-sidebar" id="calendar-asset-list"></div>
+
+          <!-- Main Post Editor & Real-Time Ban Risk Audit -->
+          <div class="calendar-editor-card card glass-card">
+            <div class="editor-header">
+              <div>
+                <span class="badge-pill" id="editor-platform-badge">REDDIT</span>
+                <span class="community-pill" id="editor-community-badge">r/SideProject</span>
+              </div>
+              <div class="score-pill-box" id="editor-score-pill">
+                <span class="score-num" id="editor-ban-score">88</span>
+                <span class="score-lbl">Ban Risk Score</span>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="editor-content">Post Copy (Editable in place)</label>
+              <textarea id="editor-content" rows="10"></textarea>
+            </div>
+
+            <div class="input-group" id="editor-first-comment-group">
+              <label for="editor-first-comment">Designated First Comment (Protects post algorithmic reach)</label>
+              <input type="text" id="editor-first-comment" placeholder="Outbound link or additional context...">
+            </div>
+
+            <div class="deductions-container">
+              <h4>Safety & Anti-Slop Audit (Live Deduction Breakdown)</h4>
+              <div class="deductions-list" id="editor-deductions-list"></div>
+            </div>
+
+            <div class="editor-footer">
+              <div class="compliance-note">
+                <span class="lock-icon">🔒</span> Deno never posts automatically. You always review and press send.
+              </div>
+              <div class="button-group">
+                <button class="btn-secondary" id="copy-post-btn">📋 Copy Post</button>
+                <a href="https://reddit.com" target="_blank" rel="noopener noreferrer" class="btn-primary" id="open-platform-link">
+                  Open Platform ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: Standalone Ban Risk Studio Playground -->
+      <section class="tab-pane" id="auditor-tab">
+        <div class="section-title">
+          <h2>Ban Risk & Anti-Slop Studio (Playground)</h2>
+          <p>Test any piece of writing against Peter Yang's 18 structural patterns and Serge Bulaev's 2026 vocabulary density engine.</p>
+        </div>
+
+        <div class="two-col-grid">
+          <div class="card glass-card">
+            <div class="input-group">
+              <label for="play-platform">Target Platform</label>
+              <select id="play-platform">
+                <option value="REDDIT">Reddit (Strict Spam Filter & 9:1 Promo Rule)</option>
+                <option value="LINKEDIN">LinkedIn (Anti-Slop Filter & Outbound Link Penalty)</option>
+                <option value="TWITTER">X / Twitter</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="play-input">Draft Content to Audit</label>
+              <textarea id="play-input" rows="8" placeholder="Paste any AI-drafted or human-written post to inspect itemized deductions and fixes..."></textarea>
+            </div>
+            <button class="btn-primary" id="play-audit-btn">⚡ Run Safety Audit</button>
+          </div>
+
+          <div class="card glass-card">
+            <h3>Audit Report</h3>
+            <div class="score-display-card" id="play-score-card">
+              <div class="big-score" id="play-score-val">--</div>
+              <div class="score-desc" id="play-score-desc">Paste content and run audit to evaluate ban risk.</div>
+            </div>
+            <div class="deductions-list" id="play-deductions-list"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast" id="toast">Post copied to clipboard!</div>
+
+  <script src="app.js"></script>
+</body>
+</html>
