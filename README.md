@@ -20,7 +20,7 @@ Deno is a hybrid-architecture founder workspace designed for 2026 platform reali
 * **Core ML & Agent Engine:** Python 3.14 + FastAPI + Pydantic v2 + NumPy (Burrows' Delta stylometry)
 * **LLM Model & Provider:** NVIDIA NIM (`meta/llama-3.2-11b-vision-instruct` via `https://integrate.api.nvidia.com/v1`)
 * **Persistence:** SQLite relational database with idempotent schema migrations and cascading foreign keys
-* **Frontend UI:** Vanilla CSS (Glassmorphic dark design system with Outfit/Inter typography) + Vanilla JS (Reactive DOM & SSE streaming)
+* **Frontend UI:** Vanilla CSS (editorial hard-edge design system — DM Serif Display / Schibsted Grotesk / JetBrains Mono) + Vanilla JS (Reactive DOM & SSE streaming)
 
 ---
 
@@ -63,9 +63,14 @@ Deno is a hybrid-architecture founder workspace designed for 2026 platform reali
 │       ├── test_api.py               # Tests for FastAPI endpoints & storage
 │       └── test_validation_live.py   # Live end-to-end multi-agent pipeline test
 └── public/                           # Frontend Web Assets
-    ├── index.html                    # Single-page founder workspace
-    ├── style.css                     # High-end glassmorphic dark theme
-    └── app.js                        # Reactive UI & real-time SSE listener
+    ├── index.html                    # Marketing landing page
+    ├── auth.html                     # Log in / sign up
+    ├── app.html                      # Founder workspace (6-tab product)
+    ├── base.css                      # Shared design-system tokens & primitives
+    ├── landing.css / landing.js      # Landing page styles & interactions
+    ├── auth.css / auth.js            # Auth page styles & client-side validation
+    ├── app.css / app.js              # Workspace styles & reactive UI / SSE listener
+    └── assets/                       # Static images (e.g. workspace-intake.png)
 ```
 
 ---
@@ -91,8 +96,8 @@ uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 deno run --allow-net --allow-read --allow-env gateway/server.ts
 ```
 
-### 4. Access the Workspace
-Open `http://localhost:8080` in your web browser.
+### 4. Access Deno
+Open `http://localhost:8080` in your web browser — this loads the marketing landing page. Click **Validate an idea** (or go to `http://localhost:8080/auth.html`) to sign in, or go straight to `http://localhost:8080/app.html` for the founder workspace.
 
 ---
 

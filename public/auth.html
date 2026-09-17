@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deno — Log in or create a free account</title>
+<meta name="description" content="Log in to pick up your last verdict, or create a free account and validate your first idea in ninety seconds.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital,wght@0,400;1,400&family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="auth.css">
+</head>
+<body>
+
+<div class="auth-shell">
+<div class="auth-frame">
+
+  <div class="auth-topbar">
+    <a href="index.html" class="brand brand--sm">
+      <span class="brand__word">deno</span>
+      <span class="brand__chip">GTM</span>
+    </a>
+    <div class="auth-topbar__switch">
+      <button type="button" class="auth-topbar__btn" id="tab-login" data-mode="login">Log in</button>
+      <button type="button" class="auth-topbar__btn" id="tab-signup" data-mode="signup">Sign up</button>
+    </div>
+    <a href="index.html" class="mono-plain auth-topbar__back">← Back to site</a>
+  </div>
+
+  <div class="auth-grid">
+
+    <div class="auth-col">
+
+      <div id="heading-login" class="auth-heading">
+        <span class="tag tag--green">Welcome back</span>
+        <h1 class="display auth-heading__title">Pick up where the critic left off.</h1>
+        <p class="prose auth-heading__sub">Your verdicts, source ledgers and 30-day calendars are exactly where you left them. Nothing was posted while you were gone.</p>
+      </div>
+
+      <div id="heading-signup" class="auth-heading" hidden>
+        <span class="tag tag--lime">Stage 1 · Free · No card</span>
+        <h1 class="display auth-heading__title">Validate your first idea in ninety seconds.</h1>
+        <p class="prose auth-heading__sub">One account, eight adversarial agents, unlimited ideas. Ban Risk and the 30-day calendar unlock later — only if you want them.</p>
+      </div>
+
+      <div id="pending-panel" class="auth-pending rise" hidden>
+        <div class="auth-pending__head">
+          <span class="pulse-dot" style="background:var(--green)"></span>
+          <span class="mono" id="pending-label" style="color:var(--green)">CHECK YOUR INBOX</span>
+        </div>
+        <div class="display auth-pending__title" id="pending-title">One link to confirm, then you're in.</div>
+        <p class="prose auth-pending__body" id="pending-body" style="color:var(--ink-2)"></p>
+        <button type="button" class="btn" id="pending-reset">Use a different email</button>
+      </div>
+
+      <form id="auth-form" novalidate>
+        <div id="field-name" class="field" hidden>
+          <label class="field__label" for="f-name">Your name</label>
+          <input class="input" id="f-name" name="name" type="text" placeholder="First and last" autocomplete="name">
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="f-email">Email</label>
+          <input class="input" id="f-email" name="email" type="email" placeholder="you@founder.dev" autocomplete="email">
+        </div>
+
+        <div class="field" style="margin-bottom:8px">
+          <div class="field__row">
+            <label class="field__label" for="f-pw" style="margin-bottom:0">Password</label>
+            <button type="button" class="mono-plain auth-linklike" id="toggle-pw">show</button>
+          </div>
+          <input class="input" id="f-pw" name="password" type="password" placeholder="At least 10 characters" autocomplete="current-password">
+        </div>
+
+        <div id="strength-row" class="auth-strength" hidden>
+          <div class="auth-strength__track"><div class="auth-strength__fill" id="strength-fill"></div></div>
+          <span class="mono" id="strength-label">EMPTY</span>
+        </div>
+
+        <div id="row-remember" class="auth-row-between">
+          <button type="button" class="check" id="chk-remember" aria-checked="true">
+            <span class="check__box" id="chk-remember-box">✓</span>
+            Keep me signed in
+          </button>
+          <a href="#reset" class="link-mono" style="font-size:11px">Forgot password →</a>
+        </div>
+
+        <button type="button" class="check" id="chk-agree" aria-checked="false" hidden>
+          <span class="check__box" id="chk-agree-box"></span>
+          <span>I agree to the <strong>terms</strong> and the <strong>human-send policy</strong> — Deno never posts, votes or DMs on my behalf.</span>
+        </button>
+
+        <div id="error-notice" class="notice" hidden style="margin-bottom:16px">
+          <span class="notice__tag">ERR</span>
+          <span id="error-text"></span>
+        </div>
+
+        <button type="submit" class="btn btn--lime btn--block btn--raised" id="submit-btn" style="font-size:16px;padding:16px">Log in</button>
+
+        <div class="auth-or">
+          <span></span><span class="mono-plain">OR</span><span></span>
+        </div>
+        <button type="button" class="btn btn--ghost btn--block">Continue with Google</button>
+
+        <div class="auth-switch-row">
+          <span id="switch-prompt" style="font-size:14px;color:var(--ink-3)">No account yet?</span>
+          <button type="button" class="link-mono" id="switch-mode" style="font-size:12px">Create a free account →</button>
+        </div>
+
+        <p class="mono-plain" style="margin:18px 0 0">NO CARD · NO AUTO-POSTING · EVER</p>
+      </form>
+
+    </div>
+
+    <div class="auth-visual slab">
+
+      <div id="visual-login" class="auth-visual__panel">
+        <div class="auth-visual__row">
+          <span class="mono" style="color:var(--lime)">Your last run · 3 days ago</span>
+          <span class="mono-plain" style="color:var(--on-dark-dim)">deno/workspace</span>
+        </div>
+        <div class="auth-visual__verdict">
+          <div class="display" style="font-size:clamp(44px,5.6vw,68px);color:var(--lime)">BUILD</div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px">
+            <span class="display" style="font-size:28px">84%</span>
+            <span class="mono-plain" style="color:var(--on-dark-dim)">Calibrated confidence</span>
+          </div>
+          <p style="margin:12px 0 0;font-size:14px;line-height:1.55;color:var(--on-dark-soft)">Pre-merge race-condition review for Go microservices. 24 claims sourced, 6 dropped as unverifiable.</p>
+        </div>
+        <div class="auth-visual__list">
+          <div><span class="mono" style="color:var(--lime)">30-day plan</span><span>Day 06 draft ready to send</span><span class="mono-plain">Ban risk 91</span></div>
+          <div><span class="mono" style="color:var(--lime)">Story bank</span><span>14 entries · 6 metrics on file</span><span class="mono-plain">Synced</span></div>
+          <div><span class="mono" style="color:var(--lime)">Automated</span><span>Actions taken while you were away</span><span class="mono-plain">0</span></div>
+        </div>
+        <div class="auth-visual__shot">
+          <div class="auth-visual__shot-head">
+            <span>WORKSPACE · 01 INTAKE</span><span style="color:var(--on-dark-dim)">RESTORED ON LOGIN</span>
+          </div>
+          <img src="assets/workspace-intake.png" alt="Deno workspace intake screen">
+        </div>
+      </div>
+
+      <div id="visual-signup" class="auth-visual__panel" hidden>
+        <span class="mono" style="color:var(--lime)">What the free account includes</span>
+        <div class="display" style="font-size:clamp(26px,3vw,40px);line-height:1.04">Validation is free. Forever. Not a trial.</div>
+        <div class="auth-visual__features">
+          <div><span class="mono" style="color:var(--lime)">01</span><span>Eight-agent validation DAG, unlimited ideas <span style="color:var(--on-dark-dim)">— one of the agents is hostile by design.</span></span></div>
+          <div><span class="mono" style="color:var(--lime)">02</span><span>Build / Pivot / Kill verdict <span style="color:var(--on-dark-dim)">— with the top three arguments on each side.</span></span></div>
+          <div><span class="mono" style="color:var(--lime)">03</span><span>Bottom-up TAM / SAM / SOM <span style="color:var(--on-dark-dim)">— auditable line by line.</span></span></div>
+          <div><span class="mono" style="color:var(--lime)">04</span><span>Source ledger with retrieval timestamps <span style="color:var(--on-dark-dim)">— unsourced claims are dropped, never guessed.</span></span></div>
+          <div class="auth-visual__features-dim"><span class="mono">05</span><span>Ban Risk Score, 30-day calendar and Story Bank — Stage 2, $20/mo, 25 beta seats.</span></div>
+        </div>
+        <div class="auth-visual__cta">
+          <span class="display" style="font-size:22px;line-height:1.1">Find out tonight.<br>Post on Monday.</span>
+          <span class="mono">~90 SEC<br>RUNTIME</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<script src="auth.js"></script>
+</body>
+</html>

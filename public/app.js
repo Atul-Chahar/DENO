@@ -183,7 +183,7 @@ function renderValidationReport(report) {
     div.className = 'competitor-card';
     div.innerHTML = `
       <h4><a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a> · <span style="font-weight:400;color:var(--text-muted);">${c.pricing}</span></h4>
-      <p style="font-size:0.85rem;color:var(--text-secondary);"><strong style="color:#c4b5fd;">Gaps:</strong> ${c.exploitable_gaps.join(', ')}</p>
+      <p style="font-size:0.85rem;color:var(--text-secondary);"><strong style="color:var(--accent-violet);">Gaps:</strong> ${c.exploitable_gaps.join(', ')}</p>
     `;
     compList.appendChild(div);
   });
@@ -221,7 +221,7 @@ function renderCommunities(communities) {
       <div class="rule-row"><span class="rule-label">Gate:</span> <span>${c.karma_age_gate}</span></div>
       <div class="rule-row"><span class="rule-label">Self-Promo:</span> <span>${c.self_promo_rule}</span></div>
       <div class="rule-row"><span class="rule-label">Cadence:</span> <span>${c.max_posting_frequency}</span></div>
-      <p style="font-size:0.8rem;color:#fca5a5;margin-top:0.5rem;"><strong style="color:var(--text-muted)">AI Rule:</strong> ${c.ai_content_policy}</p>
+      <p style="font-size:0.8rem;color:var(--accent-crimson);margin-top:0.5rem;"><strong style="color:var(--text-muted)">AI Rule:</strong> ${c.ai_content_policy}</p>
     `;
     grid.appendChild(div);
   });
