@@ -6,11 +6,20 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator, with_config
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    field_validator,
+    model_validator,
+    with_config,
+)
 
 from deno_core.db import models as m
 from deno_core.db.enums import ProjectStatus, RunStatus, Source, Stance, TakedownStatus, VerdictKind
-from deno_core.text import CleanText
+from deno_core.text import CleanText, clean_text
 
 
 class _Out(BaseModel):
@@ -56,11 +65,11 @@ class ProjectCreate(BaseModel):
         pattern=IDEA_PATTERN,
         description="The idea in plain words, or a landing-page URL",
     )
-    author_handle: CleanText | None = Field(default=None, max_length=64)
+    author_handle: Annotated[str, Field(max_length=64), AfterValidator(clean_text)] | None = Field(default=None)
 
 
 class ProjectPatch(BaseModel):
-    title: CleanText | None = Field(default=None, min_length=1, max_length=200)
+    title: Annotated[str, Field(min_length=1, max_length=200), AfterValidator(clean_text)] | None = Field(default=None)
     status: Literal[ProjectStatus.ARCHIVED, ProjectStatus.DRAFT] | None = None
 
 
@@ -278,10 +287,12 @@ class QualityWeights(TypedDict, total=False):
 class MeUpdate(BaseModel):
     """Only the fields you send change. The email is managed by the login provider, not here."""
 
-    display_name: CleanText | None = Field(default=None, max_length=120)
-    product_name: CleanText | None = Field(default=None, max_length=120)
-    product_url: CleanText | None = Field(default=None, max_length=500)
-    timezone: CleanText | None = Field(default=None, max_length=64, description="IANA name, e.g. Asia/Kolkata")
+    display_name: Annotated[str, Field(max_length=120), AfterValidator(clean_text)] | None = Field(default=None)
+    product_name: Annotated[str, Field(max_length=120), AfterValidator(clean_text)] | None = Field(default=None)
+    product_url: Annotated[str, Field(max_length=500), AfterValidator(clean_text)] | None = Field(default=None)
+    timezone: Annotated[str, Field(max_length=64), AfterValidator(clean_text)] | None = Field(
+        default=None, description="IANA name, e.g. Asia/Kolkata"
+    )
     founder_role: Literal["solo_founder", "co_founder", "indie_hacker", "founding_marketer"] | None = None
     handles: list[Handle] | None = Field(default=None, max_length=10)
     voice_preset: Literal["terse_engineer", "build_in_public", "dry_humour", "data_first", "storyteller"] | None = None
@@ -311,14 +322,16 @@ class MeUpdate(BaseModel):
 
 
 class TakedownCreate(BaseModel):
-    url: CleanText | None = Field(
-        default=None, max_length=2048, pattern=r"^https?://\S+$", description="The post to remove"
+    url: Annotated[str, Field(max_length=2048, pattern=r"^https?://\S+$"), AfterValidator(clean_text)] | None = Field(
+        default=None, description="The post to remove"
     )
-    author_handle: CleanText | None = Field(
-        default=None, max_length=128, pattern=r"^@?[\w.\-]{1,127}$", description="Remove everything by this author"
-    )
+    author_handle: (
+        Annotated[str, Field(max_length=128, pattern=r"^@?[\w.\-]{1,127}$"), AfterValidator(clean_text)] | None
+    ) = Field(default=None, description="Remove everything by this author")
     reason: CleanText = Field(min_length=3, max_length=2000)
-    contact: CleanText | None = Field(default=None, max_length=320, description="Where we can confirm the outcome")
+    contact: Annotated[str, Field(max_length=320), AfterValidator(clean_text)] | None = Field(
+        default=None, description="Where we can confirm the outcome"
+    )
 
     @model_validator(mode="after")
     def _has_target(self) -> TakedownCreate:

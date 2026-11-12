@@ -81,7 +81,7 @@ Legend for the **Prod** column: 🔒 = a secret Vercel env var, `—` = not set 
 | Variable | Default | Prod | Purpose |
 |---|---|---|---|
 | `WEB_SEARCH_PROVIDER` | `exa` | `exa` | `site:` discovery for X, LinkedIn posts, Product Hunt: `exa` (no key needed), `brave`, `searxng` (local), or `none`. Exa has no X index: tweets are found through mirror pages, so X coverage is thin without `brave` |
-| `EXA_API_KEY` | empty | 🔒 recommended | Raises Exa's rate limit (keyless answers 429 to bursts, per IP; capped at 600 searches a day here) |
+| `EXA_API_KEY` | empty | 🔒 recommended | With a key, searches go to Exa's documented API (`api.exa.ai/search`, billed per request, own rate limit). Without one, the keyless hosted endpoint (`mcp.exa.ai`), rate limited per shared IP. Capped at 600 searches a day here |
 | `BRAVE_SEARCH_API_KEY` | empty | 🔒 when used | Brave Search API key (~1,000 queries a month on the free credit; capped at 30 a day) |
 | `SEARXNG_URL` | `http://127.0.0.1:8890` | — | A local SearXNG, only with `WEB_SEARCH_PROVIDER=searxng` |
 | `SOURCES_ROBOTS_OPT_IN` | empty | — | Hosts fetched even though robots.txt disallows bots. **Only after legal review** |

@@ -10,7 +10,7 @@ import pytest
 import respx
 
 from deno_sources import AccessDenied, SourceConfig, SourceName, SourceUnavailable, build_clients, build_fetcher
-from deno_sources.base import EXA_MCP_URL, ExaSearchClient
+from deno_sources.base import EXA_API_URL, EXA_MCP_URL, ExaSearchClient
 from deno_sources.linkedin import parse_exa_post
 from deno_sources.registry import build_web_search
 
@@ -99,12 +99,39 @@ async def test_x_is_searched_through_tweet_mirrors() -> None:
 
 
 @respx.mock
-async def test_api_key_is_sent_when_configured() -> None:
-    route = respx.post(EXA_MCP_URL).respond(200, text=found({"results": []}))
+async def test_with_a_key_the_documented_search_api_is_used() -> None:
+    keyless = respx.post(EXA_MCP_URL).respond(200, text=found({"results": []}))
+    route = respx.post(EXA_API_URL).respond(
+        200,
+        json={
+            "results": [
+                {
+                    "url": "https://www.producthunt.com/products/churnkey",
+                    "title": "Churnkey",
+                    "text": "Cancel flows that save customers.",
+                    "publishedDate": "2026-10-01T00:00:00.000Z",
+                }
+            ]
+        },
+    )
     cfg, fetcher = setup(web_search_api_key="exa-key")
-    client = build_web_search(cfg, fetcher)
-    assert await client.search("site:producthunt.com churn") == []
-    assert route.calls[0].request.headers["x-api-key"] == "exa-key"
+    results = await build_web_search(cfg, fetcher).search("site:producthunt.com churn", time_range="year")
+    assert [r["url"] for r in results] == ["https://www.producthunt.com/products/churnkey"]
+    assert results[0]["full_text"] == "Cancel flows that save customers."
+    request = route.calls[0].request
+    assert request.headers["x-api-key"] == "exa-key"
+    body = json.loads(request.content)
+    assert body["includeDomains"] == ["producthunt.com"] and body["query"] == "churn"
+    assert body["contents"]["text"]["maxCharacters"] > 0 and "startPublishedDate" in body
+    assert not keyless.called
+
+
+@respx.mock
+async def test_a_keyed_search_error_is_unavailable_not_empty() -> None:
+    respx.post(EXA_API_URL).respond(402, json={"error": "out of credits"})
+    cfg, fetcher = setup(web_search_api_key="exa-key")
+    with pytest.raises(SourceUnavailable):
+        await build_web_search(cfg, fetcher).search("site:linkedin.com/posts churn")
 
 
 @respx.mock
