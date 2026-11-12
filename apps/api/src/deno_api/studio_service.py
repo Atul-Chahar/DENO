@@ -412,7 +412,7 @@ async def save_version(
                 text=f"{f['message']} → {f['fix']}",
                 tags=["check", f["severity"]],
                 author="system",
-                **film.locate(float(f["t"])),
+                **_strip_locate(film.locate(float(f["t"]))),
             )
     return {
         "item_id": str(item.id),
