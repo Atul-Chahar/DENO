@@ -101,6 +101,8 @@ class Settings(BaseSettings):
     stripe_secret_key: SecretStr = SecretStr("")
     stripe_webhook_secret: SecretStr = SecretStr("")
     stripe_price_pro: str = ""  # price_… for the Pro monthly subscription
+    # Public URL of this API: the MCP server's OAuth resource identifier is "<api_url>/mcp" (docs/16).
+    api_url: str = "http://localhost:8000"
     app_url: str = "http://localhost:3000"  # where Stripe sends people back after checkout / portal
 
     # --- Observability (ADR-013) ---

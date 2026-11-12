@@ -15,6 +15,7 @@ from deno_api import cron
 from deno_api.errors import install_error_handlers
 from deno_api.health import register_readiness_check
 from deno_api.health import router as health_router
+from deno_api.mcp_server import build_mcp
 from deno_api.middleware import BodySizeLimitMiddleware, RequestContextMiddleware
 from deno_api.v1 import billing, content, me, projects, runs, takedowns
 from deno_api.v1.schemas import ERROR_RESPONSES
@@ -48,8 +49,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await redis.ping()
 
         register_readiness_check("valkey", valkey_ready)
+    mcp = getattr(app.state, "mcp", None)
     try:
-        yield
+        if mcp is not None:
+            async with mcp.session_manager.run():  # the MCP endpoint's task group (stateless; docs/16)
+                yield
+        else:
+            yield
     finally:
         if engine is not None:
             await engine.dispose()
@@ -82,6 +88,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(v1)
     app.include_router(health_router)
     app.include_router(cron.router)
+
+    # MCP server for the founder's own Claude/ChatGPT (docs/16). Mounted last, so every API route matches first.
+    mcp_parts = build_mcp(app, settings)
+    app.state.mcp = mcp_parts[0] if mcp_parts else None
+    if mcp_parts:
+        app.mount("/", mcp_parts[1])
 
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.request_max_bytes)
     # Browsers normally reach the API through the Next.js /api rewrite (same
