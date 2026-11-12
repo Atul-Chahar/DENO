@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deno Studio still</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="brand.css">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--body); }
+  .page { position: absolute; inset: 0; padding: 9%; box-sizing: border-box; display: none; flex-direction: column; justify-content: center; gap: 4%; }
+  .page h1 { font-family: var(--display); font-weight: 400; font-size: calc(var(--h) * 0.075); line-height: 1.02; margin: 0; letter-spacing: -0.02em; }
+  .page p { font-size: calc(var(--h) * 0.032); line-height: 1.35; margin: 0; }
+  .num { font-family: var(--mono); font-size: calc(var(--h) * 0.022); letter-spacing: 0.1em; }
+  .mark { background: var(--accent); padding: 0 0.1em; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <section class="page"><div class="num">01</div><h1>The pain, in your <span class="mark">customer's words</span>.</h1></section>
+  <section class="page"><div class="num">02</div><h1>One idea per page.</h1><p>From your validated evidence or your Story Bank. Under 25 words.</p></section>
+  <section class="page"><div class="num">03</div><h1>What to do next.</h1><p>yourproduct.com</p></section>
+</div>
+<script type="module">
+  // Stills: window.PAGES pages; seek(p) shows page p. `studio still --pdf` renders PNGs and a carousel PDF.
+  import { stage } from './lib/stage.js';
+  stage();
+  const pages = [...document.querySelectorAll('.page')];
+  window.PAGES = pages.length;
+  window.DURATION = 0;
+  window.seek = (p) => pages.forEach((el, i) => (el.style.display = i === Math.round(p) ? 'flex' : 'none'));
+  window.ready = document.fonts.ready.then(() => window.seek(Number(new URLSearchParams(location.search).get('t')) || 0));
+</script>
+</body>
+</html>

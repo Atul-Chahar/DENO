@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+// On the Bash PATH while the deno-studio plugin is enabled. CommonJS on purpose (works on any Node 22+), loads the
+// ESM kit next to this file.
+const fs = require('node:fs');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+const here = path.dirname(fs.realpathSync(__filename));
+import(pathToFileURL(path.join(here, '..', 'kit', 'cli.mjs')).href).catch((err) => {
+  process.stderr.write(`studio: ${err.message}\n`);
+  process.exit(1);
+});

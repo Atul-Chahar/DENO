@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deno Studio film</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="brand.css">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--body); }
+  .layer { position: absolute; inset: 0; }
+  .hook { position: absolute; left: 8%; right: 8%; top: 38%; font-family: var(--display); font-size: calc(var(--h) * 0.075); line-height: 1.02; letter-spacing: -0.02em; }
+  .hook b { background: var(--accent); font-weight: inherit; padding: 0 0.12em; }
+  .card { position: absolute; left: 50%; top: 50%; width: 60%; padding: calc(var(--h) * 0.04); border: 3px solid var(--ink); background: var(--paper); box-shadow: 14px 14px 0 var(--ink); font-size: calc(var(--h) * 0.04); }
+  .name { position: absolute; left: 0; right: 0; top: 44%; text-align: center; font-family: var(--display); font-size: calc(var(--h) * 0.09); }
+  .url { position: absolute; left: 0; right: 0; top: 58%; text-align: center; font-family: var(--mono); font-size: calc(var(--h) * 0.03); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="layer" id="s1"><div class="hook" id="hook">Your PRs wait <b>three days</b><br>for a review.</div></div>
+  <div class="layer" id="s2"><div class="card" id="card">Replace this sample with your treatment.</div></div>
+  <div class="layer" id="s3"><div class="name" id="name">yourproduct</div><div class="url" id="url">yourproduct.com</div></div>
+</div>
+<script type="module">
+  // A sample film so `studio render` works right after `studio init`. Replace it with the treatment's shots.
+  // Rule: everything below is a pure function of t. See CLAUDE.md.
+  import { stage, film } from './lib/stage.js';
+  import { spring, track, local, TYPE, UI, ramp } from './lib/motion.js';
+
+  stage();
+  const DURATION = 6;
+  const $ = (id) => document.getElementById(id);
+  const shots = [['s1', 0, 2.4], ['s2', 2.4, 4.4], ['s3', 4.4, 6]];
+
+  function seek(t) {
+    for (const [id, a, b] of shots) $(id).style.display = local(t, a, b) === null ? 'none' : 'block';
+    const t1 = local(t, 0, 2.4);
+    if (t1 !== null) {
+      const p = spring(t1, ...TYPE);
+      $('hook').style.transform = `translateY(${(1 - p) * 40}px)`;
+      $('hook').style.opacity = String(Math.min(1, 0.55 + p)); // readable from the first frame: open on the hook
+    }
+    const t2 = local(t, 2.4, 4.4);
+    if (t2 !== null) {
+      const x = track(t2, [[0, 12], [0, 0]], ...UI);
+      $('card').style.transform = `translate(-50%, -50%) translateX(${x}%)`;
+    }
+    const t3 = local(t, 4.4, 6);
+    if (t3 !== null) {
+      $('name').style.transform = `scale(${0.9 + 0.1 * spring(t3, ...TYPE)})`;
+      $('url').style.opacity = String(ramp(t3, 0.4, 0.8));
+    }
+  }
+
+  film({
+    duration: DURATION,
+    seek,
+    chapters: [{ id: 'hook', start: 0, end: 2.4 }, { id: 'product', start: 2.4, end: 4.4 }, { id: 'name', start: 4.4, end: 6 }],
+    cues: [{ t: 0.05, kind: 'thump' }, { t: 2.4, kind: 'whoosh' }, { t: 4.4, kind: 'chime' }],
+  });
+</script>
+</body>
+</html>

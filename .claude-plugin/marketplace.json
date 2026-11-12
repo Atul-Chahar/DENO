@@ -1,0 +1,12 @@
+{
+  "name": "deno",
+  "owner": { "name": "Deno", "url": "https://deno-web-eight.vercel.app" },
+  "description": "Deno's Claude Code plugins.",
+  "plugins": [
+    {
+      "name": "deno-studio",
+      "source": "./plugin",
+      "description": "Launch videos, reels, carousels and posts from your validated idea, rendered on your machine and reviewed on your Deno dashboard."
+    }
+  ]
+}

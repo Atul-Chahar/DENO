@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "deno": {
+      "type": "http",
+      "url": "https://deno-api-swart.vercel.app/mcp"
+    }
+  }
+}
