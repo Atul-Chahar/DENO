@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, Response, status
+from pydantic import ValidationError
 
 from deno_api.auth import AuthUser, current_user
 from deno_api.deps import Scope
@@ -15,6 +16,23 @@ from deno_core.settings import get_settings
 
 router = APIRouter(prefix="/me", tags=["account"])
 log = get_logger(__name__)
+
+
+def _stored_handles(raw: Any) -> list[Handle]:
+    """The saved handles that are still valid.
+
+    A row saved before a rule tightened must not turn every GET /me into a 500: the founder
+    couldn't even open the page to remove it. An unusable handle is left out instead.
+    """
+    handles: list[Handle] = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            handles.append(Handle.model_validate(item))
+        except ValidationError:
+            log.warning("stored_handle_skipped", platform=str(item.get("platform")))
+    return handles
 
 
 def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
@@ -28,7 +46,7 @@ def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
         product_url=profile.product_url,
         timezone=profile.timezone,
         founder_role=profile.founder_role,
-        handles=[Handle.model_validate(h) for h in profile.handles or [] if isinstance(h, dict)],
+        handles=_stored_handles(profile.handles),
         voice_preset=profile.voice_preset,
         notification_prefs={k: bool(v) for k, v in (profile.notification_prefs or {}).items()},
     )
