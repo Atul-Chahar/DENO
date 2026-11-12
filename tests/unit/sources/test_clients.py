@@ -8,7 +8,7 @@ import httpx
 import pytest
 import respx
 
-from deno_sources import SourceConfig, SourceName, build_clients, build_fetcher
+from deno_sources import SourceConfig, SourceName, SourceUnavailable, build_clients, build_fetcher
 from deno_sources.feeds import parse_producthunt_atom, parse_trends_rss
 from deno_sources.hn import parse_hit
 from deno_sources.linkedin import parse_job_cards, parse_post_page
@@ -273,3 +273,109 @@ async def test_reddit_client_keeps_posts_with_query_words_close_together() -> No
     respx.get("https://arctic-shift.photon-reddit.com/api/posts/search").respond(200, json={"data": []})
     posts = await clients()[SourceName.REDDIT].search("ball speed tracking")
     assert sorted(p.text for p in posts) == sorted(items[i]["body"] for i in (0, 1))
+
+
+@respx.mock
+async def test_reddit_rides_out_arctic_shift_overload_with_jittered_backoff() -> None:
+    """Arctic Shift answers 422 "Timeout. Maybe slow down a bit" for roughly half of all requests
+    (measured 2026-10-22), so recovering from it is the normal path, not an edge case. The delays
+    are jittered because collection runs several searches at once and must not retry in lockstep."""
+    overload = httpx.Response(422, json={"data": None, "error": "Timeout. Maybe slow down a bit"})
+    respx.get("https://arctic-shift.photon-reddit.com/api/comments/search").mock(
+        side_effect=[overload, overload, httpx.Response(200, json=jfixture("arctic_comments.json"))]
+    )
+    respx.get("https://arctic-shift.photon-reddit.com/api/posts/search").respond(
+        200, json=jfixture("arctic_posts.json")
+    )
+    waits: list[float] = []
+
+    async def record(seconds: float) -> None:
+        waits.append(seconds)
+
+    config = SourceConfig(searxng_url="http://searxng:8080", subreddits=["SaaS"])
+    fetcher = build_fetcher(config, resolver=public, transport=httpx.AsyncHTTPTransport(), sleep=record)
+    posts = await build_clients(config, fetcher)[SourceName.REDDIT].search(
+        "churn", since=datetime(2026, 1, 1, tzinfo=UTC)
+    )
+
+    assert {p.kind for p in posts} == {"comment", "post"}, "the overloaded comments call must recover, not be lost"
+    assert len(waits) == 2, f"expected two backoffs before success, got {waits}"
+    assert 2.0 <= waits[0] < 3.0, waits  # base delay plus jitter, never shorter than the base
+    assert 5.0 <= waits[1] < 7.5, waits
+
+
+@respx.mock
+async def test_reddit_that_stays_overloaded_reports_unavailable_not_zero_posts() -> None:
+    """An outage must surface as an error: an empty list reads as "nobody talks about this" and the
+    founder gets told their idea has no evidence (the collector turns the error into a retry)."""
+    overload = httpx.Response(422, json={"data": None, "error": "Timeout. Maybe slow down a bit"})
+    respx.get("https://arctic-shift.photon-reddit.com/api/comments/search").mock(return_value=overload)
+    respx.get("https://arctic-shift.photon-reddit.com/api/posts/search").mock(return_value=overload)
+    with pytest.raises(SourceUnavailable, match="HTTP 422"):
+        await clients()[SourceName.REDDIT].search("churn", since=datetime(2026, 1, 1, tzinfo=UTC))
+
+
+@respx.mock
+async def test_reddit_keeps_partial_results_when_one_endpoint_answers() -> None:
+    overload = httpx.Response(422, json={"data": None, "error": "Timeout. Maybe slow down a bit"})
+    respx.get("https://arctic-shift.photon-reddit.com/api/comments/search").mock(return_value=overload)
+    respx.get("https://arctic-shift.photon-reddit.com/api/posts/search").respond(
+        200, json=jfixture("arctic_posts.json")
+    )
+    posts = await clients()[SourceName.REDDIT].search("churn", since=datetime(2026, 1, 1, tzinfo=UTC))
+    assert posts and {p.kind for p in posts} == {"post"}
+
+
+@respx.mock
+async def test_hn_and_searxng_outages_raise_instead_of_returning_nothing() -> None:
+    respx.get("https://hn.algolia.com/api/v1/search").respond(503)
+    respx.get("http://searxng:8080/search").respond(429)
+    c = clients()
+    with pytest.raises(SourceUnavailable, match="HTTP 503"):
+        await c[SourceName.HN].search("churn")
+    with pytest.raises(SourceUnavailable, match="HTTP 429"):
+        await c[SourceName.X].search("churn")
+
+
+BLOCKED_SEARXNG = {
+    "query": "site:x.com churn",
+    "results": [],
+    "unresponsive_engines": [["brave", "too many requests"], ["duckduckgo", "CAPTCHA"]],
+}
+
+
+@respx.mock
+async def test_blocked_search_engines_are_reported_not_mistaken_for_no_posts() -> None:
+    """SearXNG answers HTTP 200 with no results when its engines are CAPTCHA'd. Treating that as
+    "nobody talks about this" made a blocked server look like a verdict about the idea."""
+    from deno_sources import SourceUnavailable
+
+    respx.get("http://searxng:8080/search").respond(200, json=BLOCKED_SEARXNG)
+    with pytest.raises(SourceUnavailable, match=r"search engines blocked: brave \(too many requests\), duckduckgo"):
+        await clients()[SourceName.X].search("churn")
+
+
+@respx.mock
+async def test_a_blocked_search_is_not_cached() -> None:
+    """Search results are cached for 24 h. Caching a blocked answer kept returning nothing for a day
+    after the block lifted - and made a retry pointless."""
+    from deno_sources import SourceUnavailable
+
+    route = respx.get("http://searxng:8080/search").respond(200, json=BLOCKED_SEARXNG)
+    x = clients()[SourceName.X]
+    for _ in range(2):
+        with pytest.raises(SourceUnavailable):
+            await x.search("churn")
+    assert route.call_count == 2, "the second search must reach SearXNG again, not the cache"
+
+
+@respx.mock
+async def test_a_genuinely_empty_search_is_still_cached_and_quiet() -> None:
+    """No results with every engine answering is a real answer: cache it, and don't raise."""
+    route = respx.get("http://searxng:8080/search").respond(
+        200, json={"query": "site:x.com churn", "results": [], "unresponsive_engines": []}
+    )
+    x = clients()[SourceName.X]
+    assert await x.search("churn") == []
+    assert await x.search("churn") == []
+    assert route.call_count == 1

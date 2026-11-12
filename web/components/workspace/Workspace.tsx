@@ -14,13 +14,17 @@ import {
   type Brief,
   type Claim,
   type Community,
+  type Draft,
   type GateLayer,
   type GatePlatform,
   type Plan,
   type Project,
+  type QualityDimension,
+  type QualityTrend,
   type Run,
   type Report,
   type StreamEvent,
+  type StudioEdit,
 } from '@/lib/api';
 
 type Screen = 0 | 1 | 2 | 3;
@@ -219,7 +223,7 @@ export function Workspace() {
 const STAGES: { label: string; nodes: string[] }[] = [
   { label: 'Idea Intake', nodes: ['intake'] },
   { label: 'Research Planner', nodes: ['perspective_planner', 'query_planner'] },
-  { label: 'Source Collectors', nodes: ['collect'] },
+  { label: 'Source Collectors', nodes: ['collect', 'broaden'] },
   { label: 'Evidence Index', nodes: ['ingest', 'coverage_check'] },
   { label: 'Seven Analysts', nodes: ['analyst'] },
   { label: 'Citation Judge', nodes: ['citation_validator'] },
@@ -233,6 +237,7 @@ const NODE_TEXT: Record<string, string> = {
   collect: 'collecting public posts',
   ingest: 'indexing the evidence',
   coverage_check: 'checking there is enough evidence to judge',
+  broaden: 'evidence was thin, widening the search once',
   analyst: 'analysts reading the evidence',
   citation_validator: 'checking every claim against the post it cites',
   signal_scorer: 'computing signals from the evidence',
@@ -790,28 +795,216 @@ const PLATFORM_LINKS: Record<string, string> = {
   x: 'https://x.com/compose/post',
 };
 
+const DIMENSION_LABELS: Record<string, string> = {
+  hook_strength: 'Hook strength',
+  specificity: 'Specificity',
+  voice_authenticity: 'Voice authenticity',
+  platform_fit: 'Platform fit',
+  engagement_potential: 'Engagement potential',
+  story_grounding: 'Story grounding',
+  slop_cleanliness: 'Slop cleanliness',
+  readability: 'Readability',
+  originality: 'Originality',
+  community_compliance: 'Community compliance',
+};
+
+function dimensionLabel(name: string): string {
+  return DIMENSION_LABELS[name] ?? name.replace(/_/g, ' ');
+}
+
+/**
+ * Ten dimensions, one measure (0–10): a horizontal bar per dimension, one ink hue for all of
+ * them, with the pass bar drawn once as a reference line. Deliberately not a radar chart — radar
+ * distorts magnitude by area and makes the axis order look meaningful when it isn't.
+ *
+ * State (meets the bar / below it) is carried by the printed score and a "BELOW BAR" tag, never
+ * by hue alone: this palette's green↔red pair is ΔE 4.6 under protanopia, i.e. indistinguishable.
+ */
+function QualityPanel({
+  score,
+  explanation,
+  dimensions,
+  threshold,
+  stale,
+}: {
+  score: number;
+  explanation: string | null;
+  dimensions: QualityDimension[];
+  threshold: number;
+  stale: boolean;
+}) {
+  const tone = scoreTone(score * 10);
+  return (
+    <div style={{ padding: 'clamp(18px,2.4vw,28px) clamp(14px,2vw,22px)', borderBottom: '1.5px solid var(--ink)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div className="dv-label" style={{ margin: 0 }}>QUALITY VERIFICATION</div>
+        <span className="dv-mono dv-muted" style={{ fontSize: 10 }}>
+          {stale ? 'SCORED BEFORE YOUR EDIT · SAVE TO RE-SCORE' : `BAR ${threshold}/10 · WEIGHTED OVER 10 DIMENSIONS`}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, flexWrap: 'wrap' }}>
+        <span
+          className="dv-mono"
+          style={{ display: 'flex', alignItems: 'baseline', gap: 4, border: '1.5px solid var(--ink)', background: tone.bg, padding: '6px 10px', flex: 'none' }}
+        >
+          <span className="dv-serif" style={{ fontSize: 28, lineHeight: 1 }}>{score.toFixed(1)}</span>
+          <span style={{ fontSize: 11 }}>/10</span>
+        </span>
+        <span className="dv-mono" style={{ fontSize: 11, fontWeight: 700, color: score >= threshold ? 'var(--green)' : 'var(--red-ink)', flex: 'none' }}>
+          {score >= threshold ? 'MEETS THE BAR' : 'BELOW THE BAR'}
+        </span>
+        {explanation && <span style={{ fontSize: 13, lineHeight: 1.45, minWidth: 0, flex: 1 }}>{explanation}</span>}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {dimensions.map((d) => {
+          const below = d.score < threshold;
+          return (
+            <div key={d.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(96px,150px) 1fr auto', gap: 10, alignItems: 'center' }}>
+              <span className="dv-mono" style={{ fontSize: 10.5, color: 'var(--muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {dimensionLabel(d.name).toUpperCase()}
+              </span>
+              <span
+                title={d.flaws.length ? d.flaws.join(' · ') : `${dimensionLabel(d.name)} ${d.score.toFixed(1)}/10 · weight ${d.weight}×`}
+                style={{ position: 'relative', display: 'block', height: 14, background: 'var(--paper-2)', border: '1px solid rgba(16,22,19,.18)', minWidth: 0 }}
+              >
+                <span style={{ display: 'block', height: '100%', width: `${Math.max(0, Math.min(100, d.score * 10))}%`, background: below ? 'var(--ink-3)' : 'var(--ink)' }} />
+                {/* The pass bar, per row so each bar can be read against it. Drawn as a paper
+                    notch with an ink edge rather than a tinted line: a line dark enough to read
+                    on the empty track disappears into the near-black fill, and vice versa. */}
+                <span
+                  aria-hidden
+                  style={{ position: 'absolute', top: -2, bottom: -2, left: `${threshold * 10}%`, width: 2, marginLeft: -1, background: 'var(--paper)', boxShadow: '0 0 0 1px var(--ink)' }}
+                />
+              </span>
+              <span className="dv-mono" style={{ fontSize: 10.5, fontWeight: 700, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>
+                {d.score.toFixed(1)}
+                <span className="dv-muted" style={{ fontWeight: 400 }}>/10</span>
+                {below && <span style={{ color: 'var(--red-ink)' }}> ↓</span>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {dimensions.some((d) => d.flaws.length > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
+          {dimensions
+            .filter((d) => d.flaws.length > 0)
+            .map((d) => (
+              <div key={d.name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--paper-2)', border: '1px solid rgba(16,22,19,.18)', padding: '9px 12px' }}>
+                <span className="dv-mono" style={{ fontSize: 10, fontWeight: 700, flex: 'none', paddingTop: 2 }}>{d.score.toFixed(1)}</span>
+                <span style={{ fontSize: 12.5, lineHeight: 1.45, minWidth: 0 }}>
+                  <span className="dv-mono" style={{ fontSize: 10.5 }}>{dimensionLabel(d.name).toUpperCase()}</span>{' '}
+                  <span className="dv-muted">→ {d.flaws.join(' · ')}</span>
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One measure over time: a 2px line, last point marked, value printed. No per-point markers. */
+function QualitySparkline({ scores }: { scores: number[] }) {
+  if (scores.length < 2) return null;
+  const w = 260;
+  const h = 34;
+  const pad = 3;
+  const pts = scores.map((s, i) => {
+    const x = pad + (i * (w - pad * 2)) / (scores.length - 1);
+    const y = pad + (1 - Math.max(0, Math.min(10, s)) / 10) * (h - pad * 2);
+    return [x, y] as const;
+  });
+  const last = pts[pts.length - 1];
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Last ${scores.length} quality scores, oldest to newest`} style={{ display: 'block', maxWidth: '100%' }}>
+      <polyline points={pts.map(([x, y]) => `${x},${y}`).join(' ')} fill="none" stroke="var(--ink)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={last[0]} cy={last[1]} r={4} fill="var(--ink)" stroke="var(--paper)" strokeWidth={2} />
+    </svg>
+  );
+}
+
+const TREND_COPY: Record<'improving' | 'stable' | 'declining', string> = {
+  improving: '↑ IMPROVING',
+  stable: '→ STABLE',
+  declining: '↓ DECLINING',
+};
+
+function QualityTrendBlock({ trend }: { trend: QualityTrend }) {
+  if (trend.total_drafts === 0) return null;
+  // items are newest-first; the sparkline reads oldest → newest.
+  const scores = trend.items.map((i) => i.quality_score).reverse();
+  return (
+    <div style={{ padding: 'clamp(18px,2.4vw,28px) clamp(14px,2vw,22px)', background: 'var(--paper-2)', borderBottom: '1.5px solid var(--ink)' }}>
+      <div className="dv-label" style={{ marginBottom: 12 }}>QUALITY OVER YOUR LAST {trend.total_drafts} DRAFT{trend.total_drafts === 1 ? '' : 'S'}</div>
+      <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ flex: 'none' }}>
+          <span className="dv-serif" style={{ fontSize: 26, lineHeight: 1 }}>{trend.avg_score?.toFixed(1) ?? '—'}</span>
+          <span className="dv-mono dv-muted" style={{ fontSize: 10, display: 'block', marginTop: 4 }}>AVERAGE</span>
+        </span>
+        <span style={{ flex: 'none' }}>
+          <span className="dv-mono" style={{ fontSize: 13, fontWeight: 700 }}>{trend.trend ? TREND_COPY[trend.trend] : '—'}</span>
+          <span className="dv-mono dv-muted" style={{ fontSize: 10, display: 'block', marginTop: 4 }}>
+            {trend.trend ? 'RECENT HALF VS OLDER HALF' : 'NEEDS 6 SCORED DRAFTS'}
+          </span>
+        </span>
+        <span style={{ flex: 'none' }}>
+          <span className="dv-mono" style={{ fontSize: 13, fontWeight: 700 }}>{trend.adaptive_threshold}/10</span>
+          <span className="dv-mono dv-muted" style={{ fontSize: 10, display: 'block', marginTop: 4 }}>YOUR CURRENT BAR</span>
+        </span>
+        <span style={{ flex: 'none' }}><QualitySparkline scores={scores} /></span>
+      </div>
+    </div>
+  );
+}
+
 function CalendarScreen({ plan, onPlan, onToast }: { plan: Plan; onPlan: (p: Plan) => void; onToast: (m: string) => void }) {
   const briefs = plan.briefs.filter((b) => b.draft);
   const [selected, setSelected] = useState(0);
   const [content, setContent] = useState(briefs[0]?.draft?.text ?? '');
   const [layers, setLayers] = useState<GateLayer[]>(briefs[0]?.draft?.gates ?? []);
   const [dirty, setDirty] = useState(false);
+  const [quality, setQuality] = useState<Draft | null>(briefs[0]?.draft ?? null);
+  const [trend, setTrend] = useState<QualityTrend | null>(null);
   const debounce = useRef<number | undefined>(undefined);
+  // Bumped whenever the editor's text stops being the one a pending live check was for, so a late
+  // answer can't paint the previous draft's (or an older edit's) findings over the current one.
+  const checkSeq = useRef(0);
   const brief: Brief | undefined = briefs[selected];
 
+  const loadTrend = useCallback(() => {
+    api.qualityHistory().then(setTrend).catch(() => undefined);
+  }, []);
+  useEffect(loadTrend, [loadTrend]);
+
   function load(i: number) {
+    window.clearTimeout(debounce.current);
+    checkSeq.current += 1;
     setSelected(i);
     setDirty(false);
     setContent(briefs[i]?.draft?.text ?? '');
     setLayers(briefs[i]?.draft?.gates ?? []);
+    setQuality(briefs[i]?.draft ?? null);
   }
 
   function onChange(text: string) {
     setContent(text);
     setDirty(true);
     window.clearTimeout(debounce.current);
+    const draftId = brief?.draft?.id;
+    if (!draftId) return;
+    const seq = ++checkSeq.current;
     debounce.current = window.setTimeout(() => {
-      api.audit(text, brief?.platform === 'reddit' ? 'reddit' : 'linkedin', brief?.community).then((a) => setLayers(a.layers)).catch(() => undefined);
+      // The draft's own gates (story numbers, community rules, voice); not counted against the audit quota.
+      api
+        .checkDraft(draftId, text)
+        .then((l) => {
+          if (seq === checkSeq.current) setLayers(l);
+        })
+        .catch(() => undefined);
     }, 400);
   }
 
@@ -835,11 +1028,21 @@ function CalendarScreen({ plan, onPlan, onToast }: { plan: Plan; onPlan: (p: Pla
   async function save() {
     if (!brief?.draft) return;
     try {
+      window.clearTimeout(debounce.current);
+      checkSeq.current += 1;
       const d = await api.editDraft(brief.draft.id, content);
       setLayers(d.gates);
+      setQuality(d);
       setDirty(false);
       await refresh();
-      onToast(d.status === 'gated' ? 'Saved. Passes every gate.' : 'Saved. Some gates still flag it.');
+      loadTrend();
+      onToast(
+        d.status !== 'gated'
+          ? 'Saved. Some gates still flag it.'
+          : d.quality_score !== null && d.quality_threshold !== null && d.quality_score < d.quality_threshold
+            ? `Saved. Passes every gate, but quality dropped to ${d.quality_score.toFixed(1)}/10.`
+            : 'Saved. Passes every gate.',
+      );
     } catch (err) {
       onToast(err instanceof Error ? err.message : String(err));
     }
@@ -928,6 +1131,17 @@ function CalendarScreen({ plan, onPlan, onToast }: { plan: Plan; onPlan: (p: Pla
           </div>
         </div>
 
+        {quality?.quality_score !== null && quality?.quality_score !== undefined && quality.quality_dimensions && (
+          <QualityPanel
+            score={quality.quality_score}
+            explanation={quality.quality_explanation}
+            dimensions={quality.quality_dimensions}
+            threshold={quality.quality_threshold ?? 7}
+            stale={dirty}
+          />
+        )}
+        {trend && <QualityTrendBlock trend={trend} />}
+
         <div style={{ marginTop: 'auto', padding: '14px clamp(14px,2vw,22px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <span className="dv-mono dv-muted" style={{ fontSize: 10.5 }}>🔒 DENO NEVER POSTS. YOU PRESS SEND.</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -939,6 +1153,11 @@ function CalendarScreen({ plan, onPlan, onToast }: { plan: Plan; onPlan: (p: Pla
               className="dv-btn ghost sm"
               onClick={() => {
                 void navigator.clipboard.writeText(content);
+                if (dirty) {
+                  // The approved version isn't what was copied: don't record it as the exported post.
+                  onToast('Copied your unsaved edit. Save and approve it to mark it as posted.');
+                  return;
+                }
                 if (brief?.draft && brief.draft.status === 'approved') void api.exportDraft(brief.draft.id).then(refresh).catch(() => undefined);
                 onToast('Post copied. You are ready to publish.');
               }}
@@ -960,17 +1179,52 @@ function StudioScreen() {
   const [text, setText] = useState('');
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [edit, setEdit] = useState<StudioEdit | null>(null);
+  const [editing, setEditing] = useState(false);
+  // A suggestion belongs to the exact text and platform it was made for: typing or switching platform
+  // drops it (and any answer still on its way), so "Use this version" can't overwrite newer writing.
+  const editSeq = useRef(0);
+  const community = platform === 'reddit' ? 'r/SaaS' : null;
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   const sentences = text.split(/[.!?]+(\s|$)/).filter((s) => s && s.trim()).length;
 
   async function run(value = text) {
     if (!value.trim()) return;
     try {
-      setAudit(await api.audit(value.trim(), platform, platform === 'reddit' ? 'r/SaaS' : null));
+      setAudit(await api.audit(value.trim(), platform, community));
+      dropEdit();
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  function dropEdit() {
+    editSeq.current += 1;
+    setEdit(null);
+    setEditing(false);
+  }
+
+  async function fixForMe() {
+    const seq = ++editSeq.current;
+    setEditing(true);
+    try {
+      const result = await api.studioEdit(text.trim(), platform, community);
+      if (seq !== editSeq.current) return;
+      setEdit(result);
+      setError(null);
+    } catch (err) {
+      if (seq === editSeq.current) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (seq === editSeq.current) setEditing(false);
+    }
+  }
+
+  function acceptEdit(e: StudioEdit) {
+    setText(e.edited);
+    // The edit was already re-checked by every gate: show that result without spending another audit.
+    setAudit({ passed: e.passed, layers: e.layers, autofixed: e.edited });
+    dropEdit();
   }
 
   const blocking = audit ? blockingFindings(audit.layers) : [];
@@ -990,7 +1244,17 @@ function StudioScreen() {
           <div className="dv-label" style={{ margin: 0, padding: '11px 14px', borderBottom: '1.5px solid var(--ink)', background: 'var(--paper-2)' }}>TARGET PLATFORM</div>
           <div style={{ padding: '12px 14px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {(['reddit', 'linkedin', 'x'] as GatePlatform[]).map((p) => (
-              <button key={p} className={`dv-tab${platform === p ? ' on' : ''}`} style={{ padding: '7px 11px' }} onClick={() => setPlatform(p)}>{p.toUpperCase()}</button>
+              <button
+                key={p}
+                className={`dv-tab${platform === p ? ' on' : ''}`}
+                style={{ padding: '7px 11px' }}
+                onClick={() => {
+                  if (p !== platform) dropEdit();
+                  setPlatform(p);
+                }}
+              >
+                {p.toUpperCase()}
+              </button>
             ))}
           </div>
         </div>
@@ -998,7 +1262,10 @@ function StudioScreen() {
           <div className="dv-label" style={{ margin: 0, padding: '11px 14px', borderBottom: '1.5px solid var(--ink)', background: 'var(--paper-2)' }}>DRAFT TO AUDIT</div>
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (edit || editing) dropEdit();
+            }}
             rows={9}
             placeholder="Paste a post to see exactly what gets flagged and how to fix it..."
             style={{ width: '100%', border: 0, background: 'transparent', padding: '16px 14px', fontFamily: 'var(--sans)', fontSize: 14.5, lineHeight: 1.65, minHeight: 200, color: 'var(--ink-2)', resize: 'vertical', outline: 'none' }}
@@ -1046,6 +1313,43 @@ function StudioScreen() {
                 >
                   Apply safe mechanical fixes → rescore
                 </button>
+              )}
+              {(blocking.length > 0 || warnings.length > 0) && !edit && (
+                <button
+                  className="dv-btn ghost"
+                  style={{ marginTop: 10, width: '100%', boxShadow: 'none', color: 'var(--paper)', borderColor: 'rgba(250,248,243,.5)' }}
+                  disabled={editing}
+                  onClick={() => void fixForMe()}
+                >
+                  {editing ? 'Editing in your voice…' : 'Fix it for me → keeps your voice, lists every change'}
+                </button>
+              )}
+              {edit && (
+                <section aria-label="Suggested edit" style={{ marginTop: 20, border: '1px solid rgba(250,248,243,.3)', padding: 16 }}>
+                  <div className="dv-dark-label" style={{ marginBottom: 10 }}>
+                    SUGGESTED EDIT · {edit.passed ? 'PASSES EVERY GATE' : `${blockingFindings(edit.layers).length} ISSUES LEFT`}
+                  </div>
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '0 0 14px' }}>{edit.edited}</p>
+                  <div className="dv-dark-label" style={{ marginBottom: 8 }}>WHAT CHANGED</div>
+                  <ul style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.55 }}>
+                    {edit.changes.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                  {!edit.passed && (
+                    <ul className="dv-dim" style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.5 }}>
+                      {blockingFindings(edit.layers).map((f, i) => (
+                        <li key={`${f.rule_id}-${i}`}>
+                          {f.message}{f.quote ? `: “${f.quote}”` : ''} → {f.fix}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="dv-btn lime sm" style={{ boxShadow: 'none' }} onClick={() => acceptEdit(edit)}>Use this version</button>
+                    <button className="dv-btn ghost sm" style={{ color: 'var(--paper)', borderColor: 'rgba(250,248,243,.5)' }} onClick={dropEdit}>Keep mine</button>
+                  </div>
+                </section>
               )}
             </>
           )}

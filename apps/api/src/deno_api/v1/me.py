@@ -5,16 +5,40 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 import httpx
-from fastapi import APIRouter, Depends, Response, status
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import ValidationError
 
 from deno_api.auth import AuthUser, current_user
 from deno_api.deps import Scope
+from deno_api.v1.billing import settings_of, stripe_client
 from deno_api.v1.schemas import Handle, MeOut, MeUpdate
+from deno_core.db import models as m
+from deno_core.errors import UpstreamUnavailable
 from deno_core.logging import get_logger
-from deno_core.settings import get_settings
+from deno_core.settings import Settings, get_settings
 
 router = APIRouter(prefix="/me", tags=["account"])
 log = get_logger(__name__)
+# Stripe subscription statuses that no longer bill.
+ENDED = frozenset({"canceled", "incomplete_expired"})
+
+
+def _stored_handles(raw: Any) -> list[Handle]:
+    """The saved handles that are still valid.
+
+    A row saved before a rule tightened must not turn every GET /me into a 500: the founder
+    couldn't even open the page to remove it. An unusable handle is left out instead.
+    """
+    handles: list[Handle] = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            handles.append(Handle.model_validate(item))
+        except ValidationError:
+            log.warning("stored_handle_skipped", platform=str(item.get("platform")))
+    return handles
 
 
 def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
@@ -28,9 +52,11 @@ def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
         product_url=profile.product_url,
         timezone=profile.timezone,
         founder_role=profile.founder_role,
-        handles=[Handle.model_validate(h) for h in profile.handles or [] if isinstance(h, dict)],
+        handles=_stored_handles(profile.handles),
         voice_preset=profile.voice_preset,
         notification_prefs={k: bool(v) for k, v in (profile.notification_prefs or {}).items()},
+        quality_weights=profile.quality_weights,
+        quality_threshold=profile.quality_threshold,
     )
 
 
@@ -61,14 +87,36 @@ async def export_data(scope: Scope) -> dict[str, Any]:
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account(scope: Scope) -> Response:
-    """Hard-delete all your data, then your Supabase login.
+async def delete_account(scope: Scope, request: Request) -> Response:
+    """Cancel any paid subscription, hard-delete all your data, then your Supabase login.
 
     The web client signs out first; access tokens already issued expire on their own (short TTL).
     """
+    await _cancel_subscription(scope, settings_of(request))
     await scope.delete_everything()
     await _delete_auth_user(str(scope.user_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _cancel_subscription(scope: Scope, settings: Settings) -> None:
+    """Stop billing before the account goes: deleting our rows alone left Stripe charging the card.
+
+    Any failure aborts the deletion (nothing is deleted), so the founder can retry instead of ending up
+    erased but still billed.
+    """
+    sub = await scope.session.get(m.Subscription, scope.user_id)
+    if sub is None or not sub.stripe_subscription_id or sub.status in ENDED:
+        return
+    try:
+        await stripe_client(settings).v1.subscriptions.cancel_async(sub.stripe_subscription_id)
+    except stripe.InvalidRequestError as exc:
+        if exc.code != "resource_missing":  # already gone on Stripe's side is fine
+            raise UpstreamUnavailable(
+                "We couldn't cancel your subscription, so nothing was deleted. Try again."
+            ) from exc
+    except (stripe.StripeError, HTTPException) as exc:
+        log.error("subscription_cancel_failed", user_id=str(scope.user_id))
+        raise UpstreamUnavailable("We couldn't cancel your subscription, so nothing was deleted. Try again.") from exc
 
 
 async def _delete_auth_user(user_id: str) -> None:

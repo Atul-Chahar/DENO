@@ -7,12 +7,12 @@ unless an operator opts the host in.
 
 from __future__ import annotations
 
-import asyncio
+import random
 import re
 from datetime import UTC, datetime
 
 from deno_sources.base import SourceClient
-from deno_sources.models import Engagement, Post, SourceName
+from deno_sources.models import Engagement, Post, SourceName, SourceUnavailable
 from deno_sources.net import Fetcher, FetchResult
 from deno_sources.normalize import canonical_url, clean_text, mentions_near, query_stems
 
@@ -118,28 +118,43 @@ class RedditClient(SourceClient):
         anchor = max(terms, key=len)
         stems = query_stems(query)
         posts: list[Post] = []
+        answered, last_status = 0, 0
         for sub in self.subreddits:
             params: dict[str, str | int] = {"subreddit": sub, "limit": 100}
             if since:
                 params["after"] = since.strftime("%Y-%m-%d")
             res = await self._get(f"{API}/comments/search", {**params, "body": anchor})
+            last_status = res.status
             if res.status == 200:
+                answered += 1
                 posts += [p for item in _data(res.json()) if (p := parse_comment(item))]
             res = await self._get(f"{API}/posts/search", {**params, "query": anchor})
+            last_status = res.status
             if res.status == 200:
+                answered += 1
                 posts += [p for item in _data(res.json()) if (p := parse_post(item))]
+        if self.subreddits and not answered:
+            # Still overloaded after the retries: say so, or coverage reads the silence as "nobody posts this".
+            raise SourceUnavailable(f"Arctic Shift answered HTTP {last_status}")
         # Every word, close together: a substring test let "ball" match every post in r/Softball.
         matched = [p for p in posts if mentions_near(p.text, stems, window=20)]
         matched.sort(key=lambda p: p.engagement.score or 0, reverse=True)
         return matched[: limit * max(1, len(self.subreddits))]
 
     async def _get(self, url: str, params: dict[str, str | int]) -> FetchResult:
-        """Arctic Shift reports overload as 422 "Timeout. Maybe slow down a bit": back off and retry twice."""
+        """Arctic Shift reports overload as 422 "Timeout. Maybe slow down a bit": back off and retry twice.
+
+        The delays are jittered because collection now runs several searches at once: without it a
+        burst of 422s would retry in lockstep and hit the same overloaded host together. Measured
+        2026-10-22, ~40-50% of requests answer 422 and successful ones take 0.26-10.4 s, so the
+        retry count stays at two - a third would push one search past ``PER_CALL_TIMEOUT_S``.
+        """
         res = await self.fetcher.get(url, source=self.name, params=params, cache_ttl_s=6 * 3600)
         for delay in (2.0, 5.0):
             if res.status != 422 or "slow down" not in res.text.lower():
                 break
-            await asyncio.sleep(delay)
+            # The fetcher's injected sleep, so tests drive the retry without really waiting.
+            await self.fetcher.sleep(delay + random.uniform(0, delay / 2))  # noqa: S311 — jitter, not crypto
             res = await self.fetcher.get(url, source=self.name, params=params, cache_ttl_s=6 * 3600)
         return res
 

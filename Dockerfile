@@ -26,6 +26,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-default-groups --no-editable
 
 FROM python:3.12-slim AS runtime
+# The base image lags Debian's security fixes (zlib CVE-2026-76844 at the time of writing).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 deno && useradd --system --uid 10001 --gid deno --no-create-home deno
 COPY --from=build --chown=deno:deno /app/.venv /app/.venv
 COPY --from=build --chown=deno:deno /src/migrations /app/migrations

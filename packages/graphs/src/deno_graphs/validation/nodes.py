@@ -14,7 +14,7 @@ import re
 import time
 import uuid
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -38,7 +38,7 @@ from deno_core.settings import Settings
 from deno_graphs.validation import schemas as sc
 from deno_graphs.validation.signals import ClaimView, DocView, compute_signals
 from deno_graphs.validation.state import AnalystResult, CollectResult, ValidationState
-from deno_graphs.validation.verdict import coverage, decide
+from deno_graphs.validation.verdict import coverage, decide, decide_coverage
 from deno_llm import (
     UNTRUSTED_RULE,
     BudgetExceeded,
@@ -53,6 +53,7 @@ from deno_llm import wrap_sources as wrap
 from deno_rag import Analyst, Retriever, analyst_queries, ingest_posts
 from deno_sources import AccessDenied, Fetcher, Post, SourceConfig, SourceName, SourceUnavailable, build_clients
 from deno_sources.github import RepoUnavailable, fetch_repo, find_repo
+from deno_sources.normalize import distinctive_terms
 from deno_sources.website import SiteUnavailable, fetch_site, find_site
 
 log = get_logger(__name__)
@@ -68,6 +69,10 @@ PER_SOURCE_LIMIT = {  # results per query
 }
 MAX_POSTS_PER_SOURCE = 80
 SOURCE_TIMEOUT_S = 90.0
+COLLECT_CONCURRENCY = 5  # in-flight searches per source; the per-host token bucket is the real throttle
+PER_CALL_TIMEOUT_S = 40.0  # one search, including its retries (Arctic Shift backs off twice)
+# Most actionable first: several jobs can now fail at once, and the source reports one error.
+ERROR_PRIORITY = ("blocked_by_policy", "timeout", "slow source", "unavailable", "error")
 ANALYST_FOCUS = {
     Analyst.PAIN: "is the problem real, frequent and painful for the people who have it?",
     Analyst.DEMAND: "are people actively looking for, asking for, or hacking together a solution?",
@@ -191,6 +196,10 @@ async def _link_context(d: GraphDeps, idea: str) -> tuple[str, str | None]:
             log.info("repo_unavailable", repo=f"{owner}/{name}", reason=exc.reason)
             await d.ctx.emit("log", message=f"couldn't read the repo: {exc.reason}")
             problems.append(exc.reason)
+        except Exception as exc:  # the link is optional context: never fail the run over it
+            log.warning("repo_read_failed", repo=f"{owner}/{name}", error=type(exc).__name__)
+            await d.ctx.emit("log", message="couldn't read the repo")
+            problems.append("the repository couldn't be read")
         else:
             log.info("repo_read", repo=repo.slug, readme_chars=len(repo.readme))
             await d.ctx.emit("log", message=f"read {repo.slug}: {len(repo.readme)} README characters")
@@ -204,6 +213,10 @@ async def _link_context(d: GraphDeps, idea: str) -> tuple[str, str | None]:
             log.info("site_unavailable", host=host, reason=exc.reason)
             await d.ctx.emit("log", message=f"couldn't read the website: {exc.reason}")
             problems.append(exc.reason)
+        except Exception as exc:  # the link is optional context: never fail the run over it
+            log.warning("site_read_failed", host=host, error=type(exc).__name__)
+            await d.ctx.emit("log", message="couldn't read the website")
+            problems.append(f"{host} couldn't be read")
         else:
             log.info("site_read", host=site.host, text_chars=len(site.text), thin=site.thin)
             note = " · little text (the page is probably rendered by JavaScript)" if site.thin else ""
@@ -290,6 +303,68 @@ def fan_out_collect(state: ValidationState) -> list[Send]:
 # ---- evidence ------------------------------------------------------------------------
 
 
+def worst_error(errors: list[str]) -> str | None:
+    """The one error a source reports when several of its concurrent jobs failed differently."""
+    for prefix in ERROR_PRIORITY:
+        for err in errors:
+            if err.startswith(prefix):
+                return err
+    return errors[0] if errors else None
+
+
+async def run_searches(
+    jobs: Sequence[tuple[str, Any, str]],
+    *,
+    since: datetime,
+    limit: int,
+    deadline: float,
+    source_label: str,
+    concurrency: int = COLLECT_CONCURRENCY,
+) -> tuple[list[tuple[str, str, list[Post] | None]], list[str]]:
+    """Run every (query, client, sub) search concurrently, returning results in job order.
+
+    Pacing is already handled downstream by the per-host token bucket and circuit breaker in
+    ``deno_sources.net``, so running these serially only added latency: Reddit issues
+    queries x subreddits x 2 endpoint calls against a host that regularly takes ~9 s to answer
+    and 422s about half the time, which could not fit in the budget at all.
+
+    A job returns ``None`` for its posts when it failed, so "ran and found nothing" stays
+    distinguishable from "never ran". ``deadline`` is an absolute ``time.monotonic()`` value.
+    """
+    slots = asyncio.Semaphore(concurrency)
+    blocked = asyncio.Event()  # policy applies to the whole host, so one AccessDenied stops the rest
+    errors: list[str] = []
+
+    async def run_job(query: str, client: Any, sub: str) -> tuple[str, str, list[Post] | None]:
+        async with slots:
+            if blocked.is_set():
+                return query, sub, None
+            remaining = deadline - time.monotonic()
+            if remaining <= 5:
+                errors.append("timeout")
+                return query, sub, None
+            try:
+                found = await asyncio.wait_for(
+                    client.search(query, since=since, limit=limit), timeout=min(remaining, PER_CALL_TIMEOUT_S)
+                )
+            except AccessDenied:
+                blocked.set()
+                errors.append("blocked_by_policy")
+            except SourceUnavailable as exc:
+                errors.append(f"unavailable: {str(exc)[:80]}")
+            except TimeoutError:
+                errors.append("slow source (some queries timed out)")
+            except Exception as exc:  # a broken source never aborts the run
+                log.warning("collect_failed", source=source_label, error=type(exc).__name__)
+                errors.append(f"error: {type(exc).__name__}")
+            else:
+                return query, sub, list(found)
+            return query, sub, None
+
+    # gather keeps job order, so which posts survive MAX_POSTS_PER_SOURCE stays deterministic.
+    return list(await asyncio.gather(*(run_job(*job) for job in jobs))), errors
+
+
 @node("collect")
 async def collect(payload: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     d = deps_of(config)
@@ -301,9 +376,6 @@ async def collect(payload: dict[str, Any], config: RunnableConfig) -> dict[str, 
         searxng_headers=searxng_auth_headers(d.settings),
     )
     since = datetime.now(UTC) - timedelta(days=EVIDENCE_WINDOW_DAYS)
-    posts: list[Post] = []
-    hits: list[tuple[Source, str, int]] = []
-    error: str | None = None
     started = time.monotonic()
     budget = SOURCE_TIMEOUT_S * (2 if source == SourceName.REDDIT else 1)
     # Reddit discovery is per subreddit: one client per community so each call has its own timeout.
@@ -314,33 +386,21 @@ async def collect(payload: dict[str, Any], config: RunnableConfig) -> dict[str, 
         ]
     else:
         targets = [(build_clients(cfg, d.fetcher)[source], "")]
-    for query in payload["queries"]:
-        for client, sub in targets:
-            remaining = budget - (time.monotonic() - started)
-            if remaining <= 5:
-                error = error or "timeout"
-                break
-            try:
-                found = await asyncio.wait_for(
-                    client.search(query, since=since, limit=PER_SOURCE_LIMIT[source]), timeout=min(remaining, 30)
-                )
-            except AccessDenied:
-                error = "blocked_by_policy"
-                break
-            except SourceUnavailable as exc:
-                error = f"unavailable: {str(exc)[:80]}"
-                continue
-            except TimeoutError:
-                error = "slow source (some queries timed out)"
-                continue
-            except Exception as exc:  # a broken source never aborts the run
-                log.warning("collect_failed", source=source.value, error=type(exc).__name__)
-                error = f"error: {type(exc).__name__}"
-                continue
-            hits.append((Source(source.value), f"{query} (r/{sub})" if sub else query, len(found)))
-            posts.extend(found)
-        if error == "blocked_by_policy":
-            break
+
+    jobs = [(query, client, sub) for query in payload["queries"] for client, sub in targets]
+    outcomes, errors = await run_searches(
+        jobs, since=since, limit=PER_SOURCE_LIMIT[source], deadline=started + budget, source_label=source.value
+    )
+    posts: list[Post] = []
+    hits: list[tuple[Source, str, int]] = []
+    failed_queries: list[str] = []
+    for query, sub, found in outcomes:
+        if found is None:
+            failed_queries.append(query)
+            continue
+        hits.append((Source(source.value), f"{query} (r/{sub})" if sub else query, len(found)))
+        posts.extend(found)
+    error = worst_error(errors)
     unique = list({p.canonical_url: p for p in posts}.values())[:MAX_POSTS_PER_SOURCE]
     async with d.session() as scope:
         await scope.add_queries(d.run_id, hits)
@@ -354,6 +414,7 @@ async def collect(payload: dict[str, Any], config: RunnableConfig) -> dict[str, 
         "posts": [p.model_dump(mode="json") for p in unique],
         "error": error,
         "seconds": round(time.monotonic() - started, 1),
+        "failed_queries": list(dict.fromkeys(failed_queries)),
     }
     return {"collected": [result]}
 
@@ -392,14 +453,94 @@ async def coverage_check(state: ValidationState, config: RunnableConfig) -> dict
     recent_cut = datetime.now(UTC) - timedelta(days=365)
     recent = sum(1 for doc in docs if doc.published_at and doc.published_at >= recent_cut)
     cov = coverage(by_source, recent)
-    errors = {c["source"]: c["error"] for c in state.get("collected", []) if c["error"]}
-    return {"coverage": {**vars(cov), "source_errors": errors}}
+    errors = latest_errors(state.get("collected", []))
+    rounds = state.get("collect_round", 1)
+    decision = decide_coverage(cov, planned=planned_sources(state["plan"]), errors=errors, rounds=rounds)
+    if decision.action == "retry":
+        why = ", ".join(f"{s} ({errors[s]})" if errors.get(s) else f"{s} (thin)" for s in decision.retry_sources)
+        await d.ctx.emit("log", message=f"Evidence was thin, widening the search once: {why}")
+    return {
+        "coverage": {
+            **vars(cov),
+            "source_errors": {s: e for s, e in errors.items() if e},
+            "action": decision.action,
+            "cause": decision.cause,
+            "retry_sources": list(decision.retry_sources),
+            "round": rounds,
+        }
+    }
+
+
+def latest_errors(collected: Sequence[CollectResult]) -> dict[str, str | None]:
+    """Each source's error from its most recent pass: a retry that succeeded clears the first failure."""
+    out: dict[str, str | None] = {}
+    for c in collected:
+        out[c["source"]] = c["error"]
+    return out
+
+
+def planned_sources(plan: dict[str, Any]) -> list[str]:
+    """Sources the query planner gave queries to - the same set ``fan_out_collect`` sends."""
+    return [str(source) for source in PER_SOURCE_LIMIT if plan.get(str(source))]
 
 
 def route_after_coverage(state: ValidationState) -> list[Send] | str:
-    if not state["coverage"]["ok"]:
+    cov = state["coverage"]
+    # Runs checkpointed before the retry existed carry only ``ok``.
+    action = cov.get("action") or ("ok" if cov["ok"] else "insufficient")
+    if action == "retry":
+        return "broaden"
+    if action != "ok":
         return "insufficient"
     return [Send("analyst", {"analyst": a.value, "brief": state["brief"]}) for a in Analyst]
+
+
+GENERIC_SUBREDDITS = ("SaaS", "startups", "Entrepreneur", "smallbusiness")
+MAX_RETRY_SUBREDDITS = 6
+MAX_RETRY_QUERIES = 4
+
+
+def broader_queries(ran: Sequence[str], failed: Sequence[str], keywords: Sequence[str]) -> list[str]:
+    """Queries for the retry pass: what never answered, then wider variants of what did.
+
+    Full-text backends match every word, so dropping words is what widens recall. Precision is
+    handled downstream (hybrid retrieval + rerank); collection's job is not to miss evidence.
+    """
+    out = list(dict.fromkeys(failed))
+    seen = {q.lower() for q in ran}
+    candidates = [" ".join(sorted(distinctive_terms(q), key=len, reverse=True)[:2]) for q in ran]
+    candidates += _clean_queries(list(keywords), 5)
+    for q in candidates:
+        if q and q.lower() not in seen and q.lower() not in {o.lower() for o in out}:
+            out.append(q)
+    return out[:MAX_RETRY_QUERIES]
+
+
+@node("broaden")
+async def broaden(state: ValidationState, config: RunnableConfig) -> dict[str, Any]:
+    """One wider pass over only the sources that failed or came back thin."""
+    plan, cov = state["plan"], state["coverage"]
+    failed = {c["source"]: c.get("failed_queries", []) for c in state.get("collected", [])}
+    subs = list(dict.fromkeys([*plan.get("subreddits", []), *GENERIC_SUBREDDITS]))[:MAX_RETRY_SUBREDDITS]
+    retry = {
+        source: {
+            "queries": broader_queries(
+                plan.get(source, []), failed.get(source, []), state["brief"].get("keywords", [])
+            ),
+            "subreddits": subs,
+        }
+        for source in cov.get("retry_sources", [])
+    }
+    return {"retry": retry, "collect_round": state.get("collect_round", 1) + 1}
+
+
+def fan_out_retry(state: ValidationState) -> list[Send] | str:
+    sends = [
+        Send("collect", {"source": source, "queries": job["queries"], "subreddits": job["subreddits"]})
+        for source, job in state.get("retry", {}).items()
+        if job["queries"]
+    ]
+    return sends or "insufficient"
 
 
 # ---- analysis ------------------------------------------------------------------------
@@ -785,6 +926,17 @@ async def verdict(state: ValidationState, config: RunnableConfig) -> dict[str, A
     return {"verdict": {"verdict": band.verdict, "confidence": band.confidence, "reasons": band.reasons}}
 
 
+def insufficient_reasons(cov: dict[str, Any]) -> list[str]:
+    """Coverage gaps, led by the sources that failed, so infrastructure is never blamed on the idea."""
+    failures = [
+        f"{source} failed ({error})"
+        for source, error in (cov.get("source_errors") or {}).items()
+        # A policy block is standing configuration (e.g. LinkedIn without robots opt-in), not news.
+        if not error.startswith("blocked_by_policy")
+    ]
+    return failures + list(cov.get("gaps") or ["not enough public evidence"])
+
+
 @node("insufficient")
 async def insufficient(state: ValidationState, config: RunnableConfig) -> dict[str, Any]:
     """Honest short-circuit: unclear idea, or not enough public evidence. No invented verdict."""
@@ -796,10 +948,14 @@ async def insufficient(state: ValidationState, config: RunnableConfig) -> dict[s
         reasons = [rejected]
     else:
         cov = dict(state.get("coverage", {}))
-        reasons = list(cov.get("gaps") or ["not enough public evidence"])
-    text = "Not enough evidence to judge this idea. " + " ".join(
-        r[:1].upper() + r[1:].rstrip(".") + "." for r in reasons[:3]
+        reasons = insufficient_reasons(cov)
+    lead = (
+        "We couldn't gather enough evidence because some of our sources failed. That says nothing about "
+        "your idea; try again in a while. "
+        if cov.get("cause") == "sources_failed"
+        else "Not enough evidence to judge this idea. "
     )
+    text = lead + " ".join(r[:1].upper() + r[1:].rstrip(".") + "." for r in reasons[:3])
     async with d.session() as scope:
         await scope.upsert_verdict(
             d.run_id,
@@ -851,8 +1007,9 @@ async def finalize(state: ValidationState, config: RunnableConfig) -> dict[str, 
     d = deps_of(config)
     async with d.session() as scope:
         run = await scope.get_run(d.run_id)
-        project = await scope.get_project(run.project_id)
-        if project.status != ProjectStatus.ARCHIVED:
+        # Deleted mid-run: the run still finishes (its report stays reachable from the run), the project stays deleted.
+        project = await scope.get_project(run.project_id, include_deleted=True)
+        if project.deleted_at is None and project.status != ProjectStatus.ARCHIVED:
             project.status = ProjectStatus.VALIDATED
         flagged = await scope.session.scalar(
             select(m.Claim.id).where(m.Claim.run_id == d.run_id, m.Claim.flagged_wrong.is_(True)).limit(1)

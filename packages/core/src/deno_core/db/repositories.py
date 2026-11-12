@@ -38,7 +38,10 @@ from deno_core.errors import Conflict, InvalidInput, NotFound
 
 T = TypeVar("T", bound=Base)
 
-ACTIVE_RUN_STATUSES = (RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.AWAITING_REVIEW)
+# Runs that hold a worker. A run awaiting review is paused with its verdict written and holds nothing,
+# so it must not count against the concurrency quota: every successful run ends there, and counting it
+# locked free users (1 concurrent run) out of a second validation until they answered the review.
+ACTIVE_RUN_STATUSES = (RunStatus.QUEUED, RunStatus.RUNNING)
 
 
 _FTS_WORD = re.compile(r"[a-z0-9]+")
@@ -114,9 +117,9 @@ class UserScope:
         await self.session.flush()
         return project
 
-    async def get_project(self, project_id: uuid.UUID) -> m.Project:
+    async def get_project(self, project_id: uuid.UUID, *, include_deleted: bool = False) -> m.Project:
         project = await self._get(m.Project, project_id)
-        if project.deleted_at is not None:
+        if project.deleted_at is not None and not include_deleted:
             raise NotFound()
         return project
 
@@ -584,9 +587,11 @@ class UserScope:
         )
         return list((await self.session.execute(stmt)).scalars())
 
-    async def get_story(self, story_id: uuid.UUID) -> m.StoryBankEntry:
+    async def get_story(self, story_id: uuid.UUID, *, include_deleted: bool = False) -> m.StoryBankEntry:
+        """``include_deleted`` for drafts already built on a story: deleting it from the bank must not
+        make them uneditable, and their numbers stay sourced by it."""
         entry = await self._get(m.StoryBankEntry, story_id)
-        if entry.deleted_at is not None:
+        if entry.deleted_at is not None and not include_deleted:
             raise NotFound()
         return entry
 
@@ -670,6 +675,7 @@ class UserScope:
                     passed=bool(layer["passed"]),
                     score=layer.get("score"),
                     findings=_jsonable(layer.get("findings", [])),
+                    meta=_jsonable(layer["meta"]) if layer.get("meta") is not None else None,
                 )
             )
         await self.session.flush()
