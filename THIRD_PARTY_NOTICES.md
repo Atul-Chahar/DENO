@@ -29,3 +29,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Deno Studio kit (plugin/kit) — installed on the user's machine, not bundled
+
+The kit downloads these on first use into `~/.deno-studio/deps`; none are redistributed in this repository.
+
+| Component | Licence | Use |
+|---|---|---|
+| playwright-core (Microsoft) | Apache-2.0 | Drives headless Chromium to render frames |
+| kokoro-js + Kokoro-82M ONNX weights (hexgrad / onnx-community) | Apache-2.0 | Local voiceover |
+| @huggingface/transformers (transformers.js) | Apache-2.0 | Runs Whisper and Kokoro locally |
+| Whisper "base" timestamped ONNX weights (OpenAI / onnx-community) | MIT | Local captions with word timings |
+| ffmpeg (user-installed) | LGPL/GPL (the user's build) | Encoding and audio mixing; called as a separate program |
+
+Ideas, not code: the Studio playbooks (packages/studio/content) are written in our own words from the research in
+docs/13, which credits each source. Media found through `search_media` keeps its provider's licence (Pexels,
+Pixabay, CC0 on Freesound, ISC Lucide icons, MIT Tabler icons); the kit records each asset's credit in the project's
+`CREDITS.json` and Deno stores it with the version.

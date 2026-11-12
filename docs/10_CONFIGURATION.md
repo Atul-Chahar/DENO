@@ -89,6 +89,18 @@ Legend for the **Prod** column: 🔒 = a secret Vercel env var, `—` = not set 
 | `GITHUB_TOKEN` | empty | — | Optional. Ideas that link a public GitHub repo are read through api.github.com (description, topics, README). Without a token GitHub allows 60 requests/hour per IP (2 per run); a fine-grained token with no scopes raises that to 5,000 |
 | `TAKEDOWN_RATE_LIMIT_PER_HOUR` | `5` | — | Public takedown form limit |
 
+### Studio (docs/18)
+| Variable | Default | Prod | Purpose |
+|---|---|---|---|
+| `PEXELS_API_KEY` | empty | 🔒 recommended | Stock video and photos for `search_media` (free; 200 req/h until Pexels raises it). Results cached 24 h in Valkey |
+| `PIXABAY_API_KEY` | empty | 🔒 recommended | Stock video and photos (free; 100 req/min; the 24 h cache is required by their terms) |
+| `FREESOUND_API_KEY` | empty | 🔒 recommended | Sound effects and music loops, CC0 only (free; 2,000 req/day) |
+| `STUDIO_BUCKET` | `studio` | — | Private Supabase Storage bucket (created by migration 0006). Uses `SUPABASE_SECRET_KEY` for signed URLs |
+| `STUDIO_UPLOAD_MAX_BYTES` | `52428800` | — | Per-file upload cap (Supabase free plan: 50 MB per file, 1 GB in total) |
+| `STUDIO_VERSIONS_PER_MONTH_FREE` / `_PRO` | `30` / `1000` | — | Saved studio versions per month by plan; `internal` is unlimited |
+| `MCP_READS_PER_MINUTE` / `MCP_WRITES_PER_MINUTE` | `120` / `30` | — | Per-founder MCP rate limits by tool group |
+| `MEDIA_SEARCHES_PER_HOUR` | `60` | — | Per-founder `search_media` limit (protects the providers' quotas) |
+
 ### Jobs and crons
 | Variable | Default | Prod | Purpose |
 |---|---|---|---|
