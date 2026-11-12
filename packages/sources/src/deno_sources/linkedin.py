@@ -14,7 +14,7 @@ from datetime import datetime
 
 from selectolax.parser import HTMLParser
 
-from deno_sources.base import SearxngClient, SourceClient
+from deno_sources.base import SourceClient, WebSearch
 from deno_sources.models import Engagement, Post, SourceName
 from deno_sources.net import Fetcher
 from deno_sources.normalize import canonical_url, clean_text
@@ -130,7 +130,7 @@ def _int(value: object) -> int | None:
 class LinkedInPostsClient(SourceClient):
     name = SourceName.LINKEDIN_POSTS
 
-    def __init__(self, fetcher: Fetcher, searxng: SearxngClient) -> None:
+    def __init__(self, fetcher: Fetcher, searxng: WebSearch) -> None:
         super().__init__(fetcher)
         self.searxng = searxng
 

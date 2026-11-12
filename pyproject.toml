@@ -9,6 +9,14 @@ dependencies = ["deno-api", "deno-core", "deno-gates", "deno-graphs", "deno-llm"
 package = false
 default-groups = ["dev", "spikes"]
 
+# Vercel (docs/15): the FastAPI app is the function entrypoint; deno_worker.queue registers the
+# graph-runs subscriber, which Vercel builds into its own queue-triggered function.
+[tool.vercel]
+entrypoint = "server.app:app"
+
+[[tool.vercel.subscribers]]
+entrypoint = "server.queues"
+
 [tool.uv.workspace]
 members = ["packages/*", "apps/*"]
 

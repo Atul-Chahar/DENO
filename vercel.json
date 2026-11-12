@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": [
+    "hnd1"
+  ],
+  "crons": [
+    {
+      "path": "/internal/cron/purge",
+      "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/internal/cron/requeue",
+      "schedule": "40 3 * * *"
+    }
+  ],
+  "framework": "fastapi"
+}

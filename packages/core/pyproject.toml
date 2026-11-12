@@ -17,6 +17,8 @@ dependencies = [
   "taskiq>=0.12.6,<0.13",
   "taskiq-redis>=1.2.3,<2",
   "httpx>=0.28,<0.29",
+  # Vercel Queues: graph runs on Vercel (docs/15)
+  "vercel-queue>=0.1",
 ]
 
 [build-system]

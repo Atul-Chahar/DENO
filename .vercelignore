@@ -1,0 +1,20 @@
+# The API project (docs/15) deploys from the repo root. The web app is its own Vercel project (root: web/).
+.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+web
+launch-video
+public
+design
+spikes
+docs
+evals
+tests
+deploy
+.github
+*.md
+!README.md
+deno_workspace.db
+_vc_queue_handlers

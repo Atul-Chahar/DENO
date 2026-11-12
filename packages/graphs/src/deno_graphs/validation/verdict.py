@@ -74,8 +74,11 @@ def decide_coverage(
     """
     if cov.ok:
         return CoverageDecision("ok", "ok")
-    policy_blocked = {s for s, e in errors.items() if e and e.startswith("blocked_by_policy")}
-    failed = [s for s in planned if (e := errors.get(s)) and e.startswith(RETRYABLE_ERRORS)]
+    # A policy block or a source with no backend configured (e.g. web search off) won't change on a retry.
+    policy_blocked = {
+        s for s, e in errors.items() if e and (e.startswith("blocked_by_policy") or "not configured" in e)
+    }
+    failed = [s for s in planned if (e := errors.get(s)) and e.startswith(RETRYABLE_ERRORS) and s not in policy_blocked]
     near_miss = cov.documents >= NEAR_MISS_DOCS
     cause: CoverageCause = "sources_failed" if failed else "thin" if near_miss else "no_evidence"
     if rounds >= MAX_COLLECT_ROUNDS:

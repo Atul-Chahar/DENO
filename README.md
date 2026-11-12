@@ -21,11 +21,11 @@ Deno is a hybrid-architecture founder workspace designed for 2026 platform reali
 | Layer | Technology |
 |---|---|
 | Web | Next.js 16 + React 19 (TypeScript), Supabase Auth via `@supabase/ssr` — on **Vercel** |
-| API | Python 3.12, FastAPI, Pydantic v2 — on **Google Cloud Run** |
-| Agents | LangGraph + LangChain, Postgres checkpointer — one **Cloud Run Job** execution per run |
-| LLM | NVIDIA NIM (Nemotron 3 Super 120B, Llama 3.2 11B fallback, Nemotron embed/rerank) |
+| API | Python 3.12, FastAPI, Pydantic v2 — a **Vercel** Python function (Tokyo) |
+| Agents | LangGraph + LangChain, Postgres checkpointer — one **Vercel Queues** message per run, run by a push subscriber |
+| LLM | NVIDIA NIM (Nemotron 3.5 Super 120B, Nemotron 3.5 Lightning 30B fallback, Nemotron embed/rerank) |
 | Data | **Supabase** Postgres + pgvector (SQLAlchemy async, Alembic); **Upstash** Redis |
-| Search | Self-hosted SearXNG (private Cloud Run service) + keyless sources |
+| Search | Keyless sources (Reddit via Arctic Shift, HN, GitHub, websites) + optional Brave Search API for `site:` discovery |
 
 Full breakdown: [`docs/11_TECH_STACK.md`](docs/11_TECH_STACK.md).
 
@@ -47,12 +47,12 @@ Full breakdown: [`docs/11_TECH_STACK.md`](docs/11_TECH_STACK.md).
 
 ## Quickstart (local)
 
-Prerequisites: Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node 20+, Docker (for local Redis/SearXNG).
+Prerequisites: Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node 20+. Postgres and Redis are the hosted
+Supabase and Upstash from `.env`: no containers.
 
 ```bash
 cp .env.example .env              # NIM key, Supabase DATABASE_URL etc. — docs/10_CONFIGURATION.md
 cp web/.env.example web/.env.local
-docker compose -f compose.dev.yml up -d valkey searxng
 uv sync && uv run alembic upgrade head
 uv run uvicorn deno_api.main:app --host 127.0.0.1 --port 8000
 uv run taskiq worker deno_worker.tasks:broker --workers 1
@@ -64,7 +64,7 @@ Without Supabase keys the app runs in dev mode (no login). Next.js proxies `/api
 ## Tests
 
 ```bash
-uv run ruff check . && uv run mypy && uv run pytest     # integration: docker compose -f compose.dev.yml --profile test up -d postgres-test
+uv run ruff check . && uv run mypy && uv run pytest     # integration tests need TEST_DATABASE_URL (CI provides one)
 uv run pytest -m live                                   # live NIM tests (opt-in)
 cd web && npm run lint && npx tsc --noEmit && npm run build
 ```
@@ -72,8 +72,8 @@ cd web && npm run lint && npx tsc --noEmit && npm run build
 ## Deploy
 
 ```bash
-git push origin main            # web redeploys on Vercel automatically
-bash deploy/deploy-free.sh      # backend: build image, update Cloud Run job + API + crons
+uv run alembic upgrade head     # first, if the change has a migration
+git push origin main            # Vercel redeploys both projects: deno-web (web/) and deno-api (repo root)
 ```
 
 Details, first-time setup and rollback: [`docs/09_FREE_DEPLOYMENT.md`](docs/09_FREE_DEPLOYMENT.md).

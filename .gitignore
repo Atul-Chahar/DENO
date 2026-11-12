@@ -11,3 +11,6 @@ __pycache__/
 *.sqlite3
 node_modules
 .DS_Store
+.vercel
+.env*
+_vc_queue_handlers/

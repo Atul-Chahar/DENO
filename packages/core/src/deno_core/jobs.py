@@ -1,8 +1,9 @@
-"""Background job contract shared by the API (enqueues) and the worker (executes).
+"""Background job contract shared by the API (enqueues) and whatever executes the job.
 
-taskiq on Valkey Streams (ADR-004): acknowledged delivery. A job whose worker
-dies is re-claimed by another worker after ``idle_timeout``, and graph runs
-then resume from their LangGraph checkpoint (thread_id = run_id).
+- Production (docs/15): TASK_RUNNER=vercel_queue. Each graph run is one Vercel Queues message on the
+  ``graph-runs`` topic; a push subscriber (``deno_api.queue_worker``) executes it. A delivery that
+  fails or runs out of time is redelivered and the graph resumes from its LangGraph checkpoint.
+- Local development: taskiq on Valkey Streams (ADR-004) and a worker process.
 """
 
 from __future__ import annotations
@@ -23,8 +24,8 @@ TASK_VALIDATION_RUN = "validation.run"
 TASK_CONTENT_PLAN = "content.plan"
 TASK_PURGE_SCRAPED_TEXT = "maintenance.purge_scraped_text"
 TASK_REQUEUE_STALE_RUNS = "maintenance.requeue_stale_runs"
-# The one-shot entrypoint a Cloud Run Job execution runs: `python -m deno_worker.run_once <task> <json kwargs>`.
-RUN_ONCE_MODULE = "deno_worker.run_once"
+# The Vercel Queues topic graph runs travel on (docs/15).
+GRAPH_RUNS_TOPIC = "graph-runs"
 
 # Longest a job may run before another worker re-claims it (validation p95 target is 4 min).
 JOB_IDLE_TIMEOUT_MS = 15 * 60 * 1000
@@ -66,15 +67,17 @@ def get_broker() -> AsyncBroker:
 async def enqueue(task_name: str, broker: AsyncBroker | None = None, **kwargs: Any) -> str:
     """Send a job by name (the API never imports worker code). Returns the job id.
 
-    With TASK_RUNNER=cloudrun_job the job becomes one Cloud Run Job execution instead
-    of a queue message, so no worker has to stay running (docs/09 §4.1).
+    With TASK_RUNNER=vercel_queue the job is a Vercel Queues message instead, executed by a push
+    subscriber function, so no worker has to stay running (docs/15). The idempotency key makes a
+    double submit of the same run one message.
     """
     settings = get_settings()
-    if broker is None and settings.task_runner == "cloudrun_job":
-        from deno_core.gcp import run_cloud_run_job
+    if broker is None and settings.task_runner == "vercel_queue":
+        from vercel.queue import send
 
-        args = ["-m", RUN_ONCE_MODULE, task_name, json.dumps(kwargs, sort_keys=True)]
-        return await run_cloud_run_job(settings.cloudrun_job, args)
+        key = f"{task_name}:{json.dumps(kwargs, sort_keys=True)}"
+        message_id = await send(GRAPH_RUNS_TOPIC, {"task": task_name, "kwargs": kwargs}, idempotency_key=key)
+        return message_id or key
     kicker: AsyncKicker[Any, Any] = AsyncKicker(task_name, broker or get_broker(), {})
     task = await kicker.kiq(**kwargs)
     return str(task.task_id)

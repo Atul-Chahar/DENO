@@ -1,5 +1,5 @@
-"""Graph-run job bodies, shared by the taskiq worker (tasks.py) and the one-shot
-Cloud Run Job entrypoint (run_once.py)."""
+"""Graph-run job bodies, shared by the Vercel Queues subscriber (queue.py) and the local taskiq worker
+(tasks.py)."""
 
 from __future__ import annotations
 

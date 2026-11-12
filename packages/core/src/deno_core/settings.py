@@ -36,12 +36,15 @@ class Settings(BaseSettings):
     # --- LLM provider (NVIDIA NIM, ADR-008) ---
     nvidia_nim_api_key: SecretStr = SecretStr("")
     nvidia_nim_base_url: str = "https://integrate.api.nvidia.com/v1"
-    llm_model_fast: str = "nvidia/nemotron-3-super-120b-a12b"
-    llm_model_strong: str = "nvidia/nemotron-3-super-120b-a12b"
-    llm_model_judge: str = "nvidia/nemotron-3-super-120b-a12b"
-    llm_model_fallback: str = "meta/llama-3.2-11b-vision-instruct"
+    llm_model_fast: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+    llm_model_strong: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+    llm_model_judge: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+    llm_model_fallback: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
     llm_requests_per_minute: int = Field(default=36, ge=1, le=40, description="NIM hard cap is 40/min per key")
-    llm_timeout_seconds: float = 60.0
+    # Per call, scaled by role (fast 0.5x, strong 1.5x, judge 1x). Normal calls take 1-12 s; NIM sometimes
+    # stalls a request in its queue for a minute (measured: a 54-token reply took 63 s). A short timeout
+    # retries once, then falls back to the second model, instead of holding the run.
+    llm_timeout_seconds: float = 20.0
     # LangChain `init_chat_model` provider. "openai" = NIM's OpenAI-compatible endpoint (json_schema
     # structured output works there; ChatNVIDIA's guided_json is rejected by NIM since 2026-09).
     llm_provider: str = "openai"
@@ -61,19 +64,22 @@ class Settings(BaseSettings):
     # --- Data ---
     database_url: str = Field(default="", description="postgresql+asyncpg://… (Supabase Postgres)")
     valkey_url: str = "redis://127.0.0.1:6379/0"
+    # --- Web search (X and Product Hunt discovery use `site:` queries; docs/15) ---
+    # searxng: a self-hosted SearXNG (local dev). brave: the Brave Search API (production on Vercel).
+    # none: those sources report "web search is not configured" and every other source still runs.
+    web_search_provider: Literal["searxng", "brave", "none"] = "none"
     searxng_url: str = "http://127.0.0.1:8890"
-    # Send a Google ID token to SearXNG when it runs as a private Cloud Run service (docs/09 §5.3).
-    searxng_gcp_auth: bool = False
+    brave_search_api_key: SecretStr = SecretStr("")
 
-    # --- Jobs (docs/09 §4) ---
-    # taskiq: Valkey queue + worker process (compose / VPS). cloudrun_job: one Cloud Run Job
-    # execution per graph run (free tier, no always-on worker).
-    task_runner: Literal["taskiq", "cloudrun_job"] = "taskiq"
-    cloudrun_job: str = ""  # projects/<project>/locations/<region>/jobs/<name>
-    # Cloud Scheduler -> POST /internal/cron/*: the OIDC audience and the caller's service account.
-    # Both empty = the cron endpoints answer 404 (the taskiq scheduler runs maintenance instead).
-    cron_oidc_audience: str = ""
-    cron_service_account: str = ""
+    # --- Jobs (docs/15) ---
+    # taskiq: Valkey queue + a worker process (local dev). vercel_queue: one Vercel Queues message per
+    # graph run, executed by a push subscriber function (production; no worker to keep running).
+    task_runner: Literal["taskiq", "vercel_queue"] = "taskiq"
+    # A run hands itself off before the function limit (300 s on Vercel Hobby): the delivery ends,
+    # the queue redelivers it, and the graph resumes from its Postgres checkpoint.
+    run_time_budget_s: int = Field(default=270, ge=30)
+    # Vercel Cron sends "Authorization: Bearer $CRON_SECRET" to /internal/cron/*. Empty = 404.
+    cron_secret: SecretStr = SecretStr("")
 
     # --- Sources (Phase 5) ---
     # Hosts whose robots.txt disallows bots but the operator has decided (after legal review)
@@ -135,13 +141,18 @@ class Settings(BaseSettings):
                 "SUPABASE_URL": bool(self.supabase_url),
                 "NVIDIA_NIM_API_KEY": bool(self.nvidia_nim_api_key.get_secret_value()),
                 "DATABASE_URL": self.database_url.startswith("postgresql"),
-                "CLOUDRUN_JOB": self.task_runner != "cloudrun_job" or self.cloudrun_job.count("/") == 5,
+                "BRAVE_SEARCH_API_KEY": self.web_search_provider != "brave"
+                or bool(self.brave_search_api_key.get_secret_value()),
             }.items()
             if not ok
         ]
         if missing:
             raise ValueError(f"production requires: {', '.join(missing)}")
         return self
+
+    @property
+    def web_search_api_key(self) -> str:
+        return self.brave_search_api_key.get_secret_value() if self.web_search_provider == "brave" else ""
 
     @property
     def billing_enabled(self) -> bool:
@@ -155,6 +166,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-
-
-settings = get_settings()

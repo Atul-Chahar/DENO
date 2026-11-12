@@ -10,14 +10,14 @@ Design detail and ADRs: [`02_ARCHITECTURE.md`](02_ARCHITECTURE.md), [`08_DEVELOP
 |---|---|---|
 | Web app | Next.js 16, React 19, TypeScript, hand-written CSS (pixel-identical to the original design) | Vercel |
 | Auth | Supabase Auth (email + password, Google OAuth, TOTP 2FA) via `@supabase/ssr` | Supabase |
-| API | Python 3.12, FastAPI, Pydantic v2, uvicorn | Google Cloud Run |
-| Agents | LangGraph `StateGraph` + LangChain (structured output, Postgres checkpointer) | Cloud Run Job |
+| API | Python 3.12, FastAPI, Pydantic v2 | Vercel Python function (`hnd1`) |
+| Agents | LangGraph `StateGraph` + LangChain (structured output, Postgres checkpointer) | Vercel Queues push subscriber |
 | LLM | NVIDIA NIM (OpenAI-compatible): Nemotron 3 Super 120B, Llama 3.2 11B fallback, Nemotron embed + rerank | NVIDIA |
 | Database | PostgreSQL + pgvector (`halfvec` 2048-d), SQLAlchemy 2 async + asyncpg, Alembic | Supabase |
 | Cache / events / limits | Valkey / Redis (`redis[hiredis]`) | Upstash |
-| Background jobs | taskiq (local/VPS) or Cloud Run Job executions (free deploy) | Cloud Run |
+| Background jobs | Vercel Queues (production) or taskiq (local) | Vercel |
 | Scheduled jobs | taskiq scheduler (local/VPS) or Cloud Scheduler → `/internal/cron/*` | Cloud Scheduler |
-| Web search | SearXNG (self-hosted metasearch) | Cloud Run (private) |
+| Web search | Brave Search API (optional; SearXNG for local dev) | hosted API |
 | Scraping | httpx (HTTP/2), selectolax, defusedxml | — |
 | Text analysis | NumPy (Burrows' Delta stylometry), regex anti-slop gates | — |
 | Observability | structlog JSON logs, Prometheus metrics, Sentry, Langfuse | Cloud Logging |
@@ -31,7 +31,7 @@ Design detail and ADRs: [`02_ARCHITECTURE.md`](02_ARCHITECTURE.md), [`08_DEVELOP
 apps/
   api/      deno_api     FastAPI app: v1 routes (projects, runs, content, me, billing, takedowns),
                          Supabase JWT auth, SSE run stream, /internal/cron, /readyz, /metrics
-  worker/   deno_worker  taskiq tasks + run_once.py (one job per Cloud Run Job execution)
+  worker/   deno_worker  graph-run handlers, the Vercel Queues subscriber (queue.py), local taskiq tasks
 packages/
   core/     deno_core    settings, logging, errors, DB session + models, jobs.enqueue, gcp.py, maintenance, rate limits
   gates/    deno_gates   anti-slop gates, density scorer, Ban Risk Score, stylometry (pure Python + NumPy)
@@ -43,12 +43,12 @@ packages/
   graphs/   deno_graphs  LangGraph graphs: validation/ (idea → verdict) and content/ (30-day plan)
 web/                     Next.js app (app router): marketing, auth, /app workspace, account, legal
 migrations/              Alembic migrations (0001 schema, 0002 seed data, 0003 profile fields)
-deploy/                  cloudbuild-api.yaml, deploy-free.sh, searxng/Dockerfile
+deploy/                  backup/ (Supabase backup + restore drill)
+server/                  Vercel entrypoints: app.py (FastAPI), queues.py (subscriber)
+vercel.json              API project: region, crons
 evals/                   retrieval and gate evaluation scripts
 tests/                   unit, integration (local postgres-test only), live (NIM, opt-in)
 Dockerfile               one backend image for API, worker, job and migrations
-compose.dev.yml          local Valkey, SearXNG and postgres-test (+ optional api/worker/web)
-compose.prod.yml         single-VPS alternative (Caddy TLS)
 public/, gateway/        legacy static UI and Deno gateway, kept for the visual-diff baseline
 ```
 
@@ -58,13 +58,14 @@ public/, gateway/        legacy static UI and Deno gateway, kept for the visual-
 and protects `/app`).
 
 **API call:** browser → `https://deno-web-eight.vercel.app/api/v1/...` → Next.js rewrite (`BACKEND_URL`) →
-Cloud Run `deno-api`. The browser sends `Authorization: Bearer <Supabase access token>`. FastAPI verifies it
+the Vercel function `deno-api`. The browser sends `Authorization: Bearer <Supabase access token>`. FastAPI verifies it
 against the project's JWKS and scopes every query to the token's `sub`. Users with 2FA must hold an `aal2` session.
 
-**Validation run:** API → Cloud Run Admin API → `deno-run` execution → LangGraph graph:
-query planning → parallel source fetches (SearXNG + keyless sources) → retrieval and rerank → adversarial agents →
-verdict, TAM/SAM/SOM, competitors, communities. State is checkpointed in Postgres, so a retried
-execution resumes. Progress events go to Redis and stream to the browser over SSE.
+**Validation run:** API → Vercel Queues message (`graph-runs`) → push subscriber function → LangGraph graph:
+query planning → parallel source fetches (keyless sources + optional Brave `site:` search) → retrieval and
+rerank → analysts → citation check → critic → verdict. State is checkpointed in Postgres, so a redelivered
+message resumes (also when a run hands off at its 270 s budget). Progress events go to Redis and stream to the
+browser over SSE.
 
 ## 4. Key choices
 
@@ -72,16 +73,15 @@ execution resumes. Progress events go to Redis and stream to the browser over SS
 - **LangGraph rather than ad-hoc scripts:** typed state, checkpoints and retries, parallel `Send` branches,
   and the same graph runs in a worker or a one-shot job.
 - **NVIDIA NIM:** free trial key, OpenAI-compatible. The 40 req/min cap is enforced client-side through Redis.
-- **Cloud Run Jobs instead of an always-on worker:** Cloud Run gives CPU only while it handles a request,
-  and a polling worker would burn the Upstash free quota. One execution per run costs nothing while idle.
-- **Same image everywhere:** API, job and migrations all use one Docker image, so code can't drift between them.
-- **Tokyo region for everything:** Supabase, Upstash and Cloud Run sit side by side, which keeps database
-  round trips short.
+- **Vercel Queues instead of an always-on worker:** one push-delivered message per run; nothing runs while
+  idle, and a redelivered message resumes from the checkpoint. No containers, no second cloud (docs/15).
+- **Same code everywhere:** the API and the queue subscriber are two functions built from one deploy.
+- **Tokyo region for everything:** Supabase, Upstash and the Vercel functions (`hnd1`) sit side by side,
+  which keeps database round trips short.
 
 ## 5. Local development
 
 ```bash
-docker compose -f compose.dev.yml up -d valkey searxng       # local Redis + SearXNG (DB is hosted Supabase)
 uv sync
 uv run alembic upgrade head
 uv run uvicorn deno_api.main:app --host 127.0.0.1 --port 8000
@@ -91,6 +91,6 @@ cd web && npm install && npm run dev                         # http://localhost:
 
 Checks before pushing:
 ```bash
-uv run ruff check . && uv run mypy && uv run pytest          # integration tests need: docker compose -f compose.dev.yml --profile test up -d postgres-test
+uv run ruff check . && uv run mypy && uv run pytest          # integration tests need TEST_DATABASE_URL (CI provides one)
 cd web && npm run lint && npx tsc --noEmit && npm run build
 ```

@@ -32,7 +32,6 @@ from sqlalchemy import select
 from deno_core.db import models as m
 from deno_core.db.enums import DraftStatus, Platform
 from deno_core.db.repositories import UserScope, community_rules, get_hook_patterns
-from deno_core.gcp import searxng_auth_headers
 from deno_core.logging import get_logger
 from deno_core.observability import GATE_RESULTS
 from deno_core.runs import RunContext
@@ -234,7 +233,8 @@ async def mine_hooks(d: ContentDeps, communities: list[m.Community]) -> None:
         SourceConfig(
             searxng_url=settings.searxng_url,
             robots_opt_in=settings.sources_robots_opt_in,
-            searxng_headers=searxng_auth_headers(settings),
+            web_search_provider=settings.web_search_provider,
+            web_search_api_key=settings.web_search_api_key,
         ),
         cache=ValkeyCache(d.ctx.events.redis),
     )
