@@ -15,7 +15,9 @@ export function buildCsp(nonce: string): string {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
+    // Studio posters, contact sheets and review copies are signed URLs on Supabase Storage (docs/18).
+    `img-src 'self' data: blob:${supabase ? ` ${supabase}` : ''}`,
+    `media-src 'self' blob:${supabase ? ` ${supabase}` : ''}`,
     `connect-src ${connect}`,
     "object-src 'none'",
     "base-uri 'self'",

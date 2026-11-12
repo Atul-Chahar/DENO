@@ -21,6 +21,8 @@ export interface LatestRun {
   finished_at: string | null;
   verdict: VerdictKind | null;
   confidence: number | null;
+  /** The AI app that started it through Deno's MCP ("Claude"); null = this web app. */
+  client_name?: string | null;
 }
 
 export interface Project {
@@ -243,6 +245,150 @@ export interface StreamEvent {
 
 // ---- transport ---------------------------------------------------------------------
 
+// ---- studio (docs/18) ----------------------------------------------------------------
+
+export type StudioKind = 'video' | 'still';
+export type StudioStatus = 'draft' | 'in_review' | 'approved' | 'archived';
+export type NoteStatus = 'open' | 'fixed' | 'wontfix' | 'resolved';
+
+export interface StudioItemCard {
+  id: string;
+  idea_id: string;
+  kind: StudioKind;
+  title: string;
+  status: StudioStatus;
+  client_name: string | null;
+  current_version: number;
+  updated_at: string;
+  duration: number | null;
+  poster_url: string | null;
+  open_notes: number;
+}
+
+export interface StudioCheck {
+  rule_id: string;
+  severity: 'block' | 'warn';
+  t: number | null;
+  message: string;
+  fix: string;
+  quote?: string | null;
+}
+
+export interface FilmClip {
+  id: string;
+  chapter?: string | null;
+  start: number;
+  end: number;
+  label?: string;
+}
+
+export interface FilmManifest {
+  title: string;
+  kind: StudioKind;
+  style?: string | null;
+  formats: { ratio: string; w?: number | null; h?: number | null }[];
+  fps: number;
+  duration: number;
+  pages: number;
+  chapters?: { id: string; title?: string; start: number; end: number }[];
+  clips?: FilmClip[];
+  captions?: { start: number; end: number; text: string }[];
+}
+
+export interface StudioVersion {
+  version: number;
+  created_at: string;
+  summary: string | null;
+  duration: number | null;
+  client_name: string | null;
+  files: { review?: string | null; poster?: string | null; sheet?: string | null; captions?: string | null; source?: string | null; pages?: (string | null)[] };
+  checks: StudioCheck[];
+  manifest: FilmManifest | Record<string, unknown>;
+}
+
+export interface ReviewNote {
+  id: string;
+  version: number;
+  frame: number | null;
+  t: number | null;
+  t_end: number | null;
+  x: number | null;
+  y: number | null;
+  page: number | null;
+  text: string;
+  tags: string[];
+  status: NoteStatus;
+  reply: string | null;
+  fixed_in: number | null;
+  clip_id: string | null;
+  chapter_id: string | null;
+  author: 'founder' | 'system';
+  created_at: string;
+}
+
+export interface StudioCredit {
+  asset_id: string;
+  kind: string;
+  license: string;
+  credit: string;
+  source_url: string | null;
+  commercial: boolean;
+}
+
+export interface StudioItem {
+  id: string;
+  idea_id: string;
+  brief_id: string | null;
+  kind: StudioKind;
+  title: string;
+  status: StudioStatus;
+  client_name: string | null;
+  current_version: number;
+  created_at: string;
+  updated_at: string;
+  versions: StudioVersion[];
+  credits?: StudioCredit[];
+  notes?: ReviewNote[];
+}
+
+export interface NoteInput {
+  text: string;
+  version?: number;
+  t?: number | null;
+  t_end?: number | null;
+  x?: number | null;
+  y?: number | null;
+  page?: number | null;
+  tags?: string[];
+}
+
+export interface Rule {
+  id: string;
+  doc: string;
+  doc_title: string;
+  kind: 'playbooks' | 'styles';
+  text: string;
+  core: boolean;
+  struck: boolean;
+}
+
+export interface Rulebook {
+  rules: Rule[];
+  taste: { struck_rules: number; tag_counts: Record<string, number>; recent_notes: string[] };
+}
+
+export interface BrandKit {
+  name?: string;
+  source_url?: string;
+  colors?: Record<string, string>;
+  palette?: string[];
+  fonts?: Record<string, string>;
+  google_fonts?: string[];
+  logo_url?: string | null;
+  icon_url?: string | null;
+  notes?: string[];
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -374,6 +520,24 @@ export const api = {
   studioEdit: (text: string, platform: GatePlatform, community?: string | null) =>
     send<StudioEdit>('POST', '/gates/edit', { text, platform, community: community ?? null }),
   qualityHistory: (limit = 50) => request<QualityTrend>(`/quality/history?limit=${limit}`),
+
+  studioItems: (projectId?: string | null) =>
+    request<StudioItemCard[]>(`/studio/items${projectId ? `?project_id=${enc(projectId)}` : ''}`),
+  studioItem: (id: string) => request<StudioItem>(`/studio/items/${enc(id)}`),
+  approveStudioItem: (id: string) => send<StudioItem>('POST', `/studio/items/${enc(id)}/approve`),
+  deleteStudioItem: (id: string) => send<void>('DELETE', `/studio/items/${enc(id)}`),
+  addNote: (itemId: string, note: NoteInput) => send<ReviewNote>('POST', `/studio/items/${enc(itemId)}/notes`, note),
+  updateNote: (noteId: string, patch: { status?: NoteStatus; reply?: string; text?: string }) =>
+    send<ReviewNote>('PATCH', `/studio/notes/${enc(noteId)}`, patch),
+  deleteNote: (noteId: string) => send<void>('DELETE', `/studio/notes/${enc(noteId)}`),
+  rulebook: () => request<Rulebook>('/studio/rulebook'),
+  saveRulebook: (struck: string[]) => send<{ struck: string[] }>('PUT', '/studio/rulebook', { struck }),
+  brandKit: (projectId: string) =>
+    request<{ brand_kit: BrandKit | null; source_url: string | null }>(`/projects/${enc(projectId)}/brand`),
+  saveBrandKit: (projectId: string, body: { colors?: Record<string, string>; fonts?: Record<string, string>; logo_url?: string | null }) =>
+    send<{ brand_kit: BrandKit }>('PUT', `/projects/${enc(projectId)}/brand`, body),
+  importBrandKit: (projectId: string, url: string) =>
+    send<{ brand_kit: BrandKit }>('POST', `/projects/${enc(projectId)}/brand/import`, { url }),
 };
 
 /**

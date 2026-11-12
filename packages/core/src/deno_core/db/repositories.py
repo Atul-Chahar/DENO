@@ -24,12 +24,15 @@ from deno_core.db import models as m
 from deno_core.db.base import Base, new_id
 from deno_core.db.enums import (
     DraftStatus,
+    NoteStatus,
     Platform,
     ProjectStatus,
     RunStatus,
     Source,
     Stance,
     StoryCategory,
+    StudioKind,
+    StudioStatus,
     TakedownStatus,
     UsageKind,
     VerdictKind,
@@ -169,7 +172,7 @@ class UserScope:
     # ---- runs ---------------------------------------------------------------
 
     async def create_run(
-        self, project_id: uuid.UUID, idempotency_key: str | None = None
+        self, project_id: uuid.UUID, idempotency_key: str | None = None, *, client_name: str | None = None
     ) -> tuple[m.ValidationRun, bool]:
         """Returns (run, created). The same idempotency key returns the existing run."""
         await self.get_project(project_id)
@@ -181,7 +184,13 @@ class UserScope:
                 return existing, False
         run_id = new_id()
         run = self._add(
-            m.ValidationRun(id=run_id, project_id=project_id, thread_id=str(run_id), idempotency_key=idempotency_key)
+            m.ValidationRun(
+                id=run_id,
+                project_id=project_id,
+                thread_id=str(run_id),
+                idempotency_key=idempotency_key,
+                client_name=client_name,
+            )
         )
         await self.session.flush()
         return run, True
@@ -600,12 +609,28 @@ class UserScope:
 
     # ---- content plans -----------------------------------------------------------
 
-    async def create_content_plan(self, project_id: uuid.UUID, run_id: uuid.UUID | None, days: int) -> m.ContentPlan:
+    async def create_content_plan(
+        self,
+        project_id: uuid.UUID,
+        run_id: uuid.UUID | None,
+        days: int,
+        *,
+        client_name: str | None = None,
+        status: RunStatus = RunStatus.QUEUED,
+    ) -> m.ContentPlan:
         await self.get_project(project_id)
         if run_id is not None:
             await self.get_run(run_id)
         plan = self._add(
-            m.ContentPlan(id=new_id(), project_id=project_id, run_id=run_id, days=days, thread_id=f"plan-{new_id()}")
+            m.ContentPlan(
+                id=new_id(),
+                project_id=project_id,
+                run_id=run_id,
+                days=days,
+                thread_id=f"plan-{new_id()}",
+                client_name=client_name,
+                status=status,
+            )
         )
         await self.session.flush()
         return plan
@@ -647,6 +672,7 @@ class UserScope:
         status: DraftStatus,
         edited_by_user: bool = False,
         gate_layers: Sequence[dict[str, Any]] = (),
+        client_name: str | None = None,
     ) -> m.ContentDraft:
         latest = await self.session.scalar(
             select(func.max(m.ContentDraft.version)).where(
@@ -663,6 +689,7 @@ class UserScope:
                 first_comment=first_comment,
                 status=status,
                 edited_by_user=edited_by_user,
+                client_name=client_name,
             )
         )
         await self.session.flush()
@@ -730,6 +757,194 @@ class UserScope:
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
+    # ---- studio (docs/18) -------------------------------------------------------------
+
+    async def get_brand_kit(self, project_id: uuid.UUID) -> m.BrandKitRow | None:
+        await self.get_project(project_id)
+        stmt = self._owned(m.BrandKitRow).where(m.BrandKitRow.project_id == project_id)
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def save_brand_kit(
+        self, project_id: uuid.UUID, data: dict[str, Any], source_url: str | None
+    ) -> m.BrandKitRow:
+        row = await self.get_brand_kit(project_id)
+        if row is None:
+            row = self._add(
+                m.BrandKitRow(id=new_id(), project_id=project_id, data=_jsonable(data), source_url=source_url)
+            )
+        else:
+            row.data = _jsonable(data)
+            if source_url:
+                row.source_url = source_url
+        await self.session.flush()
+        return row
+
+    async def create_studio_item(
+        self,
+        project_id: uuid.UUID,
+        *,
+        kind: StudioKind,
+        title: str,
+        brief_id: uuid.UUID | None = None,
+        client_name: str | None = None,
+    ) -> m.StudioItem:
+        await self.get_project(project_id)
+        if brief_id is not None:
+            await self.get_brief(brief_id)
+        item = self._add(
+            m.StudioItem(
+                id=new_id(),
+                project_id=project_id,
+                brief_id=brief_id,
+                kind=kind,
+                title=title[:200],
+                client_name=client_name,
+            )
+        )
+        await self.session.flush()
+        return item
+
+    async def get_studio_item(self, item_id: uuid.UUID) -> m.StudioItem:
+        item = await self._get(m.StudioItem, item_id)
+        if item.deleted_at is not None:
+            raise NotFound()
+        return item
+
+    async def list_studio_items(self, project_id: uuid.UUID | None = None, limit: int = 50) -> list[m.StudioItem]:
+        stmt = self._owned(m.StudioItem).where(m.StudioItem.deleted_at.is_(None))
+        if project_id is not None:
+            stmt = stmt.where(m.StudioItem.project_id == project_id)
+        stmt = stmt.order_by(m.StudioItem.updated_at.desc()).limit(max(1, min(limit, 200)))
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def delete_studio_item(self, item_id: uuid.UUID) -> list[str]:
+        """Soft-delete; returns the storage paths of every version so the caller can remove the files."""
+        item = await self.get_studio_item(item_id)
+        item.deleted_at = datetime.now(UTC)
+        paths: list[str] = []
+        for v in await self.list_studio_versions(item_id):
+            paths += _paths(v.files)
+        return paths
+
+    async def add_studio_version(
+        self,
+        item: m.StudioItem,
+        *,
+        manifest: dict[str, Any],
+        files: dict[str, Any],
+        checks: list[dict[str, Any]],
+        assets: Sequence[dict[str, Any]],
+        summary: str | None,
+        duration: float | None,
+        client_name: str | None,
+    ) -> m.StudioVersion:
+        # Lock the item row so two uploads can't both take the same version number.
+        await self.session.execute(
+            select(m.StudioItem.id)
+            .where(m.StudioItem.id == item.id, m.StudioItem.user_id == self.user_id)
+            .with_for_update()
+        )
+        number = (
+            await self.session.scalar(
+                select(func.max(m.StudioVersion.version)).where(
+                    m.StudioVersion.user_id == self.user_id, m.StudioVersion.item_id == item.id
+                )
+            )
+            or 0
+        ) + 1
+        version = self._add(
+            m.StudioVersion(
+                id=new_id(),
+                item_id=item.id,
+                version=number,
+                manifest=_jsonable(manifest),
+                files=_jsonable(files),
+                checks=_jsonable(checks),
+                summary=summary,
+                duration=duration,
+                client_name=client_name,
+            )
+        )
+        for a in assets:
+            self._add(
+                m.StudioAsset(
+                    id=new_id(),
+                    item_id=item.id,
+                    version=number,
+                    asset_id=str(a["asset_id"])[:200],
+                    kind=str(a.get("kind") or "other")[:32],
+                    source=str(a.get("source") or "")[:64],
+                    license=str(a.get("license") or "unknown")[:64],
+                    credit=str(a.get("credit") or "")[:300],
+                    source_url=a.get("source_url"),
+                    commercial=bool(a.get("commercial")),
+                )
+            )
+        item.current_version = number
+        item.updated_at = datetime.now(UTC)
+        if item.status in (StudioStatus.DRAFT, StudioStatus.APPROVED):
+            item.status = StudioStatus.IN_REVIEW
+            item.approved_at = None
+        await self.session.flush()
+        return version
+
+    async def list_studio_versions(self, item_id: uuid.UUID) -> list[m.StudioVersion]:
+        stmt = (
+            self._owned(m.StudioVersion)
+            .where(m.StudioVersion.item_id == item_id)
+            .order_by(m.StudioVersion.version.desc())
+        )
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def get_studio_version(self, item_id: uuid.UUID, version: int | None = None) -> m.StudioVersion:
+        item = await self.get_studio_item(item_id)
+        number = version or item.current_version
+        stmt = self._owned(m.StudioVersion).where(m.StudioVersion.item_id == item_id, m.StudioVersion.version == number)
+        row = (await self.session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise NotFound()
+        return row
+
+    async def list_studio_assets(self, item_id: uuid.UUID, version: int) -> list[m.StudioAsset]:
+        stmt = self._owned(m.StudioAsset).where(m.StudioAsset.item_id == item_id, m.StudioAsset.version == version)
+        return list((await self.session.execute(stmt.order_by(m.StudioAsset.created_at))).scalars())
+
+    async def count_studio_versions_since(self, since: datetime) -> int:
+        stmt = select(func.count()).where(m.StudioVersion.user_id == self.user_id, m.StudioVersion.created_at >= since)
+        return int((await self.session.execute(stmt)).scalar_one())
+
+    async def add_review_note(self, item: m.StudioItem, **fields: Any) -> m.ReviewNote:
+        note = self._add(m.ReviewNote(id=new_id(), item_id=item.id, **fields))
+        await self.session.flush()
+        return note
+
+    async def list_review_notes(
+        self, item_id: uuid.UUID, *, version: int | None = None, statuses: Sequence[NoteStatus] | None = None
+    ) -> list[m.ReviewNote]:
+        stmt = self._owned(m.ReviewNote).where(m.ReviewNote.item_id == item_id)
+        if version is not None:
+            stmt = stmt.where(m.ReviewNote.version == version)
+        if statuses:
+            stmt = stmt.where(m.ReviewNote.status.in_(list(statuses)))
+        stmt = stmt.order_by(m.ReviewNote.version, m.ReviewNote.t.nulls_last(), m.ReviewNote.created_at)
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def get_review_note(self, note_id: uuid.UUID) -> m.ReviewNote:
+        return await self._get(m.ReviewNote, note_id)
+
+    async def delete_review_note(self, note_id: uuid.UUID) -> None:
+        note = await self.get_review_note(note_id)
+        await self.session.delete(note)
+
+    async def recent_review_notes(self, limit: int = 40) -> list[m.ReviewNote]:
+        stmt = (
+            self._owned(m.ReviewNote)
+            .where(m.ReviewNote.author == "founder")
+            .order_by(m.ReviewNote.created_at.desc())
+            .limit(limit)
+        )
+        return list((await self.session.execute(stmt)).scalars())
+
     # ---- usage ----------------------------------------------------------------
 
     async def record_usage(
@@ -764,6 +979,16 @@ class UserScope:
             if table.name in m.TENANT_TABLES:
                 await self.session.execute(delete(table).where(table.c.user_id == self.user_id))
         await self.session.execute(delete(m.Profile).where(m.Profile.id == self.user_id))
+
+
+def _paths(files: dict[str, Any]) -> list[str]:
+    out: list[str] = []
+    for value in files.values():
+        if isinstance(value, str):
+            out.append(value)
+        elif isinstance(value, list):
+            out += [v for v in value if isinstance(v, str)]
+    return out
 
 
 def _jsonable(value: Any) -> Any:

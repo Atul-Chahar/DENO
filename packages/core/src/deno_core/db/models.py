@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from deno_core.db.base import Base, IdMixin, SoftDeleteMixin, TenantMixin, TimestampMixin
 from deno_core.db.enums import (
     DraftStatus,
+    NoteStatus,
     Plan,
     Platform,
     ProjectStatus,
@@ -30,6 +31,8 @@ from deno_core.db.enums import (
     Source,
     Stance,
     StoryCategory,
+    StudioKind,
+    StudioStatus,
     TakedownStatus,
     UsageKind,
     VerdictKind,
@@ -78,6 +81,8 @@ class Profile(TimestampMixin, Base):
     quality_weights: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # Override the default quality threshold (1–10). NULL = use system default (7).
     quality_threshold: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    # Studio taste (docs/18 phase G): rules the founder struck from the Rulebook, quick-tag counts from reviews.
+    studio_prefs: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
 
 
 class ApiAuditLog(IdMixin, Base):
@@ -117,6 +122,8 @@ class ValidationRun(IdMixin, TenantMixin, TimestampMixin, Base):
     finished_at: Mapped[datetime | None]
     cost_usd: Mapped[Decimal] = mapped_column(sa.Numeric(10, 4), server_default="0")
     error_code: Mapped[str | None] = mapped_column(sa.String(64))
+    # The AI app that started it through the MCP ("Claude", "ChatGPT"); NULL = the Deno web app (migration 0006).
+    client_name: Mapped[str | None] = mapped_column(sa.String(64))
 
     project: Mapped[Project] = relationship(back_populates="runs")
 
@@ -323,6 +330,7 @@ class ContentPlan(IdMixin, TenantMixin, TimestampMixin, Base):
     days: Mapped[int]
     status: Mapped[RunStatus] = mapped_column(enum_col(RunStatus), server_default=RunStatus.QUEUED.value)
     thread_id: Mapped[str] = mapped_column(sa.String(64), unique=True)
+    client_name: Mapped[str | None] = mapped_column(sa.String(64))
 
 
 class ContentBrief(IdMixin, TenantMixin, Base):
@@ -346,6 +354,7 @@ class ContentDraft(IdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin, Base):
     first_comment: Mapped[str | None] = mapped_column(sa.Text)
     status: Mapped[DraftStatus] = mapped_column(enum_col(DraftStatus), server_default=DraftStatus.DRAFT.value)
     edited_by_user: Mapped[bool] = mapped_column(server_default=sa.false())
+    client_name: Mapped[str | None] = mapped_column(sa.String(64))
 
     __table_args__ = (UniqueConstraint("brief_id", "version", name="uq_content_drafts_brief_version"),)
 
@@ -453,6 +462,90 @@ class FeatureFlag(TimestampMixin, Base):
     key: Mapped[str] = mapped_column(sa.String(64), primary_key=True)
     enabled: Mapped[bool] = mapped_column(server_default=sa.false())
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+
+
+# --------------------------------------------------------------------------- studio (docs/18)
+
+
+class BrandKitRow(IdMixin, TenantMixin, TimestampMixin, Base):
+    """Colours, fonts and logo for one idea, read from the founder's site and/or set by hand."""
+
+    __tablename__ = "brand_kits"
+    project_id: Mapped[uuid.UUID] = mapped_column(fk("projects.id"), unique=True)
+    source_url: Mapped[str | None] = mapped_column(sa.Text)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+
+
+class StudioItem(IdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """A video or a still (poster, carousel, thumbnail) made by the founder's AI and rendered on their machine."""
+
+    __tablename__ = "studio_items"
+    project_id: Mapped[uuid.UUID] = mapped_column(fk("projects.id"), index=True)
+    brief_id: Mapped[uuid.UUID | None] = mapped_column(fk("content_briefs.id", ondelete="SET NULL"))
+    kind: Mapped[StudioKind] = mapped_column(enum_col(StudioKind), server_default=StudioKind.VIDEO.value)
+    title: Mapped[str] = mapped_column(sa.String(200))
+    status: Mapped[StudioStatus] = mapped_column(enum_col(StudioStatus), server_default=StudioStatus.DRAFT.value)
+    current_version: Mapped[int] = mapped_column(server_default="0")
+    client_name: Mapped[str | None] = mapped_column(sa.String(64))
+    approved_at: Mapped[datetime | None]
+
+    __table_args__ = (
+        Index("ix_studio_items_user_active", "user_id", "updated_at", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+
+class StudioVersion(IdMixin, TenantMixin, Base):
+    __tablename__ = "studio_versions"
+    item_id: Mapped[uuid.UUID] = mapped_column(fk("studio_items.id"), index=True)
+    version: Mapped[int]
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # Storage paths in the private `studio` bucket: review (mp4), poster, sheet, source (zip), pages[] (stills).
+    files: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    checks: Mapped[list[Any]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    summary: Mapped[str | None] = mapped_column(sa.Text)  # what changed, from the AI
+    duration: Mapped[float | None]
+    client_name: Mapped[str | None] = mapped_column(sa.String(64))
+    created_at: Mapped[datetime] = mapped_column(server_default=sa.func.now())
+
+    __table_args__ = (UniqueConstraint("item_id", "version", name="uq_studio_versions_item_version"),)
+
+
+class StudioAsset(IdMixin, TenantMixin, Base):
+    """Licence ledger: every third-party asset a version used, with its licence and credit."""
+
+    __tablename__ = "studio_assets"
+    item_id: Mapped[uuid.UUID] = mapped_column(fk("studio_items.id"), index=True)
+    version: Mapped[int]
+    asset_id: Mapped[str] = mapped_column(sa.String(200))
+    kind: Mapped[str] = mapped_column(sa.String(32))
+    source: Mapped[str] = mapped_column(sa.String(64), server_default="")
+    license: Mapped[str] = mapped_column(sa.String(64))
+    credit: Mapped[str] = mapped_column(sa.String(300), server_default="")
+    source_url: Mapped[str | None] = mapped_column(sa.Text)
+    commercial: Mapped[bool] = mapped_column(server_default=sa.false())
+    created_at: Mapped[datetime] = mapped_column(server_default=sa.func.now())
+
+
+class ReviewNote(IdMixin, TenantMixin, TimestampMixin, Base):
+    """A note pinned to a frame (and optionally a range and a spot) of one version, by the founder or the checks."""
+
+    __tablename__ = "review_notes"
+    item_id: Mapped[uuid.UUID] = mapped_column(fk("studio_items.id"), index=True)
+    version: Mapped[int]
+    frame: Mapped[int | None]
+    t: Mapped[float | None]
+    t_end: Mapped[float | None]
+    x: Mapped[float | None]  # 0..1 of the frame width
+    y: Mapped[float | None]
+    page: Mapped[int | None]  # stills
+    text: Mapped[str] = mapped_column(sa.Text)
+    tags: Mapped[list[Any]] = mapped_column(JSONB, server_default=sa.text("'[]'::jsonb"))
+    status: Mapped[NoteStatus] = mapped_column(enum_col(NoteStatus), server_default=NoteStatus.OPEN.value)
+    reply: Mapped[str | None] = mapped_column(sa.Text)
+    fixed_in: Mapped[int | None]
+    clip_id: Mapped[str | None] = mapped_column(sa.String(64))
+    chapter_id: Mapped[str | None] = mapped_column(sa.String(64))
+    author: Mapped[str] = mapped_column(sa.String(16), server_default="founder")  # founder | system
 
 
 TENANT_TABLES: tuple[str, ...] = tuple(

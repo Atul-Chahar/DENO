@@ -13,7 +13,7 @@ import {
 } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 
-type Tab = 'profile' | 'voice' | 'billing' | 'checkout' | 'notif' | 'security' | 'data';
+type Tab = 'profile' | 'voice' | 'billing' | 'checkout' | 'notif' | 'security' | 'apps' | 'data';
 
 const TIMEZONES = [
   'Asia/Kolkata',
@@ -128,7 +128,8 @@ export function AccountPage() {
     ['checkout', '04', 'Checkout', ''],
     ['notif', '05', 'Notifications', ''],
     ['security', '06', 'Security', ''],
-    ['data', '07', 'Data & privacy', ''],
+    ['apps', '07', 'Connected apps', ''],
+    ['data', '08', 'Data & privacy', ''],
   ];
 
   async function signOut() {
@@ -202,6 +203,7 @@ export function AccountPage() {
             {tab === 'checkout' && billing && <CheckoutTab billing={billing} onError={setMessage} />}
             {tab === 'notif' && me && <NotifTab me={me} onSaved={setMe} onError={setMessage} />}
             {tab === 'security' && <SecurityTab onError={setMessage} />}
+            {tab === 'apps' && <ConnectedAppsTab onError={setMessage} />}
             {tab === 'data' && <DataTab onError={setMessage} />}
           </div>
         </div>
@@ -609,6 +611,72 @@ function NotifTab({ me, onSaved, onError }: Saver) {
   );
 }
 
+type Grant = { client: { id: string; name: string; uri: string }; scopes: string[]; granted_at: string };
+
+function ConnectedAppsTab({ onError }: { onError: (m: string) => void }) {
+  const [grants, setGrants] = useState<Grant[] | null>(null);
+  const [unsupported, setUnsupported] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- no auth configured: nothing to load
+      setGrants([]);
+      return;
+    }
+    supabase.auth.oauth
+      .listGrants()
+      .then(({ data, error }) => {
+        if (error) {
+          setUnsupported(true);
+          setGrants([]);
+        } else setGrants((data ?? []) as Grant[]);
+      })
+      .catch(() => {
+        setUnsupported(true);
+        setGrants([]);
+      });
+  }, []);
+
+  async function revoke(g: Grant) {
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error } = await supabase.auth.oauth.revokeGrant({ clientId: g.client.id });
+    if (error) return onError(error.message);
+    setGrants((list) => (list ?? []).filter((x) => x.client.id !== g.client.id));
+  }
+
+  return (
+    <div className="dv-rise">
+      <Head
+        kicker="07 · CONNECTED APPS"
+        title="AI apps that can use your Deno."
+        lede="Claude, ChatGPT or the Deno Studio kit connect through Deno's MCP. They act as you: they read your ideas and save posts, videos and images to this dashboard. Revoke any of them here; they lose access immediately."
+      />
+      <div className="dv-pad dv-cell">
+        {grants === null && <div className="dv-mono dv-muted" style={{ fontSize: 12 }}>LOADING…</div>}
+        {grants?.length === 0 && (
+          <p className="dv-muted" style={{ margin: 0, fontSize: 14 }}>
+            {unsupported ? 'Connected apps are not available on this server yet.' : 'No apps connected. Add Deno as a connector in Claude, or install the Studio plugin in Claude Code.'}
+          </p>
+        )}
+        {(grants ?? []).map((g) => (
+          <div key={g.client.id} className="dv-card" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{g.client.name || 'Unnamed app'}</div>
+              <div className="dv-mono dv-muted" style={{ fontSize: 10.5, marginTop: 4 }}>
+                Connected {new Date(g.granted_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                {g.scopes.length ? ` · ${g.scopes.join(' ')}` : ''}
+              </div>
+            </div>
+            <button className="dv-btn danger sm" onClick={() => revoke(g)}>Revoke</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SecurityTab({ onError }: { onError: (m: string) => void }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -748,7 +816,7 @@ function DataTab({ onError }: { onError: (m: string) => void }) {
 
   return (
     <div className="dv-rise">
-      <Head kicker="07 · DATA & PRIVACY" title="Your data leaves when you do." lede="Download everything Deno stores about you, or delete it all. Deletion is permanent and also removes your login." />
+      <Head kicker="08 · DATA & PRIVACY" title="Your data leaves when you do." lede="Download everything Deno stores about you, or delete it all. Deletion is permanent and also removes your login." />
       <div className="dv-split">
         <div className="dv-pad dv-rr dv-cell" style={{ alignItems: 'flex-start' }}>
           <div className="dv-serif" style={{ fontSize: 26, lineHeight: 1.1 }}>Export</div>

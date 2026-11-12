@@ -17,7 +17,7 @@
   "functions": {
     "server/app.py": {
       "maxDuration": 300,
-      "excludeFiles": "{web/**,public/**,docs/**,scripts/**,deploy/**,**/*.md}"
+      "excludeFiles": "{web/**,public/**,docs/**,scripts/**,deploy/**,plugin/**,*.md,apps/**/*.md,packages/*/README.md}"
     }
   }
 }

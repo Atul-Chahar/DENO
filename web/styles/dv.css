@@ -123,3 +123,56 @@ select.dv-input { appearance: auto; }
 .dv-past-more { border: 0; border-top: 1px solid rgba(16, 22, 19, .14); background: transparent; padding: 9px 14px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; cursor: pointer; color: var(--muted); text-align: left; }
 .dv-past-more:hover { color: var(--ink); background: var(--paper-2); }
 @media (max-width: 520px) { .dv-past-badge { width: 74px; padding: 10px; } .dv-past-go { display: none; } }
+
+/* Studio (docs/18): library grid, frame-exact review player, notes, rulebook. Same tokens and hard edges. */
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.st-card { display: flex; flex-direction: column; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); text-decoration: none; transition: box-shadow .2s cubic-bezier(.2, .8, .2, 1), transform .2s cubic-bezier(.2, .8, .2, 1); }
+.st-card:hover { box-shadow: 4px 4px 0 var(--ink); transform: translate(-2px, -2px); }
+.st-thumb { aspect-ratio: 16 / 10; background: var(--paper-2); border-bottom: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.st-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--ink); }
+.st-card-body { padding: 11px 13px; display: flex; flex-direction: column; gap: 6px; }
+.st-card-title { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.st-meta { font-family: var(--mono); font-size: 10.5px; color: var(--muted); letter-spacing: .02em; }
+.st-status { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; padding: 3px 6px; border: 1px solid var(--ink); align-self: flex-start; }
+.st-status.in_review { background: var(--amber-soft); color: var(--amber); border-color: var(--amber); }
+.st-status.approved { background: var(--lime); }
+.st-status.draft { color: var(--muted); }
+.st-code { font-family: var(--mono); font-size: 12px; background: var(--ink); color: var(--lime); padding: 10px 12px; overflow-x: auto; white-space: pre; }
+
+.st-review { display: grid; grid-template-columns: minmax(0, 1fr) 360px; }
+@media (max-width: 1000px) { .st-review { grid-template-columns: 1fr; } .st-review > .dv-rr { border-right: 0; border-bottom: 1.5px solid var(--ink); } }
+.st-stage { position: relative; background: var(--ink); display: flex; justify-content: center; align-items: center; min-height: 240px; min-width: 0; container-type: inline-size; }
+/* cqw, not %: the media's wrapper shrinks to fit it, so a percentage would be circular and ignored. */
+.st-stage video, .st-stage img.st-page { display: block; max-width: 100cqw; max-height: 66vh; }
+.st-pin { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border: 2px solid var(--ink); background: var(--lime); border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px var(--paper); }
+.st-pin.fixed { background: var(--green); }
+.st-pin.pending { background: var(--paper); }
+.st-compare { position: absolute; top: 8px; left: 8px; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; background: var(--lime); color: var(--ink); padding: 3px 6px; }
+.st-transport { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); background: var(--paper-2); }
+.st-key { font-family: var(--mono); font-size: 11px; font-weight: 700; border: 1.5px solid var(--ink); background: var(--paper); padding: 6px 9px; cursor: pointer; color: var(--ink); }
+.st-key:hover { background: var(--ink); color: var(--paper); }
+.st-key.on { background: var(--ink); color: var(--lime); }
+.st-tc { font-family: var(--mono); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 132px; }
+.st-scrub { position: relative; height: 34px; margin: 12px 14px 4px; border: 1.5px solid var(--ink); background: var(--paper); cursor: pointer; touch-action: none; }
+.st-scrub-fill { position: absolute; inset: 0 auto 0 0; background: rgba(198, 242, 78, .55); pointer-events: none; }
+.st-scrub-head { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); pointer-events: none; }
+.st-scrub-range { position: absolute; top: 0; bottom: 0; background: rgba(16, 22, 19, .14); border-left: 1.5px solid var(--ink); border-right: 1.5px solid var(--ink); pointer-events: none; }
+.st-mark { position: absolute; top: 3px; width: 8px; height: 8px; margin-left: -4px; background: var(--amber); border: 1px solid var(--ink); transform: rotate(45deg); pointer-events: none; }
+.st-mark.fixed, .st-mark.resolved { background: var(--green); }
+.st-mark.wontfix { background: var(--muted-2); }
+.st-mark.system { background: var(--red-soft); border-color: var(--red-ink); top: 20px; }
+.st-chapters { position: relative; height: 16px; margin: 0 14px 10px; }
+.st-chapter { position: absolute; top: 0; height: 100%; border-left: 1px solid var(--ink); font-family: var(--mono); font-size: 9px; letter-spacing: .06em; padding-left: 4px; overflow: hidden; white-space: nowrap; color: var(--muted); }
+.st-notes { display: flex; flex-direction: column; max-height: 78vh; overflow-y: auto; }
+.st-note { border-bottom: 1px solid rgba(16, 22, 19, .16); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+.st-note.on { background: var(--paper-2); box-shadow: inset 3px 0 0 var(--ink); }
+.st-note.closed .st-note-text { text-decoration: line-through; color: var(--muted); }
+.st-note-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.st-tcode { font-family: var(--mono); font-size: 11px; font-weight: 700; border: 0; border-bottom: 1.5px solid var(--ink); background: none; padding: 0; cursor: pointer; color: var(--ink); }
+.st-note-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.st-reply { font-size: 13px; line-height: 1.5; border-left: 3px solid var(--lime); padding: 4px 0 4px 10px; color: var(--ink-3); }
+.st-tag { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; border: 1px solid rgba(16, 22, 19, .4); padding: 2px 5px; cursor: pointer; background: transparent; color: var(--ink); }
+.st-tag.on { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.st-swatch { width: 26px; height: 26px; border: 1.5px solid var(--ink); flex: none; }
+.st-rule { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(16, 22, 19, .12); font-size: 14px; line-height: 1.5; }
+.st-rule.struck .st-rule-text { text-decoration: line-through; color: var(--muted); }

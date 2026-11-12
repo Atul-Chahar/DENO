@@ -55,6 +55,7 @@ async def list_projects(
                 finished_at=run.finished_at,
                 verdict=verdict.verdict if verdict else None,
                 confidence=verdict.confidence if verdict else None,
+                client_name=run.client_name,
             )
         items.append(out)
     return ProjectPage(items=items, next_cursor=page.next_cursor)

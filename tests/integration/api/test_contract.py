@@ -69,6 +69,10 @@ def test_v1_contract(case: schemathesis.Case) -> None:
     # studio-edit tests in test_v1.py.
     if case.path.endswith(("/story-bank/extract", "/gates/edit")):
         return
+    # Media search and brand import call third parties (stock providers, the founder's site); covered with
+    # mocked HTTP in tests/unit/studio.
+    if "/studio/media/" in case.path or case.path.endswith("/brand/import"):
+        return
     # Stripe isn't configured in tests: checkout/portal answer 503 by design.
     if case.path in ("/api/v1/billing/checkout", "/api/v1/billing/portal"):
         return
@@ -82,5 +86,9 @@ def test_v1_contract(case: schemathesis.Case) -> None:
     # ours disagree on what those characters are, so it calls the resulting 422 a rejection of valid data.
     # Timezones are checked against the IANA database, which a JSON schema can't express.
     if case.method == "PATCH" and case.path in ("/api/v1/projects/{project_id}", "/api/v1/me"):
+        excluded = [positive_data_acceptance]
+    # Studio payloads carry cross-field rules a schema can't express (film.json contents, upload paths issued
+    # by the server, note times inside the video), and uploads need storage, which tests don't configure.
+    if case.path.startswith("/api/v1/studio") or case.path.endswith("/brand"):
         excluded = [positive_data_acceptance]
     case.call_and_validate(timeout=10, excluded_checks=excluded)

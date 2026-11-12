@@ -99,6 +99,22 @@ class Settings(BaseSettings):
     # Server-side only (account deletion through the Auth admin API). Never in web/.
     supabase_secret_key: SecretStr = SecretStr("")
 
+    # --- Studio (docs/18): media providers, storage, limits ---
+    # Stock video/photos and CC0 sounds for the founder's AI. Empty key = that provider is off.
+    pexels_api_key: SecretStr = SecretStr("")
+    pixabay_api_key: SecretStr = SecretStr("")
+    freesound_api_key: SecretStr = SecretStr("")
+    # Private Supabase Storage bucket for review copies, posters, contact sheets (created by migration 0006).
+    studio_bucket: str = "studio"
+    studio_upload_max_bytes: int = Field(default=50 * 1024 * 1024, ge=1024, description="Supabase free plan: 50 MB")
+    # Saved studio versions per month by plan (free/pro); internal is unlimited.
+    studio_versions_per_month_free: int = 30
+    studio_versions_per_month_pro: int = 1000
+    # MCP per-founder rate limits (per minute) by tool group, and media searches per hour.
+    mcp_reads_per_minute: int = 120
+    mcp_writes_per_minute: int = 30
+    media_searches_per_hour: int = 60
+
     # --- Billing (Stripe, ADR-012). Billing endpoints return 503 until these are set. ---
     stripe_secret_key: SecretStr = SecretStr("")
     stripe_webhook_secret: SecretStr = SecretStr("")

@@ -86,3 +86,22 @@ class TakedownStatus(StrEnum):
     RECEIVED = "received"
     PROCESSED = "processed"
     REJECTED = "rejected"
+
+
+class StudioKind(StrEnum):
+    VIDEO = "video"
+    STILL = "still"
+
+
+class StudioStatus(StrEnum):
+    DRAFT = "draft"
+    IN_REVIEW = "in_review"
+    APPROVED = "approved"
+    ARCHIVED = "archived"
+
+
+class NoteStatus(StrEnum):
+    OPEN = "open"
+    FIXED = "fixed"
+    WONTFIX = "wontfix"
+    RESOLVED = "resolved"

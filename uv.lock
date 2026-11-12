@@ -16,6 +16,7 @@ members = [
     "deno-llm",
     "deno-rag",
     "deno-sources",
+    "deno-studio",
     "deno-worker",
     "deno-workspace",
 ]
@@ -760,6 +761,7 @@ dependencies = [
     { name = "deno-core" },
     { name = "deno-gates" },
     { name = "deno-llm" },
+    { name = "deno-studio" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "mcp" },
@@ -775,6 +777,7 @@ requires-dist = [
     { name = "deno-core", editable = "packages/core" },
     { name = "deno-gates", editable = "packages/gates" },
     { name = "deno-llm", editable = "packages/llm" },
+    { name = "deno-studio", editable = "packages/studio" },
     { name = "fastapi", specifier = ">=0.141,<0.142" },
     { name = "httpx", specifier = ">=0.28,<0.29" },
     { name = "mcp", specifier = ">=2.3,<3" },
@@ -937,6 +940,27 @@ requires-dist = [
 provides-extras = ["valkey"]
 
 [[package]]
+name = "deno-studio"
+version = "0.1.0"
+source = { editable = "packages/studio" }
+dependencies = [
+    { name = "deno-gates" },
+    { name = "deno-sources" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "selectolax" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "deno-gates", editable = "packages/gates" },
+    { name = "deno-sources", editable = "packages/sources" },
+    { name = "httpx", specifier = ">=0.28,<0.29" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "selectolax", specifier = ">=0.4.12,<0.5" },
+]
+
+[[package]]
 name = "deno-worker"
 version = "0.1.0"
 source = { editable = "apps/worker" }
@@ -968,6 +992,7 @@ dependencies = [
     { name = "deno-llm" },
     { name = "deno-rag" },
     { name = "deno-sources" },
+    { name = "deno-studio" },
     { name = "deno-worker" },
 ]
 
@@ -999,6 +1024,7 @@ requires-dist = [
     { name = "deno-llm", editable = "packages/llm" },
     { name = "deno-rag", editable = "packages/rag" },
     { name = "deno-sources", editable = "packages/sources" },
+    { name = "deno-studio", editable = "packages/studio" },
     { name = "deno-worker", editable = "apps/worker" },
 ]
 
