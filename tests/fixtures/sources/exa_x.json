@@ -1,0 +1,12 @@
+{
+ "requestId": "fedcba9876543210",
+ "resolvedSearchType": "",
+ "results": [
+  {"id": "https://nitter.example.net/janedoe/status/1700000000000000001", "url": "https://nitter.example.net/janedoe/status/1700000000000000001", "title": "Jane on churn", "text": "mirror page"},
+  {"id": "https://twiscan.com/en/x/janedoe/1700000000000000001", "url": "https://twiscan.com/en/x/janedoe/1700000000000000001", "title": "same tweet, another mirror", "text": "mirror page"},
+  {"id": "https://twiscan.com/en/x/founderbob/1700000000000000002", "url": "https://twiscan.com/en/x/founderbob/1700000000000000002", "title": "Bob", "text": "mirror page"},
+  {"id": "https://twiscan.com/en/x/founderbob", "url": "https://twiscan.com/en/x/founderbob", "title": "a profile, not a tweet", "text": ""},
+  {"id": "https://blog.example.com/why-saas-customers-churn/", "url": "https://blog.example.com/why-saas-customers-churn/", "title": "a blog", "text": "long article"},
+  {"id": "https://www.unrollnow.com/status/1207952507911262208", "url": "https://www.unrollnow.com/status/1207952507911262208", "title": "no handle", "text": ""}
+ ]
+}

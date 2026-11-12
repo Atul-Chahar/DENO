@@ -1,10 +1,12 @@
-"""Source client contract and SearXNG discovery."""
+"""Source client contract and web-search discovery (Exa, Brave, SearXNG)."""
 
 from __future__ import annotations
 
+import json
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from deno_sources.models import Post, SourceName, SourceUnavailable
@@ -80,6 +82,105 @@ class BraveSearchClient:
             more = data.get("query", {}).get("more_results_available") if isinstance(data, dict) else False
             if not batch or not more:
                 break
+        return results
+
+
+# Exa's hosted search endpoint (JSON-RPC over HTTP). It answers without a key at a lower rate limit; the
+# advanced tool is the one that takes a domain filter, and has to be asked for in the URL.
+EXA_TOOL = "web_search_advanced_exa"
+EXA_MCP_URL = f"https://mcp.exa.ai/mcp?tools={EXA_TOOL}"
+EXA_MAX_RESULTS = 25
+EXA_ATTEMPTS = 2
+EXA_RETRY_WAIT_S = 3.0
+EXA_WINDOW_DAYS = {"day": 1, "week": 7, "month": 31, "year": 365}
+# Exa has no index of X: a domain filter on it finds nothing. It does index public mirrors of tweets,
+# whose URLs carry the handle and status id that X's own embed API can then be asked about. Measured
+# live on three ideas: 17-23 tweet ids per search this way, 0 from an unfiltered search.
+EXA_X_SITES = frozenset({"x.com", "twitter.com"})
+EXA_X_MIRRORS = ("twiscan.com",)
+_SITE_QUERY = re.compile(r"^\s*site:(\S+)\s*(.*)$", re.DOTALL)
+
+
+def exa_results(res: FetchResult) -> list[dict[str, object]] | None:
+    """The result rows of an Exa answer; None when the body is not an answer (error, rate limit, junk)."""
+    if res.status != 200:
+        return None
+    # Not splitlines(): it also splits on U+2028 and U+0085, which sit unescaped inside the JSON of a post.
+    events = [line[5:].strip() for line in res.text.split("\n") if line.startswith("data:")]
+    try:
+        message = json.loads(events[-1] if events else res.text)
+        result = message["result"]
+        if result.get("isError"):
+            return None
+        text = "\n".join(c.get("text", "") for c in result["content"] if c.get("type") == "text")
+        rows = json.loads(text).get("results", [])
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else None
+
+
+class ExaSearchClient:
+    """Web search through Exa's hosted endpoint. Works without a key; ``api_key`` raises the rate limit.
+
+    A leading ``site:`` operator becomes Exa's domain filter. Results carry the page text Exa extracted
+    (``full_text``), so a source can build a post from the search result without fetching the page.
+    """
+
+    def __init__(self, fetcher: Fetcher, api_key: str = "") -> None:
+        self.fetcher = fetcher
+        self._headers = {"Accept": "application/json, text/event-stream"}
+        if api_key:
+            self._headers["x-api-key"] = api_key
+
+    async def search(self, query: str, *, time_range: str | None = None, pages: int = 1) -> list[dict[str, str]]:
+        match = _SITE_QUERY.match(query)
+        site, text = (match.group(1).lower(), match.group(2)) if match else ("", query)
+        text = " ".join(text.replace('"', " ").split())  # semantic search: quotes only narrow it to nothing
+        arguments: dict[str, object] = {"query": text, "numResults": min(EXA_MAX_RESULTS, 10 * max(pages, 1))}
+        if site in EXA_X_SITES:
+            arguments.update(query=f"tweet: {text}", numResults=EXA_MAX_RESULTS, includeDomains=list(EXA_X_MIRRORS))
+        elif site:
+            arguments["includeDomains"] = [site]
+        if time_range in EXA_WINDOW_DAYS:
+            start = datetime.now(UTC) - timedelta(days=EXA_WINDOW_DAYS[time_range])
+            arguments["startPublishedDate"] = start.strftime("%Y-%m-%dT00:00:00.000Z")
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": EXA_TOOL, "arguments": arguments},
+        }
+        for attempt in range(EXA_ATTEMPTS):
+            res = await self.fetcher.post_json(
+                EXA_MCP_URL,
+                source="exa",
+                payload=payload,
+                headers=self._headers,
+                cache_ttl_s=24 * 3600,
+                cacheable=lambda r: exa_results(r) is not None,
+            )
+            rows = exa_results(res)
+            if rows is not None or res.status != 200 or attempt + 1 == EXA_ATTEMPTS:
+                break
+            await self.fetcher.sleep(EXA_RETRY_WAIT_S)  # a 200 that is not an answer is usually the rate limit
+        if rows is None:
+            # A rate limit or a tool error comes back as HTTP 200: it must not read as "nobody posts about this".
+            raise SourceUnavailable(f"search answered HTTP {res.status} without results")
+        results: list[dict[str, str]] = []
+        for row in rows:
+            url, body = str(row.get("url") or ""), str(row.get("text") or "")
+            if not url:
+                continue
+            results.append(
+                {
+                    "url": url,
+                    "title": str(row.get("title") or ""),
+                    "content": body[:500],
+                    "full_text": body,
+                    "author": str(row.get("author") or ""),
+                    "published": str(row.get("publishedDate") or ""),
+                }
+            )
         return results
 
 

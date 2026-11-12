@@ -14,7 +14,7 @@ import respx
 from deno_api.app import create_app
 from deno_core import jobs, maintenance
 from deno_core.settings import Settings
-from deno_sources.base import BraveSearchClient, NoWebSearch, SearxngClient
+from deno_sources.base import BraveSearchClient, ExaSearchClient, NoWebSearch, SearxngClient
 from deno_sources.models import SourceUnavailable
 from deno_sources.registry import SourceConfig, build_fetcher, build_web_search
 
@@ -185,6 +185,7 @@ def test_web_search_backend_follows_the_settings() -> None:
     assert pick(web_search_provider="brave") is NoWebSearch  # no key: say so rather than fail every call
     assert pick(web_search_provider="searxng", searxng_url="http://searxng:8080") is SearxngClient
     assert pick(web_search_provider="none") is NoWebSearch
+    assert pick(web_search_provider="exa") is ExaSearchClient  # works without a key
 
 
 async def test_no_web_search_reports_itself_as_unavailable() -> None:

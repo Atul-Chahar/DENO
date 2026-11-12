@@ -24,12 +24,16 @@ async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--query", default="customer churn")
     parser.add_argument("--subreddits", default="SaaS,startups")
+    parser.add_argument("--search", default="exa", choices=["exa", "brave", "searxng", "none"])
+    parser.add_argument("--search-key", default="", help="API key for --search exa (optional) or brave (required)")
     parser.add_argument("--searxng", default="http://127.0.0.1:8890")
     parser.add_argument("--opt-in", default="", help="comma-separated hosts the operator opts in despite robots.txt")
     args = parser.parse_args()
 
     config = SourceConfig(
         searxng_url=args.searxng,
+        web_search_provider=args.search,
+        web_search_api_key=args.search_key,
         robots_opt_in={h.strip() for h in args.opt_in.split(",") if h.strip()},
         subreddits=[s.strip() for s in args.subreddits.split(",") if s.strip()],
     )

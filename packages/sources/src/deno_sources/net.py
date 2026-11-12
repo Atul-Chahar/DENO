@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import ipaddress
+import json
 import random
 import time
 from collections import deque
@@ -323,12 +324,48 @@ class Fetcher:
         keep returning nothing long after the block lifted.
         """
         full_url = str(httpx.URL(url, params=params)) if params else url
+        request_headers = {"User-Agent": BROWSER_UA if browser_ua else self._ua, **(headers or {})}
+        return await self._fetch(
+            "GET", full_url, f"{source}|{full_url}", source, request_headers, None, cache_ttl_s, cacheable
+        )
+
+    async def post_json(
+        self,
+        url: str,
+        *,
+        source: str,
+        payload: object,
+        headers: Mapping[str, str] | None = None,
+        cache_ttl_s: int | None = None,
+        cacheable: Callable[[FetchResult], bool] | None = None,
+    ) -> FetchResult:
+        """POST a JSON body through the same allow-list, rate limit, daily cap, breaker and cache as ``get``.
+
+        For read-only query endpoints that take their query in the body (a JSON-RPC search): the cache key
+        covers the body, and a transport failure is retried like a GET.
+        """
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        request_headers = {"User-Agent": self._ua, "Content-Type": "application/json", **(headers or {})}
+        key = f"{source}|POST|{url}|{hashlib.sha256(body).hexdigest()}"
+        return await self._fetch("POST", url, key, source, request_headers, body, cache_ttl_s, cacheable)
+
+    async def _fetch(
+        self,
+        method: str,
+        full_url: str,
+        key: str,
+        source: str,
+        request_headers: dict[str, str],
+        body: bytes | None,
+        cache_ttl_s: int | None,
+        cacheable: Callable[[FetchResult], bool] | None,
+    ) -> FetchResult:
         breaker = self.breakers.setdefault(source, CircuitBreaker())
         health = self.health.setdefault(source, SourceHealth())
         if not breaker.allow():
             raise SourceUnavailable(f"{source} circuit open")
 
-        cache_key = hashlib.sha256(f"{source}|{full_url}".encode()).hexdigest()
+        cache_key = hashlib.sha256(key.encode()).hexdigest()
         if cache_ttl_s:
             cached = await self._cache.get(cache_key)
             if cached is not None:
@@ -339,11 +376,10 @@ class Fetcher:
             if await self._cache.incr(f"cap:{source}:{day}", 26 * 3600) > cap:
                 raise SourceUnavailable(f"{source} daily cap of {cap} requests reached")
 
-        request_headers = {"User-Agent": BROWSER_UA if browser_ua else self._ua, **(headers or {})}
         started = time.monotonic()
         health.requests += 1
         try:
-            result = await self._get_with_retries(full_url, request_headers)
+            result = await self._get_with_retries(full_url, request_headers, method, body)
         except AccessDenied:
             health.blocked += 1
             raise
@@ -360,12 +396,14 @@ class Fetcher:
                 await self._cache.set(cache_key, result.text, cache_ttl_s)
         return result
 
-    async def _get_with_retries(self, url: str, headers: dict[str, str]) -> FetchResult:
+    async def _get_with_retries(
+        self, url: str, headers: dict[str, str], method: str = "GET", body: bytes | None = None
+    ) -> FetchResult:
         attempt = 0
         while True:
             attempt += 1
             try:
-                result = await self._get_following_redirects(url, headers)
+                result = await self._get_following_redirects(url, headers, method, body)
             except httpx.TransportError as exc:
                 if attempt >= self._max_attempts:
                     raise SourceUnavailable(f"transport error: {type(exc).__name__}") from exc
@@ -378,12 +416,14 @@ class Fetcher:
                 continue
             return result
 
-    async def _get_following_redirects(self, url: str, headers: dict[str, str]) -> FetchResult:
+    async def _get_following_redirects(
+        self, url: str, headers: dict[str, str], method: str = "GET", body: bytes | None = None
+    ) -> FetchResult:
         for _ in range(MAX_REDIRECTS + 1):
             policy = await self._check_url(url)
             host = (urlsplit(url).hostname or "").lower()
             await self._bucket(host, policy).acquire()
-            res = await self._client.get(url, headers=headers)
+            res = await self._client.request(method, url, headers=headers, content=body)
             if res.is_redirect and "location" in res.headers:
                 target = urljoin(url, res.headers["location"])
                 if "authwall" in target or "/login" in target or "checkpoint" in target:
