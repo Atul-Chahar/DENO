@@ -51,6 +51,8 @@ def test_the_profile_still_renders_with_a_bad_stored_handle() -> None:
         handles=[{"platform": "x", "handle": ":"}, {"platform": "hn", "handle": "pg"}],
         voice_preset=None,
         notification_prefs=None,
+        quality_weights=None,
+        quality_threshold=None,
     )
     out = _me_out("00000000-0000-0000-0000-000000000001", None, profile)
     assert [h.handle for h in out.handles] == ["pg"]

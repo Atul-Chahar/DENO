@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator, with_config
 
 from deno_core.db import models as m
 from deno_core.db.enums import ProjectStatus, RunStatus, Source, Stance, TakedownStatus, VerdictKind
@@ -248,6 +248,31 @@ class MeOut(BaseModel):
     handles: list[Handle] = Field(default_factory=list)
     voice_preset: str | None = None
     notification_prefs: dict[str, bool] = Field(default_factory=dict)
+    quality_weights: dict[str, float] | None = Field(default=None, description="Per-dimension quality weights (0-3)")
+    quality_threshold: int | None = Field(default=None, description="Custom quality threshold (5-9)")
+
+
+# strict: a JSON `false` must not be stored as weight 0.0.
+Weight = Annotated[float, Field(strict=True, ge=0.0, le=3.0)]
+
+
+@with_config(ConfigDict(extra="forbid"))
+class QualityWeights(TypedDict, total=False):
+    """The ten quality dimensions a founder can re-weight; keys match ``deno_gates.quality``.
+
+    Closed on purpose: an open ``dict[str, float]`` let any key through to ``profiles.quality_weights``.
+    """
+
+    hook_strength: Weight
+    specificity: Weight
+    voice_authenticity: Weight
+    platform_fit: Weight
+    engagement_potential: Weight
+    story_grounding: Weight
+    slop_cleanliness: Weight
+    readability: Weight
+    originality: Weight
+    community_compliance: Weight
 
 
 class MeUpdate(BaseModel):
@@ -267,6 +292,19 @@ class MeUpdate(BaseModel):
         ]
         | None
     ) = None
+    quality_weights: QualityWeights | None = Field(
+        default=None,
+        description="How much each quality dimension counts, 0-3 (1 = default). Omitted dimensions keep the "
+        "default weight; unknown dimensions are rejected.",
+    )
+    quality_threshold: int | None = Field(default=None, ge=5, le=9, description="Custom quality threshold (5-9)")
+
+    @model_validator(mode="after")
+    def _some_dimension_counts(self) -> MeUpdate:
+        weights = self.quality_weights
+        if weights and len(weights) == 10 and not any(weights.values()):
+            raise ValueError("At least one quality dimension needs a weight above 0.")
+        return self
 
 
 # ---- takedowns --------------------------------------------------------------------

@@ -55,6 +55,8 @@ def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
         handles=_stored_handles(profile.handles),
         voice_preset=profile.voice_preset,
         notification_prefs={k: bool(v) for k, v in (profile.notification_prefs or {}).items()},
+        quality_weights=profile.quality_weights,
+        quality_threshold=profile.quality_threshold,
     )
 
 
