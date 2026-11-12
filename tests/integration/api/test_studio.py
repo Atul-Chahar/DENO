@@ -91,7 +91,7 @@ async def idea(client: httpx.AsyncClient, headers: dict[str, str]) -> str:
 
 async def test_save_review_reply_and_approve(client: httpx.AsyncClient) -> None:
     user, headers = user_token()
-    me = uuid.UUID(user)
+    me = uuid.UUID(str(user))
     project = await idea(client, headers)
     review = new_path(me, "mp4")
     poster = new_path(me, "png")
@@ -200,7 +200,12 @@ async def test_uploads_must_be_the_callers_and_finals_need_licences(client: http
     )
     final = await client.post(
         "/api/v1/studio/versions",
-        json={"idea_id": project, "manifest": nc, "files": {"review": new_path(uuid.UUID(user), "mp4")}, "final": True},
+        json={
+            "idea_id": project,
+            "manifest": nc,
+            "files": {"review": new_path(uuid.UUID(str(user)), "mp4")},
+            "final": True,
+        },
         headers=headers,
     )
     assert final.status_code == 409 and "non-commercial" in final.json()["error"]["message"]
@@ -209,7 +214,7 @@ async def test_uploads_must_be_the_callers_and_finals_need_licences(client: http
         json={
             "idea_id": project,
             "manifest": {"formats": [{"ratio": "7:3"}]},
-            "files": {"review": new_path(uuid.UUID(user), "mp4")},
+            "files": {"review": new_path(uuid.UUID(str(user)), "mp4")},
         },
         headers=headers,
     )
@@ -223,7 +228,7 @@ async def test_uploads_must_be_the_callers_and_finals_need_licences(client: http
 
 async def test_stills_need_pages(client: httpx.AsyncClient) -> None:
     user, headers = user_token()
-    me = uuid.UUID(user)
+    me = uuid.UUID(str(user))
     project = await idea(client, headers)
     still = manifest(kind="still", pages=2, duration=0, clips=[], formats=[{"ratio": "4:5"}], assets=[])
     missing = await client.post(

@@ -67,7 +67,7 @@ jobs:
       - name: kit syntax
         run: for f in plugin/kit/cli.mjs plugin/kit/lib/*.mjs plugin/kit/workers/*.mjs plugin/bin/studio; do node --check "$f"; done
       - name: kit unit tests
-        run: node --test plugin/kit/test/
+        run: node --test plugin/kit/test/*.test.mjs
 
   secrets:
     runs-on: ubuntu-latest

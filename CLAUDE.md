@@ -27,7 +27,7 @@ next steps). Then the doc for the task at hand (map below).
   migrations hit prod. Additive migrations only, and say so.
 - A contributor (GitHub `945040ad`) opens PRs; review them carefully (run checks, test live) before recommending merge.
 - Run `uv run ruff check . --exclude launch-video && uv run ruff format --check . --exclude launch-video && uv run mypy && uv run pytest tests/unit`
-  plus `uv run python scripts/build_plugin.py --check`, `node --test plugin/kit/test/` and
+  plus `uv run python scripts/build_plugin.py --check`, `node --test plugin/kit/test/*.test.mjs` and
   `cd web && ./node_modules/.bin/tsc --noEmit && ./node_modules/.bin/eslint .` before any PR.
 - Studio content (playbooks, styles, recipes, skills) is edited in `packages/studio/src/deno_studio/content/` only;
   then `uv run python scripts/build_plugin.py` regenerates `plugin/skills/`.
