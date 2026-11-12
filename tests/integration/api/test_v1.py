@@ -18,7 +18,8 @@ from deno_api.v1 import projects as projects_module
 from deno_api.v1 import runs as runs_module
 from deno_core.db import models as m
 from deno_core.db.base import new_id
-from deno_core.db.enums import Plan, Source, Stance, VerdictKind
+from deno_core.db.enums import DraftStatus, Plan, Platform, Source, Stance, VerdictKind
+from deno_core.db.repositories import UserScope
 from deno_core.events import RunEvents
 from deno_core.runs import RunContext, RunOutcome, execute_run
 from deno_core.settings import Settings
@@ -371,6 +372,13 @@ async def test_review_interrupt_and_resume(
         return RunOutcome("awaiting_review")
 
     await execute_run(run_ctx(run_id, user_id, redis, maker), needs_review)
+    # A run paused for review holds no worker: it must not block the next validation (free plan: 1 at a time),
+    # and cancelling it is refused rather than silently turning a later resume into "cancelled".
+    second = await client.post(
+        "/api/v1/projects", json={"idea": "A second idea to validate meanwhile"}, headers=headers
+    )
+    assert (await client.post(f"/api/v1/projects/{second.json()['id']}/runs", headers=headers)).status_code == 202
+    assert (await client.post(f"/api/v1/runs/{run_id}/cancel", headers=headers)).status_code == 409
     report = (await client.get(f"/api/v1/runs/{run_id}/report", headers=headers)).json()
     claim_id = report["claims"][0]["id"]
     res = await client.post(f"/api/v1/runs/{run_id}/resume", json={"wrong_claim_ids": [claim_id]}, headers=headers)
@@ -395,6 +403,267 @@ async def test_me_export_and_delete(client: httpx.AsyncClient) -> None:
     assert len(export["tables"]["projects"]) == 1
     assert (await client.delete("/api/v1/me", headers=headers)).status_code == 204
     assert (await client.get("/api/v1/projects", headers=headers)).json()["items"] == []
+
+
+# ---- content ------------------------------------------------------------------------
+
+
+async def test_a_plan_cannot_be_built_on_another_ideas_run(
+    client: httpx.AsyncClient, redis: Redis, maker: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from deno_api.v1 import content as content_module
+
+    async def no_enqueue(task: str, **kwargs: Any) -> str:
+        return "job"
+
+    monkeypatch.setattr(content_module, "enqueue", no_enqueue)
+    user_id, headers = user_token()
+    run_id = await _start(client, headers)
+    await execute_run(run_ctx(run_id, user_id, redis, maker), fake_graph)
+    other = await create_project(client, headers)
+
+    res = await client.post(f"/api/v1/projects/{other}/content-plans", json={"run_id": run_id}, headers=headers)
+    assert res.status_code == 422, res.text
+    assert res.json()["error"]["code"] == "invalid_input"
+
+
+async def test_a_draft_stays_editable_after_its_story_is_deleted(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    user_id, headers = user_token()
+    story = await client.post(
+        "/api/v1/stories",
+        json={
+            "category": "metric",
+            "headline": "Churn fell to 3%",
+            "details": "We cut churn to 3% in a quarter.",
+            "numbers": ["3%"],
+        },
+        headers=headers,
+    )
+    assert story.status_code == 201, story.text
+    pid = await create_project(client, headers)
+    async with maker() as session, session.begin():
+        scope = UserScope(session, user_id)
+        plan = await scope.create_content_plan(uuid.UUID(pid), None, 7)
+        (brief,) = await scope.replace_briefs(
+            plan.id,
+            [
+                {
+                    "day": 1,
+                    "platform": Platform.LINKEDIN,
+                    "angle": "churn",
+                    "story_entry_id": uuid.UUID(story.json()["id"]),
+                }
+            ],
+        )
+        draft = await scope.add_draft(brief, text="We cut churn to 3%.", first_comment=None, status=DraftStatus.GATED)
+    assert (await client.delete(f"/api/v1/stories/{story.json()['id']}", headers=headers)).status_code == 204
+
+    res = await client.patch(
+        f"/api/v1/drafts/{draft.id}", json={"text": "We cut churn to 3% last quarter."}, headers=headers
+    )
+    assert res.status_code == 200, res.text
+    assert not any(f["rule_id"] == "L1.unsourced_number" for g in res.json()["gates"] for f in g["findings"])
+
+
+async def test_live_draft_check_uses_the_drafts_story_and_costs_no_audit(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    user_id, headers = user_token()
+    story = await client.post(
+        "/api/v1/stories",
+        json={
+            "category": "metric",
+            "headline": "Churn fell to 3%",
+            "details": "We cut churn to 3% in a quarter.",
+            "numbers": ["3%"],
+        },
+        headers=headers,
+    )
+    pid = await create_project(client, headers)
+    async with maker() as session, session.begin():
+        scope = UserScope(session, user_id)
+        plan = await scope.create_content_plan(uuid.UUID(pid), None, 7)
+        (brief,) = await scope.replace_briefs(
+            plan.id,
+            [
+                {
+                    "day": 1,
+                    "platform": Platform.LINKEDIN,
+                    "angle": "churn",
+                    "story_entry_id": uuid.UUID(story.json()["id"]),
+                }
+            ],
+        )
+        draft = await scope.add_draft(brief, text="We cut churn to 3%.", first_comment=None, status=DraftStatus.GATED)
+
+    def rules(layers: list[dict[str, Any]]) -> set[str]:
+        return {f["rule_id"] for layer in layers for f in layer["findings"]}
+
+    sourced = await client.post(
+        f"/api/v1/drafts/{draft.id}/check", json={"text": "We cut churn to 3%."}, headers=headers
+    )
+    invented = await client.post(
+        f"/api/v1/drafts/{draft.id}/check", json={"text": "We cut churn by 42%."}, headers=headers
+    )
+    assert sourced.status_code == invented.status_code == 200
+    assert "L1.unsourced_number" not in rules(sourced.json())
+    assert "L1.unsourced_number" in rules(invented.json())
+    usage = {u["kind"]: u["used"] for u in (await client.get("/api/v1/billing", headers=headers)).json()["usage"]}
+    assert usage["audit"] == 0
+    versions = (await client.get(f"/api/v1/content-plans/{plan.id}", headers=headers)).json()["briefs"][0]["draft"]
+    assert versions["version"] == 1, "checking saves nothing"
+
+
+# ---- billing ------------------------------------------------------------------------
+
+WEBHOOK_SECRET = "whsec_test"
+
+
+class FakeStripe:
+    """The slice of ``stripe.StripeClient`` the API uses, with scripted subscriptions."""
+
+    def __init__(self, subscriptions: dict[str, dict[str, Any]], cancel_error: Exception | None = None) -> None:
+        self.subscriptions, self.cancel_error = subscriptions, cancel_error
+        self.cancelled: list[str] = []
+
+    async def cancel_async(self, sub_id: str) -> None:
+        if self.cancel_error:
+            raise self.cancel_error
+        self.cancelled.append(sub_id)
+
+    async def retrieve_async(self, sub_id: str) -> Any:
+        data = self.subscriptions[sub_id]
+        return type("Remote", (), {"to_dict": lambda _self: dict(data)})()
+
+
+def install_stripe(monkeypatch: pytest.MonkeyPatch, fake: FakeStripe) -> None:
+    from deno_api.v1 import billing as billing_module
+    from deno_api.v1 import me as me_module
+
+    wrapper = type("V1", (), {"v1": type("S", (), {"subscriptions": fake})()})()
+    monkeypatch.setattr(billing_module, "stripe_client", lambda settings: wrapper)
+    monkeypatch.setattr(me_module, "stripe_client", lambda settings: wrapper)
+
+
+async def _subscribe(maker: async_sessionmaker[AsyncSession], user_id: uuid.UUID, status: str = "active") -> None:
+    async with maker() as session, session.begin():
+        session.add(m.Profile(id=user_id, plan=Plan.PRO))
+        await session.flush()
+        session.add(
+            m.Subscription(
+                user_id=user_id,
+                plan=Plan.PRO,
+                status=status,
+                stripe_customer_id=f"cus_{user_id.hex[:8]}",
+                stripe_subscription_id=f"sub_{user_id.hex[:8]}",
+            )
+        )
+
+
+async def test_deleting_an_account_cancels_its_subscription(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user_id, headers = user_token()
+    await _subscribe(maker, user_id)
+    fake = FakeStripe({})
+    install_stripe(monkeypatch, fake)
+    assert (await client.delete("/api/v1/me", headers=headers)).status_code == 204
+    assert fake.cancelled == [f"sub_{user_id.hex[:8]}"]
+
+
+async def test_account_is_kept_when_the_subscription_cannot_be_cancelled(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import stripe
+
+    user_id, headers = user_token()
+    await _subscribe(maker, user_id)
+    install_stripe(monkeypatch, FakeStripe({}, cancel_error=stripe.APIConnectionError("down")))
+    res = await client.delete("/api/v1/me", headers=headers)
+    assert res.status_code == 503
+    assert "nothing was deleted" in res.text
+    assert (await client.get("/api/v1/me", headers=headers)).json()["plan"] == "pro"
+
+
+def _signed(event: dict[str, Any]) -> tuple[bytes, dict[str, str]]:
+    import hashlib
+    import hmac
+    import time
+
+    payload = json.dumps(event).encode()
+    ts = int(time.time())
+    sig = hmac.new(WEBHOOK_SECRET.encode(), f"{ts}.".encode() + payload, hashlib.sha256).hexdigest()
+    return payload, {"Stripe-Signature": f"t={ts},v1={sig}", "Content-Type": "application/json"}
+
+
+@pytest.fixture
+async def billing_client(maker: async_sessionmaker[AsyncSession], redis: Redis) -> AsyncIterator[httpx.AsyncClient]:
+    settings = Settings(
+        environment="test", database_url="", valkey_url=VALKEY_URL, stripe_webhook_secret=WEBHOOK_SECRET
+    )
+    app = create_app(settings)
+    app.state.sessionmaker, app.state.redis = maker, redis
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c,
+    ):
+        yield c
+
+
+async def test_a_stale_subscription_event_cannot_undo_a_cancellation(
+    billing_client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Stripe doesn't order webhooks: an old "updated: active" can land after the cancellation."""
+    user_id = uuid.uuid4()
+    await _subscribe(maker, user_id, status="canceled")
+    sub_id = f"sub_{user_id.hex[:8]}"
+    current = {
+        "id": sub_id,
+        "customer": f"cus_{user_id.hex[:8]}",
+        "status": "canceled",
+        "metadata": {"user_id": str(user_id)},
+    }
+    install_stripe(monkeypatch, FakeStripe({sub_id: current}))
+    stale = {**current, "status": "active"}
+    payload, headers = _signed(
+        {
+            "id": f"evt_{uuid.uuid4().hex}",
+            "object": "event",
+            "type": "customer.subscription.updated",
+            "data": {"object": {"object": "subscription", **stale}},
+        }
+    )
+    assert (await billing_client.post("/api/v1/billing/webhook", content=payload, headers=headers)).status_code == 200
+    async with maker() as session:
+        profile = await session.get(m.Profile, user_id)
+        assert profile is not None and profile.plan == Plan.FREE
+
+
+async def test_a_cancellation_for_a_deleted_account_does_not_recreate_it(
+    billing_client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    user_id = uuid.uuid4()
+    payload, headers = _signed(
+        {
+            "id": f"evt_{uuid.uuid4().hex}",
+            "object": "event",
+            "type": "customer.subscription.deleted",
+            "data": {
+                "object": {
+                    "object": "subscription",
+                    "id": "sub_gone",
+                    "customer": "cus_gone",
+                    "status": "canceled",
+                    "metadata": {"user_id": str(user_id)},
+                }
+            },
+        }
+    )
+    assert (await billing_client.post("/api/v1/billing/webhook", content=payload, headers=headers)).status_code == 200
+    async with maker() as session:
+        assert await session.get(m.Profile, user_id) is None
 
 
 # ---- limits -------------------------------------------------------------------------

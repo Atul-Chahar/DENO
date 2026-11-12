@@ -334,7 +334,11 @@ async def create_plan(
     await scope.get_project(project_id)
     await _check_plan_quota(scope)
     run_id = body.run_id
-    if run_id is None:
+    if run_id is not None:
+        run = await scope.get_run(run_id)
+        if run.project_id != project_id or run.status not in (RunStatus.SUCCEEDED, RunStatus.AWAITING_REVIEW):
+            raise InvalidInput("Build the plan on a finished validation run of this idea.")
+    else:
         latest = await scope.latest_run_for_project(project_id)
         run_id = latest.id if latest and latest.status in (RunStatus.SUCCEEDED, RunStatus.AWAITING_REVIEW) else None
     plan = await scope.create_content_plan(project_id, run_id, body.days)
@@ -445,7 +449,7 @@ async def _gate_context(scope: UserScope, brief: m.ContentBrief) -> tuple[GateCo
     allowed: set[str] = set()
     allowed_words: set[str] = set()
     if brief.story_entry_id:
-        story = await scope.get_story(brief.story_entry_id)
+        story = await scope.get_story(brief.story_entry_id, include_deleted=True)
         story_text = f"{story.headline} {story.details} {' '.join(map(str, story.numbers))}"
         allowed, allowed_words = numbers_in(story_text), number_words_in(story_text)
     rule = (
@@ -488,6 +492,20 @@ async def edit_draft(draft_id: uuid.UUID, body: DraftEdit, scope: Scope) -> Draf
         gate_layers=report.to_dict()["layers"],  # type: ignore[arg-type]
     )
     return _draft_out(new, (await scope.gate_results([new.id])).get(new.id, []))
+
+
+@router.post("/drafts/{draft_id}/check")
+async def check_draft(draft_id: uuid.UUID, body: DraftEdit, scope: Scope) -> list[GateLayerOut]:
+    """Gate an unsaved edit of this draft, live as you type. Nothing is saved and nothing is counted.
+
+    It uses the draft's own context (its story's numbers, community rules, your voice), so the editor
+    flags exactly what Save will. The editor used the audit endpoint before, which knew none of that
+    and spent the monthly audit quota on every pause in typing.
+    """
+    current = await scope.get_draft(draft_id)
+    ctx, profile = await _gate_context(scope, await scope.get_brief(current.brief_id))
+    report = run_gates(body.text, ctx, profile=profile)
+    return [GateLayerOut(**layer) for layer in cast(list[dict[str, Any]], report.to_dict()["layers"])]
 
 
 @router.post("/drafts/{draft_id}/approve")

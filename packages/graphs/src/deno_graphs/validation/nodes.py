@@ -191,6 +191,10 @@ async def _link_context(d: GraphDeps, idea: str) -> tuple[str, str | None]:
             log.info("repo_unavailable", repo=f"{owner}/{name}", reason=exc.reason)
             await d.ctx.emit("log", message=f"couldn't read the repo: {exc.reason}")
             problems.append(exc.reason)
+        except Exception as exc:  # the link is optional context: never fail the run over it
+            log.warning("repo_read_failed", repo=f"{owner}/{name}", error=type(exc).__name__)
+            await d.ctx.emit("log", message="couldn't read the repo")
+            problems.append("the repository couldn't be read")
         else:
             log.info("repo_read", repo=repo.slug, readme_chars=len(repo.readme))
             await d.ctx.emit("log", message=f"read {repo.slug}: {len(repo.readme)} README characters")
@@ -204,6 +208,10 @@ async def _link_context(d: GraphDeps, idea: str) -> tuple[str, str | None]:
             log.info("site_unavailable", host=host, reason=exc.reason)
             await d.ctx.emit("log", message=f"couldn't read the website: {exc.reason}")
             problems.append(exc.reason)
+        except Exception as exc:  # the link is optional context: never fail the run over it
+            log.warning("site_read_failed", host=host, error=type(exc).__name__)
+            await d.ctx.emit("log", message="couldn't read the website")
+            problems.append(f"{host} couldn't be read")
         else:
             log.info("site_read", host=site.host, text_chars=len(site.text), thin=site.thin)
             note = " · little text (the page is probably rendered by JavaScript)" if site.thin else ""
@@ -851,8 +859,9 @@ async def finalize(state: ValidationState, config: RunnableConfig) -> dict[str, 
     d = deps_of(config)
     async with d.session() as scope:
         run = await scope.get_run(d.run_id)
-        project = await scope.get_project(run.project_id)
-        if project.status != ProjectStatus.ARCHIVED:
+        # Deleted mid-run: the run still finishes (its report stays reachable from the run), the project stays deleted.
+        project = await scope.get_project(run.project_id, include_deleted=True)
+        if project.deleted_at is None and project.status != ProjectStatus.ARCHIVED:
             project.status = ProjectStatus.VALIDATED
         flagged = await scope.session.scalar(
             select(m.Claim.id).where(m.Claim.run_id == d.run_id, m.Claim.flagged_wrong.is_(True)).limit(1)

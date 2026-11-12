@@ -287,7 +287,8 @@ async def brief_planner(state: ContentState, config: RunnableConfig) -> dict[str
         async with await d.scope() as scope:
             hooks = await get_hook_patterns(scope.session, [c.id for c, _ in communities])
     slots = schedule(state["days"], communities)
-    pain = [c for c in claims if c.analyst in ("pain", "demand", "icp") and not c.dropped][:12]
+    # Claims the founder flagged as wrong at review are kept for evals, never written into posts.
+    pain = [c for c in claims if c.analyst in ("pain", "demand", "icp") and not c.dropped and not c.flagged_wrong][:12]
     popular_hooks = (
         "; ".join(f"{h.formula_id} in {h.topic} ({h.relative_engagement}x median)" for h in hooks[:6])
         or "none measured yet"
@@ -366,12 +367,16 @@ async def draft(payload: dict[str, Any], config: RunnableConfig) -> dict[str, An
     await d.ctx.emit("node_started", node="draft", brief_id=str(brief_id))
     async with await d.scope() as scope:
         brief = await scope.get_brief(brief_id)
-        story = await scope.get_story(brief.story_entry_id) if brief.story_entry_id else None
+        story = await scope.get_story(brief.story_entry_id, include_deleted=True) if brief.story_entry_id else None
         samples = await scope.list_voice_samples()
         profile_row = await scope.latest_voice_profile()
         claims: list[m.Claim] = []
         if payload.get("run_id"):
-            claims = [c for c in await scope.list_claims(uuid.UUID(str(payload["run_id"]))) if c.analyst == "pain"][:6]
+            claims = [
+                c
+                for c in await scope.list_claims(uuid.UUID(str(payload["run_id"])))
+                if c.analyst == "pain" and not c.flagged_wrong
+            ][:6]
         rule_row = (
             (await community_rules(scope.session, [brief.community_id])).get(brief.community_id)
             if brief.community_id
@@ -525,7 +530,23 @@ def build_content_graph(checkpointer: BaseCheckpointSaver[Any] | None = None) ->
 
 
 async def run_content_plan(ctx: RunContext, *, settings: Any = None) -> dict[str, Any]:
-    """Execute a content plan (ctx.run_id is the plan id). Returns the summary."""
+    """Execute a content plan (ctx.run_id is the plan id). Returns the summary.
+
+    Safe to deliver twice, like validation runs: a lease keeps two workers off the same plan, and a
+    plan that already finished is left alone. Without that, a re-delivered job found no pending graph
+    step, started the plan over and replaced every brief - deleting drafts the founder had edited or
+    approved, and paying for the LLM calls again.
+    """
+    from deno_core.runs import run_lease
+
+    async with run_lease(ctx) as acquired:
+        if not acquired:
+            log.info("content_plan_already_being_executed")
+            return {}
+        return await _execute_plan(ctx, settings)
+
+
+async def _execute_plan(ctx: RunContext, settings: Any) -> dict[str, Any]:
     from deno_core.db.enums import RunStatus
     from deno_core.settings import get_settings
     from deno_graphs.validation.runner import checkpointer
@@ -535,6 +556,9 @@ async def run_content_plan(ctx: RunContext, *, settings: Any = None) -> dict[str
     async with ctx.sessionmaker() as session, session.begin():
         scope = ctx.scope(session)
         plan = await scope.get_content_plan(ctx.run_id)
+        if plan.status in (RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED):
+            log.info("content_plan_already_finished", status=plan.status.value)
+            return {}
         plan.status = RunStatus.RUNNING
         thread_id, project_id, run_id, days = plan.thread_id, plan.project_id, plan.run_id, plan.days
     await ctx.emit("status", status="running")
