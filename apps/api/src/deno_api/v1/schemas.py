@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from deno_core.db import models as m
 from deno_core.db.enums import ProjectStatus, RunStatus, Source, Stance, TakedownStatus, VerdictKind
@@ -223,7 +223,16 @@ FOUNDER_ROLES = ("solo_founder", "co_founder", "indie_hacker", "founding_markete
 
 class Handle(BaseModel):
     platform: Literal["reddit", "x", "linkedin", "hn"]
-    handle: CleanText = Field(min_length=2, max_length=120, pattern=r"^[^\s]+$")
+    handle: CleanText = Field(min_length=2, max_length=120, pattern=r"^[^\s\x00-\x1f\x7f-\x9f]+$")
+
+    @field_validator("handle", mode="after")
+    @classmethod
+    def _long_enough_once_cleaned(cls, value: str) -> str:
+        # min_length is checked on the raw input; CleanText then drops control characters and
+        # NFC-composes, which can leave a shorter handle than the one that passed.
+        if len(value) < 2:
+            raise ValueError("A handle needs at least 2 visible characters.")
+        return value
 
 
 class MeOut(BaseModel):
