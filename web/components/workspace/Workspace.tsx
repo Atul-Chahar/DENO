@@ -21,6 +21,7 @@ import {
   type Run,
   type Report,
   type StreamEvent,
+  type StudioEdit,
 } from '@/lib/api';
 
 type Screen = 0 | 1 | 2 | 3;
@@ -982,17 +983,52 @@ function StudioScreen() {
   const [text, setText] = useState('');
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [edit, setEdit] = useState<StudioEdit | null>(null);
+  const [editing, setEditing] = useState(false);
+  // A suggestion belongs to the exact text and platform it was made for: typing or switching platform
+  // drops it (and any answer still on its way), so "Use this version" can't overwrite newer writing.
+  const editSeq = useRef(0);
+  const community = platform === 'reddit' ? 'r/SaaS' : null;
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   const sentences = text.split(/[.!?]+(\s|$)/).filter((s) => s && s.trim()).length;
 
   async function run(value = text) {
     if (!value.trim()) return;
     try {
-      setAudit(await api.audit(value.trim(), platform, platform === 'reddit' ? 'r/SaaS' : null));
+      setAudit(await api.audit(value.trim(), platform, community));
+      dropEdit();
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  function dropEdit() {
+    editSeq.current += 1;
+    setEdit(null);
+    setEditing(false);
+  }
+
+  async function fixForMe() {
+    const seq = ++editSeq.current;
+    setEditing(true);
+    try {
+      const result = await api.studioEdit(text.trim(), platform, community);
+      if (seq !== editSeq.current) return;
+      setEdit(result);
+      setError(null);
+    } catch (err) {
+      if (seq === editSeq.current) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (seq === editSeq.current) setEditing(false);
+    }
+  }
+
+  function acceptEdit(e: StudioEdit) {
+    setText(e.edited);
+    // The edit was already re-checked by every gate: show that result without spending another audit.
+    setAudit({ passed: e.passed, layers: e.layers, autofixed: e.edited });
+    dropEdit();
   }
 
   const blocking = audit ? blockingFindings(audit.layers) : [];
@@ -1012,7 +1048,17 @@ function StudioScreen() {
           <div className="dv-label" style={{ margin: 0, padding: '11px 14px', borderBottom: '1.5px solid var(--ink)', background: 'var(--paper-2)' }}>TARGET PLATFORM</div>
           <div style={{ padding: '12px 14px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {(['reddit', 'linkedin', 'x'] as GatePlatform[]).map((p) => (
-              <button key={p} className={`dv-tab${platform === p ? ' on' : ''}`} style={{ padding: '7px 11px' }} onClick={() => setPlatform(p)}>{p.toUpperCase()}</button>
+              <button
+                key={p}
+                className={`dv-tab${platform === p ? ' on' : ''}`}
+                style={{ padding: '7px 11px' }}
+                onClick={() => {
+                  if (p !== platform) dropEdit();
+                  setPlatform(p);
+                }}
+              >
+                {p.toUpperCase()}
+              </button>
             ))}
           </div>
         </div>
@@ -1020,7 +1066,10 @@ function StudioScreen() {
           <div className="dv-label" style={{ margin: 0, padding: '11px 14px', borderBottom: '1.5px solid var(--ink)', background: 'var(--paper-2)' }}>DRAFT TO AUDIT</div>
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (edit || editing) dropEdit();
+            }}
             rows={9}
             placeholder="Paste a post to see exactly what gets flagged and how to fix it..."
             style={{ width: '100%', border: 0, background: 'transparent', padding: '16px 14px', fontFamily: 'var(--sans)', fontSize: 14.5, lineHeight: 1.65, minHeight: 200, color: 'var(--ink-2)', resize: 'vertical', outline: 'none' }}
@@ -1068,6 +1117,43 @@ function StudioScreen() {
                 >
                   Apply safe mechanical fixes → rescore
                 </button>
+              )}
+              {(blocking.length > 0 || warnings.length > 0) && !edit && (
+                <button
+                  className="dv-btn ghost"
+                  style={{ marginTop: 10, width: '100%', boxShadow: 'none', color: 'var(--paper)', borderColor: 'rgba(250,248,243,.5)' }}
+                  disabled={editing}
+                  onClick={() => void fixForMe()}
+                >
+                  {editing ? 'Editing in your voice…' : 'Fix it for me → keeps your voice, lists every change'}
+                </button>
+              )}
+              {edit && (
+                <section aria-label="Suggested edit" style={{ marginTop: 20, border: '1px solid rgba(250,248,243,.3)', padding: 16 }}>
+                  <div className="dv-dark-label" style={{ marginBottom: 10 }}>
+                    SUGGESTED EDIT · {edit.passed ? 'PASSES EVERY GATE' : `${blockingFindings(edit.layers).length} ISSUES LEFT`}
+                  </div>
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '0 0 14px' }}>{edit.edited}</p>
+                  <div className="dv-dark-label" style={{ marginBottom: 8 }}>WHAT CHANGED</div>
+                  <ul style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.55 }}>
+                    {edit.changes.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                  {!edit.passed && (
+                    <ul className="dv-dim" style={{ margin: '0 0 14px', paddingLeft: 18, lineHeight: 1.5 }}>
+                      {blockingFindings(edit.layers).map((f, i) => (
+                        <li key={`${f.rule_id}-${i}`}>
+                          {f.message}{f.quote ? `: “${f.quote}”` : ''} → {f.fix}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="dv-btn lime sm" style={{ boxShadow: 'none' }} onClick={() => acceptEdit(edit)}>Use this version</button>
+                    <button className="dv-btn ghost sm" style={{ color: 'var(--paper)', borderColor: 'rgba(250,248,243,.5)' }} onClick={dropEdit}>Keep mine</button>
+                  </div>
+                </section>
               )}
             </>
           )}

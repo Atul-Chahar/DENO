@@ -18,7 +18,7 @@ from deno_api.v1 import projects as projects_module
 from deno_api.v1 import runs as runs_module
 from deno_core.db import models as m
 from deno_core.db.base import new_id
-from deno_core.db.enums import DraftStatus, Plan, Platform, Source, Stance, VerdictKind
+from deno_core.db.enums import DraftStatus, Plan, Platform, Source, Stance, UsageKind, VerdictKind
 from deno_core.db.repositories import UserScope
 from deno_core.events import RunEvents
 from deno_core.runs import RunContext, RunOutcome, execute_run
@@ -664,6 +664,201 @@ async def test_a_cancellation_for_a_deleted_account_does_not_recreate_it(
     assert (await billing_client.post("/api/v1/billing/webhook", content=payload, headers=headers)).status_code == 200
     async with maker() as session:
         assert await session.get(m.Profile, user_id) is None
+
+
+# ---- studio edit ("fix it for me") ---------------------------------------------------
+
+SLOP_POST = (
+    "Here's the thing: onboarding isn't about features. It's about trust. "
+    "We utilize a checklist so every new user gets a win on day one."
+)
+
+
+def scripted_editor(monkeypatch: pytest.MonkeyPatch, answer: str) -> list[str]:
+    """Stands in for the LLM stack; records the post it was asked to edit."""
+    import deno_llm
+
+    seen: list[str] = []
+
+    class Runnable:
+        async def ainvoke(self, messages: list[Any], config: Any) -> Any:
+            seen.append(str(messages[-1].content))
+            return type("Msg", (), {"content": answer})()
+
+    stack = type(
+        "Stack", (), {"router": type("Router", (), {"chat": lambda self, role, temperature=0: Runnable()})()}
+    )()
+    monkeypatch.setattr(deno_llm, "build_stack", lambda settings, redis=None: stack)
+    return seen
+
+
+async def _audits_used(client: httpx.AsyncClient, headers: dict[str, str]) -> int:
+    usage = (await client.get("/api/v1/billing", headers=headers)).json()["usage"]
+    return next(u["used"] for u in usage if u["kind"] == "audit")
+
+
+async def test_fix_it_for_me_returns_the_edit_and_what_changed(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, headers = user_token()
+    seen = scripted_editor(
+        monkeypatch,
+        "EDITED:\nOnboarding is about trust. We use a checklist so every new user gets a win on day one.\n"
+        "WHAT CHANGED:\n- Cut the throat-clearing opener\n- Stated the binary contrast directly\n- utilize -> use\n",
+    )
+    res = await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["edited"].startswith("Onboarding is about trust.")
+    assert body["changes"] == [
+        "Cut the throat-clearing opener",
+        "Stated the binary contrast directly",
+        "utilize -> use",
+    ]
+    assert body["passed"] is True
+    assert "L2.binary_contrast" in seen[0], "the editor is told what the gates found"
+    assert await _audits_used(client, headers) == 1
+
+
+async def test_an_edit_that_invents_a_number_does_not_come_back_clean(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, headers = user_token()
+    scripted_editor(
+        monkeypatch,
+        "EDITED:\nOnboarding is about trust. Our checklist cut churn by 40% for new users.\nWHAT CHANGED:\n- Tightened\n",
+    )
+    res = await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+
+    body = res.json()
+    assert body["passed"] is False
+    assert any(f["rule_id"] == "L1.unsourced_number" for g in body["layers"] for f in g["findings"])
+
+
+async def test_an_unusable_editor_answer_is_503_and_costs_nothing(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, headers = user_token()
+    scripted_editor(monkeypatch, "Sure! Here is a better version of your post.")
+    res = await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+
+    assert res.status_code == 503
+    assert await _audits_used(client, headers) == 0
+
+
+async def test_fix_it_for_me_is_refused_once_the_audit_quota_is_spent(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user_id, headers = user_token()
+    assert (await client.get("/api/v1/me", headers=headers)).status_code == 200  # creates the profile
+    async with maker() as session, session.begin():
+        session.add(m.UsageEvent(id=new_id(), user_id=user_id, kind=UsageKind.AUDIT, units=200, cost_usd=0, meta={}))
+    seen = scripted_editor(monkeypatch, "EDITED:\nanything\nWHAT CHANGED:\n- x")
+
+    res = await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+
+    assert res.status_code == 402
+    assert res.json()["error"]["code"] == "quota_exceeded"
+    assert seen == [], "the LLM is never called past the quota"
+
+
+async def test_an_editor_that_crashes_is_503_and_costs_nothing(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import deno_llm
+
+    class Broken:
+        async def ainvoke(self, messages: list[Any], config: Any) -> Any:
+            raise TimeoutError("NIM timed out")
+
+    stack = type("Stack", (), {"router": type("Router", (), {"chat": lambda self, role, temperature=0: Broken()})()})()
+    monkeypatch.setattr(deno_llm, "build_stack", lambda settings, redis=None: stack)
+    _, headers = user_token()
+
+    res = await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+
+    assert res.status_code == 503
+    assert "by hand" in res.json()["error"]["message"]
+    assert await _audits_used(client, headers) == 0
+
+
+async def test_the_edit_and_the_audit_agree_on_community_rules(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both use the target community's rules, so "passes" means the same thing in both places."""
+    _, headers = user_token()
+    edited = "We built a checklist for onboarding. Try it at https://example.com/checklist if you want."
+    scripted_editor(monkeypatch, f"EDITED:\n{edited}\nWHAT CHANGED:\n- Cut the opener")
+    params = {"platform": "reddit", "community": "r/SaaS", "is_promotional": True}
+
+    fixed = (await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, **params}, headers=headers)).json()
+    audit = (await client.post("/api/v1/gates/audit", json={"text": edited, **params}, headers=headers)).json()
+
+    def compliance(layers: list[dict[str, Any]]) -> list[str]:
+        return sorted(f["rule_id"] for layer in layers if layer["layer"] == "compliance" for f in layer["findings"])
+
+    assert compliance(fixed["layers"]), "r/SaaS's rules flag a promotional link"
+    assert compliance(fixed["layers"]) == compliance(audit["layers"])
+    assert fixed["passed"] == audit["passed"]
+
+
+@pytest.mark.parametrize(
+    ("original", "edited", "flagged"),
+    [
+        ("Three customers asked for annual billing.", "Three customers asked for annual plans.", False),
+        ("Three customers asked for annual billing.", "Five customers asked for annual plans.", True),
+        ("We cut churn to 4% last quarter.", "Churn fell to 4% last quarter.", False),
+        ("We cut churn last quarter.", "Churn fell 12% last quarter.", True),
+    ],
+    ids=["kept-word", "invented-word", "kept-figure", "invented-figure"],
+)
+async def test_only_numbers_from_the_original_survive_an_edit(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch, original: str, edited: str, flagged: bool
+) -> None:
+    _, headers = user_token()
+    scripted_editor(monkeypatch, f"EDITED:\n{edited}\nWHAT CHANGED:\n- Tightened")
+
+    body = (
+        await client.post("/api/v1/gates/edit", json={"text": original, "platform": "linkedin"}, headers=headers)
+    ).json()
+
+    unsourced = any(f["rule_id"] == "L1.unsourced_number" for g in body["layers"] for f in g["findings"])
+    assert unsourced is flagged
+    if flagged:
+        assert body["passed"] is False
+
+
+async def test_an_edit_that_keeps_slop_in_typographic_quotes_is_still_caught(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, headers = user_token()
+    scripted_editor(
+        monkeypatch, "EDITED:\nOnboarding isn\u2019t about features. It\u2019s about trust.\nWHAT CHANGED:\n- x"
+    )
+
+    body = (
+        await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+    ).json()
+
+    assert body["passed"] is False
+    assert any(f["rule_id"] == "L2.binary_contrast" for g in body["layers"] for f in g["findings"])
+
+
+async def test_dashes_the_editor_adds_are_fixed_mechanically(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, headers = user_token()
+    scripted_editor(
+        monkeypatch,
+        "EDITED:\nWe use a checklist \u2014 every new user gets a win on day one, 9\u20135.\nWHAT CHANGED:\n- x",
+    )
+
+    body = (
+        await client.post("/api/v1/gates/edit", json={"text": SLOP_POST, "platform": "linkedin"}, headers=headers)
+    ).json()
+
+    assert body["edited"] == "We use a checklist, every new user gets a win on day one, 9\u20135."
 
 
 # ---- limits -------------------------------------------------------------------------

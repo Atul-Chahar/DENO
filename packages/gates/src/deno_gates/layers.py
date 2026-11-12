@@ -33,7 +33,10 @@ _EXPERIENCE = re.compile(
     re.IGNORECASE,
 )
 _HOOK_LABEL = re.compile(r"^\s*F\d{1,2}\s*[:.)-]\s*", re.MULTILINE)
-_DASH = re.compile(r"—|–")  # typed hyphens (" - ", "--") are how people write; the typographic dash is the tell
+SHORT_COPY_WORDS = 150
+# Typed hyphens (" - ", "--") are how people write; the typographic dash is the tell. An en dash between
+# digits is a range ("9–5", "2019–2021"), not a dash.
+_DASH = re.compile(r"—|(?<!\d)–|–(?!\d)")
 
 
 def _matches(rule: Rule, text: str) -> list[Finding]:
@@ -93,6 +96,20 @@ def scrub(text: str, ctx: GateContext | None = None) -> GateResult:
             Finding("L1.em_dash", "Em-dash overuse", m.group(0), m.start(), m.end(), "Use a comma, colon or full stop.")
             for m in dashes
         ]
+    elif dashes and n_words < SHORT_COPY_WORDS:
+        # no-ai-slop: none in short copy. One is human enough not to block, so it's advice.
+        findings += [
+            Finding(
+                "L1.em_dash",
+                "Em dash in a short post",
+                m.group(0),
+                m.start(),
+                m.end(),
+                "Short posts read better without one: use a comma or a full stop.",
+                severity="warn",
+            )
+            for m in dashes
+        ]
     findings += [
         Finding(
             "L1.leak.hook_label",
@@ -146,6 +163,9 @@ def scrub(text: str, ctx: GateContext | None = None) -> GateResult:
     return GateResult("L1_scrub", not any(f.severity == "block" for f in findings), tuple(findings))
 
 
+_DASH_FIX = re.compile(r"\s*,?\s*(?:—|(?<!\d)–|–(?!\d)|(?<=\s)--(?=\s))\s*,?\s*")
+
+
 def autofix(text: str) -> str:
     """Safe mechanical fixes only: leakage lines, markdown, dashes, curly spacing. Never rewrites meaning."""
     out = _HOOK_LABEL.sub("", text)
@@ -156,9 +176,12 @@ def autofix(text: str) -> str:
             out = rule.pattern.sub(lambda m: m.group(0).strip("*"), out)
         elif rule.id == "L1.markdown.header":
             out = re.sub(r"^#{1,6}\s+", "", out, flags=re.MULTILINE)
-    out = re.sub(r"\s*[—–]\s*", ", ", out)
-    out = re.sub(r"\s+--\s+", ", ", out)
-    out = re.sub(r",\s*,", ",", out)
+    # A dash becomes a comma, swallowing a comma right next to it ("x —, y" -> "x, y"). Commas the founder
+    # typed elsewhere are left alone, and "9–5" stays a range: mechanical fixes never change a figure.
+    # Repeated until nothing changes (each pass removes a dash, so it ends): replacing one dash can leave
+    # a " -- " behind, and autofix must give the same result when run twice.
+    while (fixed := _DASH_FIX.sub(", ", out)) != out:
+        out = fixed
     out = re.sub(r"[ \t]+\n", "\n", out)
     out = re.sub(r"\n{3,}", "\n\n", out)
     return out.strip()

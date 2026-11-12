@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import re
 import uuid
 from collections.abc import AsyncIterable
 from datetime import UTC, datetime
@@ -548,11 +550,8 @@ async def _check_audit_quota(scope: UserScope) -> None:
         raise QuotaExceeded(f"Your plan includes {quota.monthly_limit} audits a month.")
 
 
-@router.post("/gates/audit")
-async def audit(body: AuditIn, scope: Scope) -> AuditOut:
-    """Run the deterministic gates on any text (Ban Risk Studio). Counts toward the monthly audit quota."""
-    await _check_audit_quota(scope)
-    await scope.record_usage(UsageKind.AUDIT)
+async def _studio_context(scope: UserScope, body: AuditIn) -> tuple[GateContext, VoiceProfile | None]:
+    """Gate context for pasted text: the target community's rules and the founder's voice, if known."""
     rules = None
     if body.community:
         row = (
@@ -571,7 +570,87 @@ async def audit(body: AuditIn, scope: Scope) -> AuditOut:
         is_promotional=body.is_promotional,
     )
     profile_row = await scope.latest_voice_profile()
-    profile = VoiceProfile.from_dict(profile_row.delta_baseline) if profile_row else None
+    return ctx, VoiceProfile.from_dict(profile_row.delta_baseline) if profile_row else None
+
+
+class StudioEditOut(BaseModel):
+    edited: str = Field(description="The edited post")
+    changes: list[str] = Field(description="What changed, one line per fix")
+    passed: bool = Field(description="Whether the edited post passes every gate")
+    layers: list[GateLayerOut] = Field(description="Gate results for the edited post")
+
+
+_EDITED_LABEL = re.compile(r"^[ \t*_#>]*edited[ \t*_]*:[ \t*_]*", re.IGNORECASE | re.MULTILINE)
+_CHANGED_LABEL = re.compile(r"^[ \t*_#>]*what changed[ \t*_]*:[ \t*_]*$", re.IGNORECASE | re.MULTILINE)
+_BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+_FENCE = re.compile(r"^\s*```[a-z]*\s*$", re.IGNORECASE | re.MULTILINE)
+
+
+def parse_studio_edit(raw: str) -> tuple[str, list[str]]:
+    """``EDITED: … WHAT CHANGED: - …`` line protocol (guided JSON stalls on this model).
+
+    Lenient about how a model dresses the labels (bold, same-line post, code fences, a missing change
+    list), strict about there being an edit: an answer without the EDITED label is a refusal or a chat
+    reply, never something to put in front of the founder as their post.
+    """
+    raw = raw.replace("\r\n", "\n").replace("\r", "\n")  # "$" doesn't match before "\r"
+    label = _EDITED_LABEL.search(raw)
+    if label is None:
+        raise ValueError("the editor's answer had no EDITED section")
+    rest = raw[label.end() :]
+    changed = _CHANGED_LABEL.search(rest)
+    post_part, changes_part = (rest[: changed.start()], rest[changed.end() :]) if changed else (rest, "")
+    post = _FENCE.sub("", post_part).strip()
+    if not post:
+        raise ValueError("the editor's answer had an empty edit")
+    changes = [_BULLET.sub("", line).strip() for line in changes_part.splitlines()]
+    return post, [c for c in changes if c][:20]
+
+
+@router.post("/gates/edit")
+async def studio_edit(body: AuditIn, scope: Scope, request: Request) -> StudioEditOut:
+    """Fix it for me: edit a pasted post by the no-ai-slop rules, then re-run every gate on the result.
+
+    Counts as one audit. The edit may not introduce numbers the original didn't have: the re-check flags
+    them, so an invented "40% faster" can never come back looking clean.
+    """
+    from deno_llm import Role, build_stack, get_prompt
+
+    await _check_audit_quota(scope)
+    ctx, profile = await _studio_context(scope, body)
+    before = run_gates(body.text, ctx, profile=profile)
+    findings = "\n".join(f'- {f.rule_id}: "{f.quote}" -> {f.fix}' for r in before.results for f in r.findings)
+    settings = getattr(request.app.state, "settings", None) or get_settings()
+    stack = build_stack(settings, getattr(request.app.state, "redis", None))
+    p = get_prompt("studio.edit")
+    try:
+        raw = await stack.router.chat(Role.STRONG, temperature=0.3).ainvoke(
+            p.messages(platform=body.platform, findings=findings or "- none", text=body.text), config=p.config()
+        )
+        edited, changes = parse_studio_edit(str(raw.content))
+    except Exception as exc:
+        raise UpstreamUnavailable("The editor is unavailable right now. Use the findings to fix it by hand.") from exc
+    await scope.record_usage(UsageKind.AUDIT)
+    edited = autofix(edited)
+    after_ctx = dataclasses.replace(
+        ctx,
+        allowed_numbers=frozenset(numbers_in(body.text)),
+        allowed_number_words=frozenset(number_words_in(body.text)),
+        check_numbers=True,
+    )
+    after = run_gates(edited, after_ctx, profile=profile)
+    layers = cast(list[dict[str, Any]], after.to_dict()["layers"])
+    return StudioEditOut(
+        edited=edited, changes=changes, passed=after.passed, layers=[GateLayerOut(**layer) for layer in layers]
+    )
+
+
+@router.post("/gates/audit")
+async def audit(body: AuditIn, scope: Scope) -> AuditOut:
+    """Run the deterministic gates on any text (Ban Risk Studio). Counts toward the monthly audit quota."""
+    await _check_audit_quota(scope)
+    await scope.record_usage(UsageKind.AUDIT)
+    ctx, profile = await _studio_context(scope, body)
     report = run_gates(body.text, ctx, profile=profile)
     layers = cast(list[dict[str, Any]], report.to_dict()["layers"])
     return AuditOut(
