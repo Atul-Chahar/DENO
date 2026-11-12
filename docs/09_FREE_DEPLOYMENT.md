@@ -62,7 +62,7 @@ Manual deploy, if ever needed: `npx vercel@latest deploy --prod` from the repo r
 | `CRON_SECRET` | random; Vercel Cron sends it as `Authorization: Bearer …` |
 | `WEB_ORIGINS`, `APP_URL` | `https://deno-web-eight.vercel.app` |
 | `WEB_SEARCH_PROVIDER` | `exa` (the default): LinkedIn posts, Product Hunt and some X discovery with no key. `brave` for full X discovery |
-| `EXA_API_KEY` | optional but recommended; keyless Exa is rate limited per IP, and Vercel's IPs are shared. A free Exa account needs no card |
+| `EXA_API_KEY` | recommended in production: switches to Exa's documented search API (`api.exa.ai/search`). Keyless Exa uses its assistant endpoint, rate limited per IP, and Vercel's IPs are shared |
 | `BRAVE_SEARCH_API_KEY` | only with `brave`; the one backend with a real X index |
 | `GITHUB_TOKEN` | optional; raises GitHub's limit for repo links in ideas (60/h per IP without it) |
 

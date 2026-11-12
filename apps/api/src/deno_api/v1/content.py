@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, Response, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic import BaseModel, Field, StrictBool
+from pydantic import AfterValidator, BaseModel, Field, StrictBool
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -23,7 +23,7 @@ from deno_core.errors import Conflict, InvalidInput, QuotaExceeded, UpstreamUnav
 from deno_core.events import RunEvent
 from deno_core.jobs import TASK_CONTENT_PLAN, enqueue
 from deno_core.settings import get_settings
-from deno_core.text import CleanText
+from deno_core.text import CleanText, clean_text
 from deno_gates import (
     CommunityRules,
     GateContext,
@@ -46,7 +46,7 @@ HEARTBEAT_MS = 15_000
 
 class VoiceSampleIn(BaseModel):
     text: CleanText = Field(min_length=40, max_length=5000, description="One of your own posts, pasted")
-    source_url: CleanText | None = Field(default=None, max_length=500)
+    source_url: Annotated[str, Field(max_length=500), AfterValidator(clean_text)] | None = Field(default=None)
 
 
 class VoiceSampleOut(BaseModel):
@@ -170,7 +170,7 @@ class DraftEdit(BaseModel):
 class AuditIn(BaseModel):
     text: CleanText = Field(min_length=1, max_length=6000)
     platform: Literal["linkedin", "reddit", "x", "hn"] = "linkedin"
-    community: CleanText | None = Field(default=None, max_length=128)
+    community: Annotated[str, Field(max_length=128), AfterValidator(clean_text)] | None = Field(default=None)
     is_promotional: StrictBool = False
 
 

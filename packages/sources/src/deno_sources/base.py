@@ -89,6 +89,10 @@ class BraveSearchClient:
 # advanced tool is the one that takes a domain filter, and has to be asked for in the URL.
 EXA_TOOL = "web_search_advanced_exa"
 EXA_MCP_URL = f"https://mcp.exa.ai/mcp?tools={EXA_TOOL}"
+# With a key we use Exa's documented search API instead: published limits, billed per request, and not
+# shared with every other keyless caller on the same Vercel egress IP.
+EXA_API_URL = "https://api.exa.ai/search"
+EXA_TEXT_CHARS = 8000
 EXA_MAX_RESULTS = 25
 EXA_ATTEMPTS = 2
 EXA_RETRY_WAIT_S = 3.0
@@ -128,9 +132,10 @@ class ExaSearchClient:
 
     def __init__(self, fetcher: Fetcher, api_key: str = "") -> None:
         self.fetcher = fetcher
+        self._api_key = api_key
         self._headers = {"Accept": "application/json, text/event-stream"}
         if api_key:
-            self._headers["x-api-key"] = api_key
+            self._headers = {"Accept": "application/json", "x-api-key": api_key}
 
     async def search(self, query: str, *, time_range: str | None = None, pages: int = 1) -> list[dict[str, str]]:
         match = _SITE_QUERY.match(query)
@@ -144,22 +149,17 @@ class ExaSearchClient:
         if time_range in EXA_WINDOW_DAYS:
             start = datetime.now(UTC) - timedelta(days=EXA_WINDOW_DAYS[time_range])
             arguments["startPublishedDate"] = start.strftime("%Y-%m-%dT00:00:00.000Z")
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": EXA_TOOL, "arguments": arguments},
-        }
+        url, payload, parse = self._request(arguments)
         for attempt in range(EXA_ATTEMPTS):
             res = await self.fetcher.post_json(
-                EXA_MCP_URL,
+                url,
                 source="exa",
                 payload=payload,
                 headers=self._headers,
                 cache_ttl_s=24 * 3600,
-                cacheable=lambda r: exa_results(r) is not None,
+                cacheable=lambda r: parse(r) is not None,
             )
-            rows = exa_results(res)
+            rows = parse(res)
             if rows is not None or res.status != 200 or attempt + 1 == EXA_ATTEMPTS:
                 break
             await self.fetcher.sleep(EXA_RETRY_WAIT_S)  # a 200 that is not an answer is usually the rate limit
@@ -182,6 +182,27 @@ class ExaSearchClient:
                 }
             )
         return results
+
+    def _request(
+        self, arguments: dict[str, object]
+    ) -> tuple[str, dict[str, object], Callable[[FetchResult], list[dict[str, object]] | None]]:
+        """The documented search API when we have a key, else the keyless hosted endpoint (JSON-RPC)."""
+        if self._api_key:
+            body = {**arguments, "type": "auto", "contents": {"text": {"maxCharacters": EXA_TEXT_CHARS}}}
+            return EXA_API_URL, body, exa_api_results
+        rpc = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": EXA_TOOL, "arguments": arguments}}
+        return EXA_MCP_URL, rpc, exa_results
+
+
+def exa_api_results(res: FetchResult) -> list[dict[str, object]] | None:
+    """Result rows of Exa's search API (``POST /search``); None when the body is not an answer."""
+    if res.status != 200:
+        return None
+    try:
+        rows = json.loads(res.text)["results"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else None
 
 
 class SearxngClient:

@@ -28,6 +28,7 @@ HOSTS: dict[str, HostPolicy] = {
     "api.search.brave.com": HostPolicy(rate_per_s=1.0, burst=2, access="api"),
     # Keyless Exa answers 429 to a burst of more than about 3 searches: send them one at a time.
     "mcp.exa.ai": HostPolicy(rate_per_s=0.5, burst=1, access="api"),
+    "api.exa.ai": HostPolicy(rate_per_s=2.0, burst=4, access="api"),
 }
 
 # Global per-source request caps per UTC day (cache hits don't count). Keeps us a
