@@ -64,12 +64,14 @@ class Settings(BaseSettings):
     # --- Data ---
     database_url: str = Field(default="", description="postgresql+asyncpg://… (Supabase Postgres)")
     valkey_url: str = "redis://127.0.0.1:6379/0"
-    # --- Web search (X and Product Hunt discovery use `site:` queries; docs/15) ---
-    # searxng: a self-hosted SearXNG (local dev). brave: the Brave Search API (production on Vercel).
+    # --- Web search (X, LinkedIn posts and Product Hunt discovery use `site:` queries; docs/15) ---
+    # exa: Exa's hosted search; needs no key (EXA_API_KEY only raises the rate limit). brave: the Brave
+    # Search API (needs a key; the only backend with a real X index). searxng: a self-hosted SearXNG.
     # none: those sources report "web search is not configured" and every other source still runs.
-    web_search_provider: Literal["searxng", "brave", "none"] = "none"
+    web_search_provider: Literal["exa", "brave", "searxng", "none"] = "exa"
     searxng_url: str = "http://127.0.0.1:8890"
     brave_search_api_key: SecretStr = SecretStr("")
+    exa_api_key: SecretStr = SecretStr("")
 
     # --- Jobs (docs/15) ---
     # taskiq: Valkey queue + a worker process (local dev). vercel_queue: one Vercel Queues message per
@@ -154,7 +156,8 @@ class Settings(BaseSettings):
 
     @property
     def web_search_api_key(self) -> str:
-        return self.brave_search_api_key.get_secret_value() if self.web_search_provider == "brave" else ""
+        keys = {"brave": self.brave_search_api_key, "exa": self.exa_api_key}
+        return keys[self.web_search_provider].get_secret_value() if self.web_search_provider in keys else ""
 
     @property
     def billing_enabled(self) -> bool:

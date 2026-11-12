@@ -19,6 +19,20 @@ from deno_sources.net import Fetcher
 from deno_sources.normalize import canonical_url, clean_text
 
 STATUS_URL = re.compile(r"https?://(?:www\.|mobile\.)?(?:x|twitter)\.com/([A-Za-z0-9_]{1,15})/status/(\d{5,25})")
+# Public mirrors of a tweet keep its handle and status id in the URL (``/<handle>/status/<id>`` or
+# ``/x/<handle>/<id>``). Only the id is taken from them; the tweet itself is read from X.
+MIRROR_URL = re.compile(
+    r"https?://[^/\s]+/(?:([A-Za-z0-9_]{1,15})/status/|(?:[a-z]{2}/)?x/([A-Za-z0-9_]{1,15})/)(\d{15,25})(?![\w.])"
+)
+
+
+def status_ref(url: str) -> tuple[str, str] | None:
+    """(handle, tweet id) named by a tweet URL, on X or on a mirror of it."""
+    if m := STATUS_URL.search(url):
+        return m.group(1), m.group(2)
+    if m := MIRROR_URL.search(url):
+        return m.group(1) or m.group(2), m.group(3)
+    return None
 
 
 def syndication_token(tweet_id: str) -> str:
@@ -104,12 +118,12 @@ class XClient(SourceClient):
 
     async def discover(self, query: str, *, time_range: str | None = None) -> list[tuple[str, str]]:
         """(handle, tweet id) pairs found by `site:x.com` search. Unquoted: an exact 4-5 word phrase almost
-        never matches a tweet."""
+        never matches a tweet. A backend with no X index (Exa) returns mirrors of tweets instead."""
         results = await self.searxng.search(f"site:x.com {query}", time_range=time_range)
         found: dict[str, tuple[str, str]] = {}
         for r in results:
-            if m := STATUS_URL.search(r["url"]):
-                found.setdefault(m.group(2), (m.group(1), m.group(2)))
+            if ref := status_ref(r["url"]):
+                found.setdefault(ref[1], ref)
         return list(found.values())
 
     async def search(self, query: str, *, since: datetime | None = None, limit: int = 25) -> list[Post]:

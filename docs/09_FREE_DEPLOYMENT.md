@@ -11,7 +11,7 @@ Why and how we moved: docs/15. No GCP, no Docker, nothing to keep running.
 | Crons | Vercel Cron Jobs in `vercel.json` (`/internal/cron/purge`, `/internal/cron/requeue`) | same project |
 | Postgres + Auth | Supabase, `ap-northeast-1` | transaction pooler `:6543` for the API |
 | Redis | Upstash | SSE events, run leases, rate limits, source cache |
-| Web search | Brave Search API (optional) | `WEB_SEARCH_PROVIDER=brave` + `BRAVE_SEARCH_API_KEY` |
+| Web search | Exa hosted search (no key needed), or the Brave Search API | `WEB_SEARCH_PROVIDER=exa`, or `brave` + `BRAVE_SEARCH_API_KEY` |
 
 ## 1. How a validation run executes
 
@@ -61,8 +61,9 @@ Manual deploy, if ever needed: `npx vercel@latest deploy --prod` from the repo r
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | Supabase |
 | `CRON_SECRET` | random; Vercel Cron sends it as `Authorization: Bearer …` |
 | `WEB_ORIGINS`, `APP_URL` | `https://deno-web-eight.vercel.app` |
-| `WEB_SEARCH_PROVIDER` | `none` until a Brave key exists, then `brave` |
-| `BRAVE_SEARCH_API_KEY` | optional; enables X, LinkedIn posts and Product Hunt discovery |
+| `WEB_SEARCH_PROVIDER` | `exa` (the default): LinkedIn posts, Product Hunt and some X discovery with no key. `brave` for full X discovery |
+| `EXA_API_KEY` | optional but recommended; keyless Exa is rate limited per IP, and Vercel's IPs are shared. A free Exa account needs no card |
+| `BRAVE_SEARCH_API_KEY` | only with `brave`; the one backend with a real X index |
 | `GITHUB_TOKEN` | optional; raises GitHub's limit for repo links in ideas (60/h per IP without it) |
 
 `deno-web` keeps `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and

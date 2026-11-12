@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
-from deno_sources.base import BraveSearchClient, NoWebSearch, SearxngClient, SourceClient, WebSearch
+from deno_sources.base import BraveSearchClient, ExaSearchClient, NoWebSearch, SearxngClient, SourceClient, WebSearch
 from deno_sources.feeds import ProductHuntClient, TrendsClient
 from deno_sources.hn import HackerNewsClient
 from deno_sources.linkedin import LinkedInJobsClient, LinkedInPostsClient
@@ -26,6 +26,8 @@ HOSTS: dict[str, HostPolicy] = {
     "trends.google.com": HostPolicy(rate_per_s=0.5, burst=1, access="robots"),
     "www.reddit.com": HostPolicy(rate_per_s=0.5, burst=1, access="robots"),
     "api.search.brave.com": HostPolicy(rate_per_s=1.0, burst=2, access="api"),
+    # Keyless Exa answers 429 to a burst of more than about 3 searches: send them one at a time.
+    "mcp.exa.ai": HostPolicy(rate_per_s=0.5, burst=1, access="api"),
 }
 
 # Global per-source request caps per UTC day (cache hits don't count). Keeps us a
@@ -41,13 +43,15 @@ DAILY_CAPS: dict[str, int] = {
     "searxng": 3000,
     # Brave's free credit is ~1,000 queries a month; results are cached for a day.
     "web_search": 30,
+    # Exa's keyless limit is not published; a run makes about 5 searches and results are cached for a day.
+    "exa": 600,
 }
 
 
 @dataclass
 class SourceConfig:
     searxng_url: str = ""
-    web_search_provider: str = "searxng"  # searxng | brave | none (docs/15)
+    web_search_provider: str = "searxng"  # exa | brave | searxng | none (docs/15)
     web_search_api_key: str = ""
     robots_opt_in: set[str] = field(default_factory=set)
     subreddits: list[str] = field(default_factory=list)
@@ -74,6 +78,8 @@ def build_fetcher(
 
 
 def build_web_search(config: SourceConfig, fetcher: Fetcher) -> WebSearch:
+    if config.web_search_provider == "exa":
+        return ExaSearchClient(fetcher, config.web_search_api_key)
     if config.web_search_provider == "brave" and config.web_search_api_key:
         return BraveSearchClient(fetcher, config.web_search_api_key)
     if config.web_search_provider == "searxng" and config.searxng_url:

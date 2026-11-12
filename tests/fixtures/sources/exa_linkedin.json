@@ -1,0 +1,32 @@
+{
+ "requestId": "0123456789abcdef",
+ "resolvedSearchType": "",
+ "results": [
+  {
+   "id": "https://www.linkedin.com/posts/samexample_customersuccess-churn-activity-7112009104717463552-2e3K",
+   "url": "https://www.linkedin.com/posts/samexample_customersuccess-churn-activity-7112009104717463552-2e3K",
+   "publishedDate": "2026-08-23T00:00:00.000Z",
+   "author": "Sam Example",
+   "title": "We lost 14 customers last quarter. | Sam Example",
+   "text": "# We lost 14 customers last quarter. | Sam Example · LinkedIn · 2026-08-23T00:00:00+00:00\n\n**Sam Example**: Head of Customer Success @ Acme | Advisor.\n\n---\n\nWe lost 14 customers last quarter.\n\nNone of them complained first. Usage dropped for three weeks, then the cancellation email arrived.\n\nWe now review every account whose logins fall by half.\n\n#CustomerSuccess #Churn\n\n## Engagement\n\n- Reactions: 37\n- Comments: 5\n\n## Comments (1 shown of 5 reported)\n\n**Pat Reader** · 2026-08-23T00:00:00+00:00 · 3 reactions\n> Same here. The silent ones are the ones that leave."
+  },
+  {
+   "id": "https://www.linkedin.com/posts/samexample_customersuccess-churn-activity-7112009104717463552-2e3K?utm_source=share",
+   "url": "https://www.linkedin.com/posts/samexample_customersuccess-churn-activity-7112009104717463552-2e3K?utm_source=share",
+   "title": "dup",
+   "text": "# dup\n\n---\n\nWe lost 14 customers last quarter. None of them complained first. Usage dropped for three weeks, then the email arrived."
+  },
+  {
+   "id": "https://www.linkedin.com/company/acme",
+   "url": "https://www.linkedin.com/company/acme",
+   "title": "not a post",
+   "text": "Acme | LinkedIn"
+  },
+  {
+   "id": "https://www.linkedin.com/posts/thin_activity-7112009104717463999-aaaa",
+   "url": "https://www.linkedin.com/posts/thin_activity-7112009104717463999-aaaa",
+   "title": "thin",
+   "text": "# thin\n\n---\n\nSign in"
+  }
+ ]
+}

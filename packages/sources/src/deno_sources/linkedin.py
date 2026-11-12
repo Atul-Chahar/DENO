@@ -20,6 +20,11 @@ from deno_sources.net import Fetcher
 from deno_sources.normalize import canonical_url, clean_text
 
 POST_URL = re.compile(r"https?://(?:[a-z]{2,3}\.)?linkedin\.com/posts/[^\s?#\"'<>]+")
+_SLUG_HANDLE = re.compile(r"/posts/([A-Za-z0-9-]{2,100})_")
+_EXA_TAIL = re.compile(r"^## (?:Engagement|Comments)\b", re.MULTILINE)
+_REACTIONS = re.compile(r"^- Reactions: (\d+)", re.MULTILINE)
+_COMMENTS = re.compile(r"^- Comments: (\d+)|^## Comments \(\d+ shown of (\d+) reported\)", re.MULTILINE)
+MIN_POST_CHARS = 40
 JOBS_API = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 
 
@@ -77,6 +82,48 @@ def parse_post_page(html: str, url: str) -> Post | None:
         return None
     return Post(
         source=SourceName.LINKEDIN_POSTS, url=url, canonical_url=canonical_url(url), text=text, tier="opengraph"
+    )
+
+
+def parse_exa_post(result: dict[str, str]) -> Post | None:
+    """A post from the page text a search backend already extracted (Exa), so LinkedIn is not fetched.
+
+    The text is a rendering of the public post page: a heading, the author's name and bio, a rule, the
+    post, then engagement counts and comments. Only the post itself is kept; a comment is someone else's
+    words and must not be attributed to the author.
+    """
+    url = result["url"]
+    page = result.get("full_text", "")
+    _, rule, after = page.partition("\n---\n")
+    body = after if rule else page
+    tail = _EXA_TAIL.search(body)
+    lines = (body[: tail.start()] if tail else body).strip().splitlines()
+    while lines and (not lines[-1].strip() or lines[-1].rstrip().endswith(" image")):
+        lines.pop()  # the alt text of the post's picture
+    text = clean_text("\n".join(lines))
+    if len(text) < MIN_POST_CHARS:
+        return None
+    published = None
+    if result.get("published"):
+        try:
+            published = datetime.fromisoformat(result["published"].replace("Z", "+00:00"))
+        except ValueError:
+            published = None
+    handle = _SLUG_HANDLE.search(url)
+    reactions, comments = _REACTIONS.search(page), _COMMENTS.search(page)
+    return Post(
+        source=SourceName.LINKEDIN_POSTS,
+        url=url,
+        canonical_url=canonical_url(url),
+        text=text,
+        title=clean_text(result.get("title", "").split(" | ")[0]) or None,
+        author_handle=handle.group(1) if handle else None,
+        published_at=published,
+        engagement=Engagement(
+            likes=int(reactions.group(1)) if reactions else None,
+            comments=int(comments.group(1) or comments.group(2)) if comments else None,
+        ),
+        tier="exa",
     )
 
 
@@ -140,9 +187,16 @@ class LinkedInPostsClient(SourceClient):
         return list(dict.fromkeys(canonical_url(u) for u in urls))
 
     async def search(self, query: str, *, since: datetime | None = None, limit: int = 10) -> list[Post]:
+        results = await self.searxng.search(f'site:linkedin.com/posts "{query}"')
+        found: dict[str, dict[str, str]] = {}
+        for r in results:
+            if m := POST_URL.search(r["url"]):
+                found.setdefault(canonical_url(m.group(0)), r)
         posts: list[Post] = []
-        for url in (await self.discover(query))[:limit]:
-            post = await self.hydrate(url)
+        for url, result in list(found.items())[:limit]:
+            # A backend that returns the page text (Exa) saves the fetch, which LinkedIn's robots.txt
+            # only allows with the operator's opt-in.
+            post = parse_exa_post({**result, "url": url}) if result.get("full_text") else await self.hydrate(url)
             if post and (since is None or post.published_at is None or post.published_at >= since):
                 posts.append(post)
         return posts
