@@ -1,0 +1,17 @@
+# Applies to BOTH Vercel projects on Git deploys (deno-web: root directory web/; deno-api: repo root).
+# Only list paths neither project needs. Never list web/ here.
+.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+_vc_queue_handlers
+launch-video
+design
+spikes
+evals
+tests
+.github
+.claude
+.agent
+deno_workspace.db

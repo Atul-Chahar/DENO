@@ -30,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from deno_core.db import models as m
 from deno_core.db.enums import Platform, ProjectStatus, Source, Stance, UsageKind, VerdictKind
 from deno_core.db.repositories import UserScope, ensure_communities, record_source_health
-from deno_core.gcp import searxng_auth_headers
 from deno_core.logging import get_logger
 from deno_core.observability import NODE_SECONDS, SOURCE_ERRORS, SOURCE_POSTS
 from deno_core.runs import RunContext
@@ -68,9 +67,17 @@ PER_SOURCE_LIMIT = {  # results per query
     SourceName.PRODUCTHUNT: 10,
 }
 MAX_POSTS_PER_SOURCE = 80
-SOURCE_TIMEOUT_S = 90.0
+# Per-source wall-clock budgets. A whole run has to fit one 300 s function on Vercel Hobby (docs/15), so
+# collection gets about a third of it; Reddit (one call per subreddit, slow upstream) gets 1.5x.
+SOURCE_TIMEOUT_S = 60.0
+REDDIT_BUDGET_FACTOR = 1.5
+# The broadened second pass only tops up thin sources. Measured live: it re-found 54 of 64 posts, so it
+# gets a short budget instead of a second full one.
+RETRY_SOURCE_TIMEOUT_S = 30.0  # Reddit: 45 s
+# Critic -> refiner passes. One pass catches nearly everything; a second cost ~30 s for little change.
+MAX_REFINE_ROUNDS = 1
 COLLECT_CONCURRENCY = 5  # in-flight searches per source; the per-host token bucket is the real throttle
-PER_CALL_TIMEOUT_S = 40.0  # one search, including its retries (Arctic Shift backs off twice)
+PER_CALL_TIMEOUT_S = 40.0  # one search, including its retries (Arctic Shift often takes 25-40 s)
 # Most actionable first: several jobs can now fail at once, and the source reports one error.
 ERROR_PRIORITY = ("blocked_by_policy", "timeout", "slow source", "unavailable", "error")
 ANALYST_FOCUS = {
@@ -373,11 +380,13 @@ async def collect(payload: dict[str, Any], config: RunnableConfig) -> dict[str, 
         searxng_url=d.settings.searxng_url,
         robots_opt_in=d.settings.sources_robots_opt_in,
         subreddits=payload.get("subreddits") or [],
-        searxng_headers=searxng_auth_headers(d.settings),
+        web_search_provider=d.settings.web_search_provider,
+        web_search_api_key=d.settings.web_search_api_key,
     )
     since = datetime.now(UTC) - timedelta(days=EVIDENCE_WINDOW_DAYS)
     started = time.monotonic()
-    budget = SOURCE_TIMEOUT_S * (2 if source == SourceName.REDDIT else 1)
+    base = RETRY_SOURCE_TIMEOUT_S if payload.get("retry") else SOURCE_TIMEOUT_S
+    budget = base * (REDDIT_BUDGET_FACTOR if source == SourceName.REDDIT else 1)
     # Reddit discovery is per subreddit: one client per community so each call has its own timeout.
     if source == SourceName.REDDIT:
         subs = cfg.subreddits or ["SaaS", "startups"]
@@ -536,7 +545,7 @@ async def broaden(state: ValidationState, config: RunnableConfig) -> dict[str, A
 
 def fan_out_retry(state: ValidationState) -> list[Send] | str:
     sends = [
-        Send("collect", {"source": source, "queries": job["queries"], "subreddits": job["subreddits"]})
+        Send("collect", {"source": source, "queries": job["queries"], "subreddits": job["subreddits"], "retry": True})
         for source, job in state.get("retry", {}).items()
         if job["queries"]
     ]
@@ -789,7 +798,7 @@ async def critic(state: ValidationState, config: RunnableConfig) -> dict[str, An
 
 
 def route_after_critic(state: ValidationState) -> str:
-    return "refiner" if state.get("critique") and state.get("critic_round", 0) <= 2 else "verdict"
+    return "refiner" if state.get("critique") and state.get("critic_round", 0) <= MAX_REFINE_ROUNDS else "verdict"
 
 
 @node("refiner")

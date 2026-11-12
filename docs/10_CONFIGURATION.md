@@ -11,10 +11,8 @@ today. Deployment steps are in [`09_FREE_DEPLOYMENT.md`](09_FREE_DEPLOYMENT.md).
 | `.env.example` | template for `.env` | yes |
 | `web/.env.local` | Next.js dev server and builds on your machine; `vercel link` also adds `VERCEL_OIDC_TOKEN` | **No** |
 | `web/.env.example` | template for `web/.env.local` | yes |
-| Cloud Run `deno-api` / `deno-run` env vars | production backend (plain values) | set by `deploy/deploy-free.sh` |
-| Google Secret Manager | production backend secrets, mounted as env vars | never in git |
-| Vercel project env (Production) | production web build and runtime | set by `deploy/deploy-free.sh` |
-| `.env.production` | VPS deploy with `compose.prod.yml` only | **No** |
+| Vercel project `deno-api` env (Production + Preview) | production API and queue worker | set with `vercel env add` (docs/09 §3) |
+| Vercel project `deno-web` env (Production) | production web build and runtime | set with `vercel env add` |
 
 How the backend loads settings (`packages/core/src/deno_core/settings.py`, pydantic-settings), highest
 priority first:
@@ -26,10 +24,10 @@ Names are case-insensitive, and unknown variables are ignored (so `NVIDIA_NIM_MO
 and other leftovers in an old `.env` do nothing). Lists are comma-separated.
 
 With `ENVIRONMENT=production` the process **refuses to start** unless `SUPABASE_URL`,
-`NVIDIA_NIM_API_KEY` and a `postgresql…` `DATABASE_URL` are set, and, with `TASK_RUNNER=cloudrun_job`,
-a full `CLOUDRUN_JOB` name.
+`NVIDIA_NIM_API_KEY` and a `postgresql…` `DATABASE_URL` are set, and, with `WEB_SEARCH_PROVIDER=brave`,
+a `BRAVE_SEARCH_API_KEY`.
 
-Legend for the **Prod** column: 🔒 = from Secret Manager, `—` = not set (default applies).
+Legend for the **Prod** column: 🔒 = a secret Vercel env var, `—` = not set (default applies).
 
 ---
 
@@ -47,14 +45,14 @@ Legend for the **Prod** column: 🔒 = from Secret Manager, `—` = not set (def
 |---|---|---|---|
 | `NVIDIA_NIM_API_KEY` | — | 🔒 `nim-key` | One key for every LLM, embedding and rerank call (40 req/min hard cap) |
 | `NVIDIA_NIM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | same | OpenAI-compatible endpoint |
-| `LLM_MODEL_FAST` | `nvidia/nemotron-3-super-120b-a12b` | — | `Role.FAST`: short structured calls (max 1500 tokens, ½ timeout) |
+| `LLM_MODEL_FAST` | `nvidia/nemotron-3.5-super-vl-120b-a12b` | — | `Role.FAST`: short structured calls (max 1500 tokens, ½ timeout) |
 | `LLM_MODEL_STRONG` | same | — | `Role.STRONG`: long reasoning (max 3000 tokens, 1.5× timeout) |
 | `LLM_MODEL_JUDGE` | same | — | `Role.JUDGE`: grading (max 1200 tokens) |
-| `LLM_MODEL_FALLBACK` | `meta/llama-3.2-11b-vision-instruct` | — | Every role falls back to it on error (`deno_llm/router.py`) |
+| `LLM_MODEL_FALLBACK` | `nvidia/nemotron-3.5-lightning-30b-a3b` | — | Every role falls back to it on error (`deno_llm/router.py`) |
 | `LLM_PROVIDER` | `openai` | — | LangChain `init_chat_model` provider; `openai` = NIM's OpenAI-compatible API |
 | `LLM_STRUCTURED_METHOD` | `json_schema` | — | `json_schema` / `json_mode` / `function_calling` (function calling doesn't work on NIM) |
 | `LLM_REQUESTS_PER_MINUTE` | `36` | — | Client-side limiter, 1–40, shared through Redis |
-| `LLM_TIMEOUT_SECONDS` | `60` | — | Per call |
+| `LLM_TIMEOUT_SECONDS` | `20` | — | Per call, scaled by role (fast 0.5x, strong 1.5x, judge 1x); then one retry, then the fallback model |
 | `LLM_THINKING_ROLES` | empty | — | Roles that keep Nemotron "thinking" on (about 10× slower), e.g. `judge` |
 | `LLM_RUN_TOKEN_BUDGET` | `400000` | — | Hard stop per validation run |
 | `LLM_USD_PER_MTOK_INPUT` / `_OUTPUT` | `0` | — | Cost accounting; NIM trial keys are free |
@@ -82,8 +80,9 @@ Legend for the **Prod** column: 🔒 = from Secret Manager, `—` = not set (def
 ### Search and sources
 | Variable | Default | Prod | Purpose |
 |---|---|---|---|
-| `SEARXNG_URL` | `http://127.0.0.1:8890` | `https://deno-searxng-86239723863.asia-northeast1.run.app` | Metasearch for discovery |
-| `SEARXNG_GCP_AUTH` | `false` | `true` | Attach a Google ID token (SearXNG is a private Cloud Run service) |
+| `WEB_SEARCH_PROVIDER` | `none` | `none` (→ `brave` once a key exists) | `site:` discovery for X, LinkedIn posts, Product Hunt: `searxng` (local), `brave`, or `none` |
+| `BRAVE_SEARCH_API_KEY` | empty | 🔒 when used | Brave Search API key (~1,000 queries a month on the free credit; capped at 30 a day) |
+| `SEARXNG_URL` | `http://127.0.0.1:8890` | — | A local SearXNG, only with `WEB_SEARCH_PROVIDER=searxng` |
 | `SOURCES_ROBOTS_OPT_IN` | empty | — | Hosts fetched even though robots.txt disallows bots. **Only after legal review** |
 | `SOURCES_USER_AGENT` | empty | — | Custom fetcher user agent |
 | `GITHUB_TOKEN` | empty | — | Optional. Ideas that link a public GitHub repo are read through api.github.com (description, topics, README). Without a token GitHub allows 60 requests/hour per IP (2 per run); a fine-grained token with no scopes raises that to 5,000 |
@@ -92,10 +91,9 @@ Legend for the **Prod** column: 🔒 = from Secret Manager, `—` = not set (def
 ### Jobs and crons
 | Variable | Default | Prod | Purpose |
 |---|---|---|---|
-| `TASK_RUNNER` | `taskiq` | `cloudrun_job` | `taskiq` = Valkey queue + worker (compose/VPS); `cloudrun_job` = one Cloud Run Job execution per run |
-| `CLOUDRUN_JOB` | empty | `projects/deno-gtm/locations/asia-northeast1/jobs/deno-run` | Full job name |
-| `CRON_OIDC_AUDIENCE` | empty | the API URL | Expected `aud` of Cloud Scheduler's token |
-| `CRON_SERVICE_ACCOUNT` | empty | `deno-scheduler@deno-gtm.iam.gserviceaccount.com` | Expected caller. Both cron settings empty = `/internal/cron/*` answers 404 |
+| `TASK_RUNNER` | `taskiq` | `vercel_queue` | `taskiq` = Valkey queue + local worker; `vercel_queue` = one Vercel Queues message per run, run by the push subscriber |
+| `RUN_TIME_BUDGET_S` | `270` | — | Seconds a run may use per function invocation before handing off to the next delivery (Hobby functions stop at 300 s) |
+| `CRON_SECRET` | empty | 🔒 | Vercel Cron's bearer token for `/internal/cron/*`; empty = those endpoints answer 404 |
 
 ### Billing (Stripe, not live yet)
 | Variable | Default | Prod | Purpose |
@@ -143,27 +141,9 @@ the web app runs in dev mode (no login needed).
 
 ---
 
-## 4. Production secrets (Google Secret Manager, project `deno-gtm`)
+## 4. Production secrets
 
-| Secret | Env var | Rotate with |
-|---|---|---|
-| `database-url` | `DATABASE_URL` | `gcloud secrets versions add database-url --data-file=-`, then a new API revision (docs/09 §8) |
-| `nim-key` | `NVIDIA_NIM_API_KEY` | same |
-| `valkey-url` | `VALKEY_URL` | same |
-| `supabase-secret` | `SUPABASE_SECRET_KEY` | same |
-
-Only `deno-api@deno-gtm.iam.gserviceaccount.com` can read them.
-
----
-
-## 5. Deploy-time constants (`deploy/deploy-free.sh`)
-
-| Constant | Value |
-|---|---|
-| `P` (project) | `deno-gtm` |
-| `R` (region) | `asia-northeast1` |
-| `IMAGE` | `asia-northeast1-docker.pkg.dev/deno-gtm/deno/api:<git short sha>` |
-| `API_SA` / `SCHED_SA` | `deno-api@…` / `deno-scheduler@…` |
-| `SEARXNG_URL` | the private SearXNG service URL |
-| `VERCEL_PROJECT` | `deno-web` (overridable from the environment) |
-| `GCLOUD` | gcloud binary (default `~/google-cloud-sdk/bin/gcloud`) |
+Secrets live as Vercel environment variables on `deno-api` (marked sensitive): `DATABASE_URL`,
+`NVIDIA_NIM_API_KEY`, `VALKEY_URL`, `SUPABASE_SECRET_KEY`, `CRON_SECRET`, and `BRAVE_SEARCH_API_KEY` when
+used. Rotate one with `vercel env rm NAME production` then `vercel env add NAME production`, and redeploy
+(`vercel deploy --prod`, or push to `main`). Deployment steps and every variable: docs/09.

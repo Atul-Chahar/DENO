@@ -8,7 +8,7 @@ from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree as SafeET
 
-from deno_sources.base import SearxngClient, SourceClient
+from deno_sources.base import SourceClient, WebSearch
 from deno_sources.models import Engagement, Post, SourceName
 from deno_sources.net import Fetcher
 from deno_sources.normalize import canonical_url, clean_text
@@ -89,7 +89,7 @@ class ProductHuntClient(SourceClient):
 
     name = SourceName.PRODUCTHUNT
 
-    def __init__(self, fetcher: Fetcher, searxng: SearxngClient) -> None:
+    def __init__(self, fetcher: Fetcher, searxng: WebSearch) -> None:
         super().__init__(fetcher)
         self.searxng = searxng
 

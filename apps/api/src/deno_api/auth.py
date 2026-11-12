@@ -20,7 +20,7 @@ import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 
-from deno_core.settings import settings
+from deno_core.settings import get_settings
 
 ASYMMETRIC_ALGORITHMS = frozenset({"ES256", "RS256", "EdDSA"})
 
@@ -97,6 +97,7 @@ class TokenVerifier:
 
 @lru_cache(maxsize=1)
 def _build_verifier() -> TokenVerifier | None:
+    settings = get_settings()
     if not settings.supabase_url:
         return None
     base = settings.supabase_url.rstrip("/")
