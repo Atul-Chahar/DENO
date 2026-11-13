@@ -1,97 +1,82 @@
 # 17 — Handoff: where we are and what's next
 
-Last updated **2026-11-12** (end of a long session). Read this first in a new chat.
+Last updated **2026-11-13** (after PR #33). Read this first in a new chat, after `CLAUDE.md`.
+Before acting on anything below, re-check it live (`gh pr list`, `git log origin/main`, `vercel env ls`):
+this file can be a few hours stale.
 
-## 1. The product direction (one paragraph)
-Deno validates startup ideas with real evidence (Reddit, HN, GitHub, the founder's website, X, LinkedIn
-posts, Product Hunt) and helps launch them. The new strategy: **Deno is also an MCP server**. A founder
-connects their own Claude or ChatGPT; their AI does the "thinking", while Deno supplies what only Deno has:
-evidence collection, retrieval, citation checks, verdict rules, founder context, anti-slop gates, and (planned)
-a video Studio kit (playbooks, assets, review loop; rendering on the user's machine). Everything made through
-MCP lands on the same Deno dashboard. A cheaper "Connect" plan follows from that, because our AI cost drops.
-Details: docs/16 (BYO AI), docs/12 + docs/13 (video), docs/14 (money).
+## 1. The product (one paragraph)
+Deno validates startup ideas with real public evidence (Reddit, HN, GitHub, the founder's website, X, LinkedIn
+posts, Product Hunt) and helps launch them. **Deno is also an MCP server**: a founder connects their own Claude
+or ChatGPT; their AI does the creative thinking, Deno supplies what only Deno has (evidence, verdict rules,
+founder context, anti-slop gates, licensed media, a review loop). The **Creation Studio** makes marketing videos
+and stills: the founder's Claude Code writes the film as HTML/JS, the local `studio` kit (Claude Code plugin
+`deno-studio`) renders it on their machine, and Deno's dashboard reviews it. Docs: 16 (BYO AI), 18 (Studio),
+14 (money), 19 (many users at once).
 
-## 2. Done in the last session
-| What | Where |
-|---|---|
-| Merged contributor PRs #14, #16, #17, #18, #20 (via #21); `MAX_REGEN_ATTEMPTS` 3 → 1 | main |
-| **GCP + Docker removed; API, graph runs, crons on Vercel Hobby** | PR #22, docs/09, docs/15 |
-| NIM models swapped (old `nemotron-3-super-120b` returned 404, fallback 410) | `deno_core/settings.py` |
-| Run time 524 s → 207–257 s (LLM timeout 20 s, short retry round, 1 critic round) | `validation/nodes.py` |
-| Migration 0005 applied to the (shared) Supabase DB | |
-| **MCP server live** at `/mcp`: list_ideas, validate_idea, get_validation, get_report, get_founder_context; Supabase OAuth + consent page | PR #24, `apps/api/src/deno_api/mcp_server.py`, `web/app/(auth)/oauth/consent` |
-| User connected Claude to the MCP and confirmed it works | |
-| Contributor PR #26: keyless **Exa** web search → X, LinkedIn posts, Product Hunt work again (verified live: X 20, LinkedIn 10, PH 10 in a 257 s run) | main |
-| Follow-up PR #27: Exa's documented API when `EXA_API_KEY` is set; optional-text-field limit bug (Schemathesis) fixed | merged |
-| Research/strategy docs 12–16 | docs/ |
+## 2. State of `main` (all merged, CI green, deployed)
+| PR | What | Docs |
+|---|---|---|
+| #22–#28 | Vercel-only infra (no GCP), MCP server + OAuth consent, Exa web search, CLAUDE.md | 09, 15, 16 |
+| #29 (+#31) | Creation Studio: MCP grew to 19 tools + 5 prompts; `packages/studio`; migration **0006** (applied); Studio library / review / Rulebook pages; `deno-studio` plugin + local `studio` kit | 18 §1–12 |
+| #30 (via #31) | Director upgrade: persona, place-before-fill placeholders, upload done-gate, sheet stats, mattes, caption presets, yt-dlp, ElevenLabs SFX, transcribe/silence/loudness. **Zero-key media** (Wikimedia Commons + Internet Archive fallbacks, `archive-pd` licence). **No MP4s on Supabase** (poster + contact-sheet JPEGs, ~250 KB/version; sheet scrubbing; `external_url`/`stream_url` embeds) | 18 §13–14 |
+| #32 | Openverse in the kit (CC0 / CC BY / CC BY-SA images + audio, keyless; `studio openverse register` optional) | 18 §15 |
+| #33 | **Burst readiness**: fair run line (`deno_core/runqueue.py`), polite 503 when the line is full, `queue_position` in MCP, optional NIM key pool (`NVIDIA_NIM_EXTRA_API_KEYS`), friendly Supabase Auth errors | 19 |
 
-## 2b. Done on 2026-11-13: the Creation Studio (docs/18 §12)
-MCP grew from 5 to 19 tools (posts, brand kit, playbooks, styles, recipes, licensed media, uploads, versions, review
-notes) plus 5 prompts and a playbook resource; new `packages/studio`; migration 0006; Studio pages on deno-web
-(library, review player, Rulebook) and Connected apps on Account; the `deno-studio` Claude Code plugin with the
-local `studio` kit. Branch `feat/studio`.
+Live checks on 2026-11-13: `/readyz` 200, web 200, DB at migration head **0006**.
 
-## 2c. 2026-11-13 (later): Studio director upgrade
-Branch `feat/studio-director-upgrade` (stacked on `feat/studio`): creative-director persona, place-before-fill
-placeholders, a hard done gate in `studio upload`, sheet colour stats, behind-the-speaker mattes, four caption
-presets, yt-dlp download, ElevenLabs SFX, transcribe/silence/loudness. Details: docs/18 §13. Merge PR #29 first.
-`docs/reference/cardboard/` is private reference material: never commit it.
-Later the same day (docs/18 §14): **media search needs zero API keys** (Wikimedia Commons + Internet Archive
-fallbacks, YouTube via local yt-dlp, synthesized `studio sfx`), and **`studio upload` no longer stores MP4s**:
-poster + contact sheet JPEGs (~250 KB a version), review page scrubs the sheet or embeds `--video-url`.
-Then (docs/18 §15): **Openverse** in the kit: `studio search image|sfx|music` adds CC0/CC BY/CC BY-SA results with no
-key and no sign-in; `studio openverse register <email>` is optional (raises the 200/day anonymous limit).
+Production env (`deno-api`) has: `NVIDIA_NIM_API_KEY`, `WEB_SEARCH_PROVIDER`, `TASK_RUNNER`, `VALKEY_URL`,
+`DATABASE_URL`, `SUPABASE_*`, `CRON_SECRET`, `APP_URL`, `API_URL`, `WEB_ORIGINS`. **Not set (all optional):**
+`EXA_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY`, `NVIDIA_NIM_EXTRA_API_KEYS`,
+`RUN_QUEUE_*` (defaults: 2 runs per key, 60 waiting max).
 
-## 2d. Burst readiness (docs/19)
-Fair run line in Redis (`deno_core/runqueue.py`): `RUN_QUEUE_CAPACITY` runs per NIM key execute, the rest wait
-first-come with their place shown (web log line, MCP `queue_position`); polite 503 past `RUN_QUEUE_MAX_WAITING`.
-Optional `NVIDIA_NIM_EXTRA_API_KEYS` (each run bound to one key). Friendly Supabase Auth errors. Before a demo,
-the owner must change Supabase Auth rate limits + SMTP and the Google consent screen status (docs/19 §2).
+## 3. Waiting on the user (ask before assuming)
+1. **Before a demo with many people on one Wi-Fi** (docs/19 §2), all dashboard-only, not verified by us:
+   Supabase Auth → Rate Limits (per-IP sign-in/refresh limits up), custom SMTP (or everyone uses Google; the
+   built-in sender only mails a few addresses an hour), Google OAuth consent screen **In production**.
+2. **Re-measure a validation** on an idle system after #33 (hard rule: < 5 min; last measured 207–257 s).
+3. Optional throughput: `NVIDIA_NIM_EXTRA_API_KEYS` (each key ≈ +15 validations/hour). Unknown whether NIM's
+   40/min cap is per key or per account.
+4. **Create a separate production Supabase project** (dev and prod share one DB: the biggest risk).
+5. **Shut down the GCP project `deno-gtm`** (unused).
+6. **Decide LinkedIn policy:** posts come from Exa's extracted text, bypassing the robots.txt opt-in gate.
+7. Housekeeping: delete merged branches on GitHub (`feat/studio*`, `feat/burst-ready`, `docs/*`, `infra/vercel`,
+   `feat/mcp-connect`, `feat/exa-web-search`, `fix/exa-*`, `integrate/contributor-prs`); triage Dependabot PRs
+   (#1, #3, #5, #6, #7, #9, #10, #15; #5/#6/#10 touch Docker and are obsolete; #9 bumps Stripe, which Dodo replaces).
+8. For billing later: Dodo Payments product IDs, API key, webhook secret.
 
-## 3. Waiting on the user (check these first)
-0. **Studio PR:** review and merge; then `uv run alembic upgrade head` (0006, additive, shared DB). Optional: add
-   `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY` to `deno-api` for more stock choice (search works
-   without them). Try it: `/plugin marketplace add Atul-Chahar/DENO`, `/plugin install
-   deno-studio@deno`, `studio doctor --install`, `studio login`.
-1. ~~Merge PR #27~~ (merged).
-2. **Vercel → deno-api → Environment Variables:** set `WEB_SEARCH_PROVIDER=exa` (production + preview; it's
-   still `none` from the migration, so X/LinkedIn/PH are OFF in prod), and add `EXA_API_KEY` (free Exa account).
-   The next deploy (merging #27) picks them up.
-3. **Decide LinkedIn policy:** posts now come from Exa's extracted text, bypassing the old "robots.txt opt-in
-   after legal review" gate. Accept, or gate it behind `SOURCES_ROBOTS_OPT_IN`.
-4. **Shut down the GCP project `deno-gtm`** (unused since the move).
-5. **Create a separate production Supabase project** (dev and prod share one DB today: the biggest risk).
-6. For billing later: Dodo Payments product IDs, API key, webhook secret.
-
-## 4. Next steps
-**Current plan: docs/18_CREATION_STUDIO_PLAN.md** (MCP hardening → posts via MCP → Studio plugin + local kit →
-media sources → sound/captions/voice/stills → review loop → library). It reorders the list below: creation
-first, BYO validation after. The original order, for reference:
-
-1. **MCP hardening** (small): per-user rate limits on MCP tools; record the calling app ("via Claude") on
-   runs; "Connected apps" list on the account page.
-2. **BYO-AI validation (docs/16 phase 2)**: the founder's AI writes brief + queries → Deno runs
-   collection + ingest only (no LLM) → `get_evidence(run, analyst)` → AI `submit_claims` with verbatim quotes →
-   Deno checks quotes deterministically, computes signals + verdict → dashboard shows "via Claude". Needs an
-   `executor` column (migration, additive) and a collection-only job on the existing queue.
+## 4. Next steps (suggested order)
+1. **Openverse in the server's `search_media`** (MCP-only clients don't get it yet; the kit does). Small.
+2. **BYO-AI validation (docs/16 phase 2)**: the founder's AI writes brief + queries → Deno collects + ingests
+   (no LLM) → `get_evidence` → AI `submit_claims` with verbatim quotes → Deno checks quotes, computes signals +
+   verdict. Also the real fix for NIM throughput: the founder's AI pays for the thinking. Needs an `executor`
+   column (additive migration) and a collection-only job on the existing queue (it must also use the run line).
 3. **Content via MCP**: create plan, `save_draft` through `deno_gates`, calendar on the dashboard.
-4. **Video Studio via MCP** (docs/12, docs/13 §11 + §14): skill/plugin with playbooks, local renderer kit,
-   `save_video`, Studio tab + frame-review page (Cut Notes-style, but our own code: Cut Notes has no licence).
-5. **Billing with Dodo Payments** + Connect plan quotas.
+4. **Billing with Dodo Payments** (replace Stripe code in `apps/api/src/deno_api/v1/billing.py`) + Connect plan quotas.
+5. Reddit fallback (Arctic Shift times out; see §5).
 
-## 5. Known issues
-- **Reddit returned 0 posts** in the last two tests: Arctic Shift (its upstream) timing out. Investigate a fallback.
-- Schemathesis can flag other fuzz edge cases at random on PRs; check whether a failure is the PR's fault.
-- `vercel.json` (root) is for the API only; `web/vercel.json` must keep `"framework": "nextjs"`.
-  The root `.vercelignore` applies to BOTH projects: never ignore `web/`.
+## 5. Known issues and gotchas
+- **NIM throughput**: one key ≈ 15 validations/hour no matter what; the run line makes bursts wait fairly
+  instead of failing (docs/19). Content plans share the same line.
+- **Reddit returned 0 posts** in recent tests: Arctic Shift (its upstream) times out.
+- **Stacked PRs:** merging a PR whose base is another feature branch does NOT reach `main` (this happened with
+  #30; #31 fixed it). Retarget the base to `main` first, or open PRs against `main`. The repo does not delete
+  branches on merge, so GitHub doesn't auto-retarget.
+- Schemathesis can flag random fuzz edge cases on PRs; check whether a failure is the PR's fault.
+- `vercel.json` (root) is the API only; `web/vercel.json` must keep `"framework": "nextjs"`. The root
+  `.vercelignore` applies to BOTH projects: never ignore `web/`.
 - Vercel entrypoints must be files under the repo root (`server/app.py`, `server/queues.py`); don't build
   `Settings()` at import time (Vercel imports the subscriber during the build).
-- NIM can stall a request ~60 s; LLM timeout is 20 s with retry + fallback. If NIM retires models again,
-  probe `https://integrate.api.nvidia.com/v1/models` and test with a real call (listed ≠ callable).
-- Open Dependabot PRs (#1, #3, #5, #6, #7, #9, #10, #15) are untriaged; #5/#6/#10 touch Docker and are now obsolete.
+- NIM can stall a request ~60 s; LLM timeout is 20 s with retry + fallback. If NIM retires models, probe
+  `https://integrate.api.nvidia.com/v1/models` and test with a real call (listed ≠ callable).
+- Web CSP (`web/lib/csp.ts`): `media-src` allows `https:` (founders' own video links); `frame-src` only
+  youtube-nocookie.com + player.vimeo.com.
+- Private, never commit: `docs/reference/` (third-party prompt text), `launch-video/`, `docs/OJT_DEMO_PREP.md`
+  (all in `.gitignore`).
 
 ## 6. Key measurements (for regression checks)
-- Validation on Vercel: queued → running in 3 s, finished in 207 s (PIVOT 0.37).
-- With Exa: 257 s; sources X 20, LinkedIn 10, PH 10, HN 41, Reddit 0 (timed out).
-- A run makes ~28 LLM calls (intake, 2 planners, 7 analysts, ~12 citation-judge batches, critic, refiner, rationale).
-- API function bundle 50 MB (limit 500 MB).
+- Validation on Vercel: queued → running in 3 s, finished in 207 s (PIVOT 0.37); with Exa 257 s.
+- A run makes ~28 chat calls (intake, 2 planners, 7 analysts, ~12 citation-judge batches, critic, refiner,
+  rationale) plus embeddings/rerank, all under the shared 36/min limiter.
+- Studio upload: contact sheet JPEG ~90–150 KB, poster ~30–80 KB (test sheet: 92 KB).
+- Openverse anonymous: 20 requests/min, 200/day.
+- Tests on 2026-11-13: 406 unit (Python), 23 kit (Node); integration tests run in CI (Postgres).
