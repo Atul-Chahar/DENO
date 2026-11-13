@@ -17,7 +17,9 @@ export function buildCsp(nonce: string): string {
     "font-src 'self' https://fonts.gstatic.com",
     // Studio posters, contact sheets and review copies are signed URLs on Supabase Storage (docs/18).
     `img-src 'self' data: blob:${supabase ? ` ${supabase}` : ''}`,
-    `media-src 'self' blob:${supabase ? ` ${supabase}` : ''}`,
+    // The MP4s stay on the founder's disk; a review can play their own unlisted link (R2, a tunnel: any https).
+    `media-src 'self' blob: https:${supabase ? ` ${supabase}` : ''}`,
+    'frame-src https://www.youtube-nocookie.com https://player.vimeo.com',
     `connect-src ${connect}`,
     "object-src 'none'",
     "base-uri 'self'",

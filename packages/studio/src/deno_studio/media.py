@@ -9,6 +9,16 @@ download a file and record where it came from. Providers:
 - Freesound: sound effects and music loops, **CC0 only** (filtered at the API).
 - Iconify: Lucide (ISC) and Tabler (MIT) icons as SVG.
 
+Keyless fallbacks (no account, no key): when a kind has no keyed provider, or the keyed ones find nothing,
+search falls back to
+
+- Wikimedia Commons: images and video, CC0 / public domain / CC BY / CC BY-SA only (licence read per file).
+- Internet Archive: public-domain and CC0 video, music and sound effects. Licences there are the uploader's
+  claim, so they are recorded as ``archive-pd`` (a warning on the review page, not a block).
+
+The kit adds two more that run on the founder's machine: YouTube search through yt-dlp (licence ``unknown``
+unless the video says Creative Commons) and its own synthesized sound effects.
+
 Every provider call is bounded (8 s) and a failing provider is skipped, never fatal: the search returns what the
 others found plus a note.
 """
@@ -19,9 +29,11 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal, Protocol
+from urllib.parse import quote
 
 import httpx
 
@@ -31,6 +43,8 @@ KINDS: tuple[MediaKind, ...] = ("video", "image", "sfx", "music", "icon")
 CACHE_TTL_S = 24 * 3600  # Pixabay requires 24 h caching; it also spares everyone's rate limits
 TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 CC0 = 'license:"Creative Commons 0"'
+# Wikimedia asks API clients for a descriptive User-Agent.
+KEYLESS_HEADERS = {"User-Agent": "DenoStudio/1.0 (media search; httpx)"}
 
 
 @dataclass(frozen=True)
@@ -60,6 +74,7 @@ class MediaKeys:
     pexels: str = ""
     pixabay: str = ""
     freesound: str = ""
+    keyless: bool = True  # fall back to Wikimedia Commons + Internet Archive (no key needed)
 
 
 class Cache(Protocol):
@@ -288,6 +303,190 @@ async def _iconify(client: httpx.AsyncClient, q: str, n: int) -> list[MediaItem]
     return out
 
 
+# --------------------------------------------------------------------------- keyless providers
+
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _commons_licence(code: str) -> str | None:
+    """Commons' machine licence code → ours; None for anything we can't use in marketing."""
+    c = code.strip().lower()
+    if c.startswith(("cc0", "pd", "public domain")):
+        return "cc0"
+    if c.startswith(("cc-by-nc", "cc-by-nd", "cc-by-sa-nc")):
+        return None
+    if c.startswith("cc-by-sa"):
+        return "cc-by-sa"
+    if c.startswith("cc-by"):
+        return "cc-by"
+    return None
+
+
+_COMMONS_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/webm": "webm"}
+
+
+def commons_file(p: dict[str, Any], kind: MediaKind) -> MediaItem | None:
+    info = (p.get("imageinfo") or [{}])[0]
+    meta = {k: str((v or {}).get("value", "")) for k, v in (info.get("extmetadata") or {}).items()}
+    lic = _commons_licence(meta.get("License") or meta.get("LicenseShortName") or "")
+    mime = str(info.get("mime", ""))
+    if lic is None or not info.get("url"):
+        return None
+    if kind == "image":
+        if not mime.startswith("image/") or mime == "image/svg+xml":
+            return None
+        download = str(info.get("thumburl") or info["url"])  # ≤ 1920 px wide, not a 50 MB original
+        ext = "jpg" if mime == "image/jpeg" else _COMMONS_EXT.get(mime, "png")
+    else:
+        if not (mime.startswith("video/") or mime == "application/ogg"):
+            return None
+        download = str(info["url"])
+        ext = _COMMONS_EXT.get(mime, "ogv" if mime == "application/ogg" else "webm")
+    artist = " ".join(_TAG.sub("", meta.get("Artist", "")).split())[:120] or "Unknown"
+    title = str(p.get("title", "")).removeprefix("File:").rsplit(".", 1)[0]
+    duration = info.get("duration")
+    return MediaItem(
+        id=f"commons:{p['pageid']}",
+        kind=kind,
+        title=title[:120] or f"Commons file {p['pageid']}",
+        preview_url=str(info.get("thumburl") or info["url"]),
+        download_url=download,
+        source="wikimedia-commons",
+        source_url=str(info.get("descriptionurl", "")),
+        license=lic,
+        credit=f"{artist} via Wikimedia Commons ({meta.get('LicenseShortName') or lic})",
+        width=int(info["width"]) if info.get("width") else None,
+        height=int(info["height"]) if info.get("height") else None,
+        duration=float(duration) if duration else None,
+        ext=ext,
+    )
+
+
+_COMMONS_PROPS: dict[str, str | int] = {
+    "prop": "imageinfo",
+    "iiprop": "url|size|mime|extmetadata",
+    "iiurlwidth": 1920,
+    "iiextmetadatafilter": "LicenseShortName|License|Artist",
+    "format": "json",
+    "formatversion": 2,
+}
+
+
+async def _commons(client: httpx.AsyncClient, kind: MediaKind, q: str, n: int) -> list[MediaItem]:
+    filetype = "video" if kind == "video" else "bitmap"
+    params: dict[str, Any] = {
+        "action": "query",
+        "generator": "search",
+        "gsrsearch": f"{q} filetype:{filetype}",
+        "gsrnamespace": 6,
+        "gsrlimit": min(50, n * 3),  # some get dropped for their licence
+        **_COMMONS_PROPS,
+    }
+    res = await client.get("https://commons.wikimedia.org/w/api.php", params=params, headers=KEYLESS_HEADERS)
+    res.raise_for_status()
+    pages = sorted((res.json().get("query") or {}).get("pages", []), key=lambda p: p.get("index", 0))
+    return [i for p in pages if (i := commons_file(p, kind))][:n]
+
+
+_ARCHIVE_PD = "licenseurl:(*publicdomain*)"
+
+
+async def _archive(client: httpx.AsyncClient, kind: MediaKind, q: str, n: int) -> list[MediaItem]:
+    mediatype = "movies" if kind == "video" else "audio"
+    query = f"({q}) AND mediatype:({mediatype}) AND {_ARCHIVE_PD}"
+    if kind == "music":
+        query += " AND subject:(music OR loop OR soundtrack OR instrumental)"
+    params: list[tuple[str, str | int | float | bool | None]] = [
+        ("q", query),
+        ("fl[]", "identifier"),
+        ("fl[]", "title"),
+        ("fl[]", "creator"),
+        ("fl[]", "licenseurl"),
+        ("rows", n),
+        ("output", "json"),
+    ]
+    res = await client.get("https://archive.org/advancedsearch.php", params=params, headers=KEYLESS_HEADERS)
+    res.raise_for_status()
+    return [i for d in (res.json().get("response") or {}).get("docs", []) if (i := archive_doc(d, kind))]
+
+
+def _first(v: Any) -> str:
+    return str(v[0] if isinstance(v, list) and v else v or "")
+
+
+def archive_doc(d: dict[str, Any], kind: MediaKind) -> MediaItem | None:
+    ident = _first(d.get("identifier"))
+    if not ident or "publicdomain" not in _first(d.get("licenseurl")):
+        return None
+    creator = _first(d.get("creator")) or "Unknown"
+    return MediaItem(
+        id=f"archive:{kind}:{ident}",
+        kind=kind,
+        title=_first(d.get("title"))[:120] or ident,
+        preview_url=f"https://archive.org/services/img/{quote(ident)}",
+        download_url=f"https://archive.org/download/{quote(ident)}",  # the exact file is picked by lookup()
+        source="internet-archive",
+        source_url=f"https://archive.org/details/{quote(ident)}",
+        license="archive-pd",
+        credit=f"{creator[:100]} via Internet Archive",
+        ext="mp4" if kind == "video" else "mp3",
+    )
+
+
+_AUDIO_FORMATS = ("vbr mp3", "mp3", "128kbps mp3", "64kbps mp3", "ogg vorbis")
+
+
+def _seconds(v: Any) -> float:
+    """Archive lengths come as "49.55" or "01:02:03"."""
+    try:
+        parts = [float(x) for x in str(v or "0").split(":")]
+    except ValueError:
+        return 0.0
+    total = 0.0
+    for x in parts:
+        total = total * 60 + x
+    return total
+
+
+def archive_pick(meta: dict[str, Any], kind: MediaKind) -> dict[str, Any] | None:
+    """The file to download from an Internet Archive item: an MP4 ≤ 1080p for video, an MP3 for sound."""
+    files = [f for f in meta.get("files") or [] if f.get("name")]
+    if kind == "video":
+        cands = [f for f in files if str(f["name"]).lower().endswith((".mp4", ".m4v"))]
+
+        def vscore(f: dict[str, Any]) -> tuple[int, int]:
+            h = int(float(f.get("height") or 0))
+            return (1 if 0 < h <= 1080 else 0, h if h <= 1080 else -h)
+
+        return max(cands, key=vscore, default=None)
+    cands = [f for f in files if str(f.get("format", "")).lower() in _AUDIO_FORMATS or str(f["name"]).endswith(".mp3")]
+    cands.sort(key=lambda f: (not str(f["name"]).endswith(".mp3"), _seconds(f.get("length")) or 1e9))
+    return cands[0] if cands else None
+
+
+async def _archive_lookup(client: httpx.AsyncClient, kind: MediaKind, ident: str) -> MediaItem | None:
+    res = await client.get(f"https://archive.org/metadata/{quote(ident)}", headers=KEYLESS_HEADERS)
+    res.raise_for_status()
+    data = res.json()
+    md = data.get("metadata") or {}
+    base = archive_doc({**md, "identifier": ident}, kind)
+    picked = archive_pick(data, kind)
+    if base is None or picked is None:
+        return None
+    length = _seconds(picked.get("length"))
+    return MediaItem(
+        **{
+            **asdict(base),
+            "kind": kind,
+            "download_url": f"https://archive.org/download/{quote(ident)}/{quote(str(picked['name']))}",
+            "duration": length or None,
+            "width": int(float(picked["width"])) if picked.get("width") else None,
+            "height": int(float(picked["height"])) if picked.get("height") else None,
+            "ext": str(picked["name"]).rsplit(".", 1)[-1].lower(),
+        }
+    )
+
+
 # --------------------------------------------------------------------------- search + lookup
 
 
@@ -318,6 +517,19 @@ async def _cached(cache: Cache | None, key: str, make: Callable[[], Awaitable[li
     return items
 
 
+_KEYLESS_NOTE: dict[MediaKind, str] = {
+    "video": "Free, keyless sources (Wikimedia Commons, Internet Archive). Check the credit; Internet Archive "
+    "licences are the uploader's claim. For web footage: `studio search youtube <query>` (drafts only unless "
+    "the founder has the rights).",
+    "image": "Free, keyless source (Wikimedia Commons): CC0, public domain or CC BY; paste the credit.",
+    "sfx": "Free, keyless source (Internet Archive; licences are the uploader's claim). The kit's own "
+    'synthesized sounds need no licence at all: `studio sfx "<sound>"` or `studio mix`.',
+    "music": "Free, keyless source (Internet Archive; licences are the uploader's claim). Or the kit's "
+    "synthesized bed: `studio mix --bed`.",
+    "icon": "",
+}
+
+
 async def search(
     kind: MediaKind,
     query: str,
@@ -333,19 +545,27 @@ async def search(
     n = max(1, min(limit, 20))
     if not q:
         return SearchResult([], ["Give a search query."])
-    calls: list[tuple[str, Callable[[httpx.AsyncClient], Awaitable[list[MediaItem]]]]] = []
+    Call = Callable[[httpx.AsyncClient], Awaitable[list[MediaItem]]]
+    calls: list[tuple[str, Call]] = []
+    free: list[tuple[str, Call]] = []  # keyless fallbacks
     if kind in ("video", "image"):
         if keys.pexels:
             calls.append(("pexels", lambda c: _pexels(c, keys.pexels, kind, q, n, orientation)))
         if keys.pixabay:
             calls.append(("pixabay", lambda c: _pixabay(c, keys.pixabay, kind, q, n, orientation)))
+        free.append(("wikimedia-commons", lambda c: _commons(c, kind, q, n)))
+        if kind == "video":
+            free.append(("internet-archive", lambda c: _archive(c, kind, q, n)))
     elif kind in ("sfx", "music"):
         if keys.freesound:
             calls.append(("freesound", lambda c: _freesound(c, keys.freesound, kind, q, n, max_duration)))
+        free.append(("internet-archive", lambda c: _archive(c, kind, q, n)))
     elif kind == "icon":
         calls.append(("iconify", lambda c: _iconify(c, q, n)))
+    if not keys.keyless:
+        free = []
     notes: list[str] = []
-    if not calls:
+    if not calls and not free:
         notes.append(
             f"No {kind} provider is configured on this Deno server."
             + (" Use the kit's synthesized sounds (`studio mix`) instead." if kind in ("sfx", "music") else "")
@@ -353,15 +573,18 @@ async def search(
         return SearchResult([], notes)
     async with httpx.AsyncClient(timeout=TIMEOUT, transport=transport, follow_redirects=True) as client:
 
-        async def run(name: str, fn: Callable[[httpx.AsyncClient], Awaitable[list[MediaItem]]]) -> list[MediaItem]:
+        async def run(name: str, fn: Call) -> list[MediaItem]:
             try:
                 return await _cached(cache, _cache_key(name, kind, q, n, orientation, max_duration), lambda: fn(client))
-            except (httpx.HTTPError, ValueError, KeyError) as exc:
+            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 status = getattr(getattr(exc, "response", None), "status_code", None)
                 notes.append(f"{name} is unavailable right now" + (f" ({status})" if status else "") + ".")
                 return []
 
-        batches = await asyncio.gather(*(run(name, fn) for name, fn in calls))
+        batches = list(await asyncio.gather(*(run(name, fn) for name, fn in calls)))
+        if free and not any(batches):
+            batches += await asyncio.gather(*(run(name, fn) for name, fn in free))
+            notes.append(_KEYLESS_NOTE[kind])
     # Interleave providers so one doesn't crowd out the other.
     items: list[MediaItem] = []
     for i in range(max((len(b) for b in batches), default=0)):
@@ -381,6 +604,16 @@ async def lookup(
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> MediaItem | None:
     """Resolve an id from ``search`` (cache first, then the provider), including its download URL."""
+    if item_id.startswith("archive:"):
+        # The search result only names the item; the exact file comes from its metadata (not cached).
+        _, kind, ident = [*item_id.split(":", 2), "", ""][:3]
+        if kind not in ("video", "sfx", "music") or not ident:
+            return None
+        async with httpx.AsyncClient(timeout=TIMEOUT, transport=transport, follow_redirects=True) as client:
+            try:
+                return await _archive_lookup(client, kind, ident)  # type: ignore[arg-type]
+            except (httpx.HTTPError, ValueError, KeyError, TypeError):
+                return None
     if cache is not None:
         try:
             raw = await cache.get(_item_key(item_id))
@@ -417,11 +650,23 @@ async def lookup(
                 res.raise_for_status()
                 data = res.json()
                 item = freesound_sound(data, "music" if float(data.get("duration") or 0) >= 20 else "sfx")
+            elif parts[0] == "commons" and len(parts) == 2 and parts[1].isdigit():
+                res = await client.get(
+                    "https://commons.wikimedia.org/w/api.php",
+                    params={"action": "query", "pageids": parts[1], **_COMMONS_PROPS},
+                    headers=KEYLESS_HEADERS,
+                )
+                res.raise_for_status()
+                for p in (res.json().get("query") or {}).get("pages", []):
+                    if str(p.get("pageid")) != parts[1]:
+                        continue
+                    mime = str((p.get("imageinfo") or [{}])[0].get("mime", ""))
+                    item = commons_file(p, "image" if mime.startswith("image/") else "video")
             elif parts[0] == "icon" and len(parts) == 3 and parts[1] in _ICON_SETS:
                 lic, credit = _ICON_SETS[parts[1]]
                 url = f"https://api.iconify.design/{parts[1]}/{parts[2]}.svg"
                 item = MediaItem(item_id, "icon", parts[2], url, url, "iconify", url, lic, credit, ext="svg")
-        except (httpx.HTTPError, ValueError, KeyError):
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
             return None
     if item is not None and cache is not None:
         with contextlib.suppress(Exception):

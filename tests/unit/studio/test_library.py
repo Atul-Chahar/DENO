@@ -25,10 +25,28 @@ def test_every_document_has_a_title_summary_and_body(kind: str) -> None:
 def test_expected_catalogue() -> None:
     assert len(list_docs("styles")) == 8
     assert len(list_docs("recipes")) == 14
-    assert {d.slug for d in list_docs("skills")} == {"video", "sound", "captions", "voice", "stills", "posts", "review"}
-    assert {"contract", "preproduction", "timing", "review", "platforms", "stills"} <= {
-        d.slug for d in list_docs("playbooks")
+    assert {d.slug for d in list_docs("skills")} == {
+        "video",
+        "sound",
+        "captions",
+        "voice",
+        "stills",
+        "posts",
+        "review",
+        "footage",
     }
+    assert {
+        "contract",
+        "preproduction",
+        "timing",
+        "review",
+        "platforms",
+        "stills",
+        "build-loop",
+        "conversation",
+        "sources",
+        "behind-subject",
+    } <= {d.slug for d in list_docs("playbooks")}
 
 
 def test_skills_carry_plugin_frontmatter() -> None:
@@ -108,3 +126,21 @@ def test_wrapped_bullets_are_one_rule_and_strike_cleanly() -> None:
     text = rulebook.apply(doc, {rule.id})
     assert "Timing from the audio" not in text and "word timings to `captions.json`" not in text
     assert "Burned-in (vertical)" in text
+
+
+def test_sources_playbook_promises_zero_keys() -> None:
+    """Media search works with no API keys: the playbook says so and names every keyless path."""
+    doc = get_doc("playbooks", "sources")
+    assert doc is not None
+    body = doc.body
+    assert "no API key is needed" in body
+    for needle in ("Wikimedia Commons", "Internet Archive", "studio search youtube", "ytsearch3:", "synth"):
+        assert needle in body, needle
+
+
+def test_delivery_playbook_keeps_mp4s_local() -> None:
+    """`studio upload` sends ~250 KB (poster + sheet + film.json); the master and review MP4s stay on disk."""
+    doc = get_doc("playbooks", "delivery")
+    assert doc is not None
+    body = doc.body
+    assert "stay on the founder's machine" in body and "--video-url" in body and "--with-video" in body

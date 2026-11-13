@@ -11,6 +11,9 @@ description: Add music, sound effects and a proper mix to a studio video: beat a
 4. Cues: push `{t, kind}` into `window.CUES` for every visual hit (`click`, `whoosh`, `pop`, `thump`, `tick`,
    `riser`, `chime`, `slam`). For library SFX, `search_media kind=sfx` and map a kind to a file in
    `film.json.sfx`.
+   `studio sfx "<the sound>" --as <kind> --at <t>`: free synthesized sound by default (no key); with the
+   founder's ElevenLabs key it generates a custom one instead (tell them it uses their credits). Talking clips: `studio silence` for dead air, `studio loudness` for levels.
 5. `studio mix` builds the mix (track, SFX from cues, voice if present), ducks, fades at cuts, normalises to
    -14 LUFS / -1 dBTP, and muxes it onto each rendered format.
-6. Look at the sound: `studio sheet --audio` also writes `waveform.png`; hits should line up with the cuts on the sheet. Then listen to the whole file.
+6. Look at the sound: `studio sheet --audio` also writes `waveform.png`; hits should line up with the cuts on the sheet.
+7. Tell the founder in a sentence what the sound does ("a low thump on the logo, music drops under the voice"), not how it was made.

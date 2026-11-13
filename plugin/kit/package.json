@@ -10,6 +10,7 @@
   "studioDeps": {
     "core": { "playwright-core": "1.63.0" },
     "voice": { "kokoro-js": "1.2.1", "@huggingface/transformers": "3.8.1" },
-    "captions": { "@huggingface/transformers": "3.8.1" }
+    "captions": { "@huggingface/transformers": "3.8.1" },
+    "matte": { "@huggingface/transformers": "3.8.1" }
   }
 }

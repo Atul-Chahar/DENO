@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { Film } from './browser.mjs';
+import { pendingItems } from './timeline.mjs';
 import { formats, info, loadFilm, num, outDir, run, warn } from './util.mjs';
 
 const CHUNK_S = 2;
@@ -23,6 +24,10 @@ function encoder(file, fps, sub, w, h) {
 export async function render(dir, opts) {
   const film = loadFilm(dir);
   if (film.kind === 'still') return warn('this is a still: use `studio still`.');
+  const pending = pendingItems(film);
+  if (pending.length && !opts.draft) {
+    throw new Error(`${pending.length} placeholder(s) still pending (${pending.map((p) => p.id).join(', ')}). Fill them first, or \`studio render --draft\` to see the shape.`);
+  }
   const fps = num(opts.fps, film.fps || 30);
   const sub = Math.max(1, num(opts.sub, opts.draft ? 1 : film.motionBlur?.samples || 2));
   const scale = opts.draft ? 0.5 : 1;

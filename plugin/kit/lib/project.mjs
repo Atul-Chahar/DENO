@@ -4,7 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from './browser.mjs';
 import { apiUrl, call, putFile } from './api.mjs';
+import { youtubeSearch } from './sources.mjs';
 import { DEPS, chromiumPath, ensure, missing } from './deps.mjs';
+import { readiness } from './timeline.mjs';
 import { RATIOS, die, formats, info, loadFilm, num, outDir, readJSON, run, safeName, saveFilm, warn, which, writeJSON } from './util.mjs';
 
 const KIT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -102,7 +104,8 @@ export async function ideas() {
 
 export async function search(opts) {
   const [, kind, ...q] = opts._;
-  if (!kind || !q.length) die('usage: studio search <video|image|sfx|music|icon> <query> [--orientation portrait] [--max-duration 10]');
+  if (!kind || !q.length) die('usage: studio search <video|image|sfx|music|icon|youtube> <query> [--orientation portrait] [--max-duration 10]');
+  if (kind === 'youtube' || kind === 'web') return youtubeSearch(opts);
   const params = new URLSearchParams({ kind, q: q.join(' '), limit: String(num(opts.limit, 8)) });
   if (opts.orientation) params.set('orientation', opts.orientation);
   if (opts['max-duration']) params.set('max_duration', String(opts['max-duration']));
@@ -134,6 +137,15 @@ export async function fetchAsset(dir, opts) {
   info(`${file} · ${item.license} · ${item.credit}${item.kind === 'video' ? `\nFootage is drawn from frames: studio frames ${file}` : ''}`);
 }
 
+/** A JPEG copy for the dashboard: at most `width` px wide, stepped down until it fits `maxBytes`. */
+export async function toJpeg(src, dest, width, maxBytes) {
+  for (const [w, q] of [[width, 4], [width, 7], [Math.round(width * 0.75), 9], [Math.round(width / 2), 12]]) {
+    await run('ffmpeg', ['-v', 'error', '-y', '-i', src, '-vf', `scale=w=min(${w}\\,iw):h=-2`, '-q:v', String(q), dest]);
+    if (fs.statSync(dest).size <= maxBytes) return dest;
+  }
+  return dest;
+}
+
 async function uploadFile(file, kind) {
   const ext = path.extname(file).slice(1).toLowerCase();
   const size = fs.statSync(file).size;
@@ -148,7 +160,21 @@ export async function upload(dir, opts) {
   if (!ideaId) die('which idea is this for? `studio upload --idea <idea_id>` (see `studio ideas`), or set deno.idea_id in film.json');
   const fmt = formats(film, opts.format)[0];
   const out = outDir(dir, fmt);
+  // The done gate: nothing goes to the founder until verify is clean on the current code and someone has
+  // looked at a contact sheet of the file being sent.
+  const why = readiness(dir, film, out);
+  if (why.length && (opts.final || !opts.unchecked)) {
+    die(`not ready to hand over:\n  - ${why.join('\n  - ')}\nFix these, then upload. (A work-in-progress upload can pass --unchecked; a --final one can't.)`);
+  }
+  if (why.length) warn(`uploading unchecked (${why.join('; ')}). Tell the founder it is a work in progress.`);
   const files = {};
+  const videoUrl = opts['video-url'] && opts['video-url'] !== true ? String(opts['video-url']).trim() : '';
+  if (videoUrl) {
+    if (!/^https:\/\/\S{4,990}$/.test(videoUrl)) die('--video-url must be a full https:// link (YouTube unlisted, R2, a tunnel)');
+    // A direct file plays in a <video>; anything else (YouTube, Vimeo, a page) is embedded as a link.
+    if (/\.(mp4|webm|m3u8)(\?|$)/i.test(videoUrl)) film.stream_url = videoUrl;
+    else film.external_url = videoUrl;
+  }
   if (film.kind === 'still') {
     const pages = fs.readdirSync(out).filter((f) => /^page-\d+\.png$/.test(f)).sort();
     if (!pages.length) die('no pages: run `studio still` first');
@@ -156,14 +182,25 @@ export async function upload(dir, opts) {
     for (const p of pages) files.pages.push(await uploadFile(path.join(out, p), 'page'));
     files.poster = files.pages[0];
   } else {
-    const review = path.join(out, 'review.mp4');
-    if (!fs.existsSync(review)) die('no review copy: run `studio render` and `studio mix` first');
-    files.review = await uploadFile(review, 'review');
-    if (fs.existsSync(path.join(out, 'poster.png'))) files.poster = await uploadFile(path.join(out, 'poster.png'), 'poster');
+    // Only light files go to Deno (about 250 KB a version); the master and review MP4s stay in out/.
+    const poster = ['poster.png', 'poster.jpg'].map((f) => path.join(out, f)).find((f) => fs.existsSync(f));
+    if (poster) files.poster = await uploadFile(await toJpeg(poster, path.join(out, 'poster.upload.jpg'), 960, 300 * 1024), 'poster');
     if (fs.existsSync(path.join(dir, 'captions.vtt'))) files.captions = await uploadFile(path.join(dir, 'captions.vtt'), 'captions');
+    if (opts['with-video']) {
+      const review = path.join(out, 'review.mp4');
+      if (!fs.existsSync(review)) die('no review copy: run `studio render` and `studio mix` first');
+      files.review = await uploadFile(review, 'review');
+    }
   }
-  const sheet = ['contact.png'].map((f) => path.join(out, f)).find((f) => fs.existsSync(f));
-  if (sheet) files.sheet = await uploadFile(sheet, 'sheet');
+  const contact = path.join(out, 'contact.png');
+  if (fs.existsSync(contact)) {
+    files.sheet = await uploadFile(await toJpeg(contact, path.join(out, 'sheet.upload.jpg'), 1600, 500 * 1024), 'sheet');
+    const index = readJSON(path.join(out, 'sheet.json'), {}).index;
+    if (index && film.kind !== 'still') film.sheet_index = index;
+  }
+  if (film.kind !== 'still' && !files.sheet && !files.review && !videoUrl && !film.external_url && !film.stream_url) {
+    warn('nothing to watch on Deno: run `studio sheet` (a contact sheet the founder can scrub) or pass --video-url.');
+  }
   const manifest = { ...film };
   delete manifest.deno;
   const saved = await call('POST', '/studio/versions', {
@@ -180,6 +217,8 @@ export async function upload(dir, opts) {
   saveFilm(dir, film);
   const blocking = saved.checks.filter((c) => c.severity === 'block');
   info(`Saved v${saved.version} to Deno Studio → ${saved.review_url}`);
+  const sent = Object.values(files).flat().length;
+  info(`Sent ${sent} light file(s)${files.review ? ' and the review MP4' : ''}; the master${files.review ? '' : ' and review copy'} stay in ${path.relative(dir, out) || out}.`);
   if (saved.checks.length) info(`Deno's checks: ${blocking.length} blocking, ${saved.checks.length - blocking.length} warning(s):`);
   for (const c of saved.checks.slice(0, 15)) info(`  ${c.severity === 'block' ? 'BLOCK' : 'warn '} ${c.message} → ${c.fix}`);
   if (saved.credits?.length) info(`Credits to paste with the post:\n${saved.credits.map((c) => `  ${c.credit} (${c.license})`).join('\n')}`);
@@ -216,7 +255,9 @@ export async function doctor(opts) {
     const chrome = await chromiumPath({ install: Boolean(opts.install) }).catch(() => null);
     chrome ? ok(`Chromium: ${chrome}`) : bad('no Chromium: run `studio doctor --install`');
   }
-  for (const g of ['captions', 'voice']) {
+  if (which('yt-dlp')) ok('yt-dlp (for `studio download`)');
+  else info(`· yt-dlp: only needed for \`studio download\` (${process.platform === 'darwin' ? 'brew install yt-dlp' : 'pipx install yt-dlp, or your package manager'})`);
+  for (const g of ['captions', 'voice', 'matte']) {
     if (opts.install && opts[g]) await ensure(g);
     missing(g).length ? info(`· ${g}: installs on first use (or \`studio doctor --install --${g}\`)`) : ok(g);
   }

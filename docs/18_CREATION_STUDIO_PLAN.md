@@ -342,3 +342,42 @@ peaks ≤ −1.6 dBFS. Login → upload tested against a mock OAuth server (DCR,
 `FREESOUND_API_KEY` on `deno-api`; first real `studio login` registers a "Deno Studio kit" OAuth client in Supabase
 (dynamic registration must stay on); MCP App (`ui://deno/review` inside claude.ai) is still later; a `LICENSE` file
 is needed before submitting the plugin to Anthropic's directory; Supabase free storage is 1 GB total.
+
+## 13. Director upgrade (2026-11-13, branch `feat/studio-director-upgrade`)
+Benchmarked against Cardboard's public agent patterns (private notes in `docs/reference/cardboard/`, **not
+committed**: they hold Cardboard's own prompt text). Our wording is our own.
+
+| Pattern | What we built |
+|---|---|
+| Creative-director voice, no machinery in chat | playbook `conversation`; persona in every plugin skill's preamble, the `video` skill, the agents and the template CLAUDE.md |
+| Place before you fill | `studio place` / `fill` / `timeline`; `pending` chapters and clips draw as striped labelled blocks in preview and `--draft`; full render refuses, `verify` blocks; server: `pending_findings` (warn in drafts, block finals); playbook `build-loop` |
+| No "done" without checks | `verify.json` carries a fingerprint of the page code; `studio upload` refuses unless verify is clean and current, nothing is pending, and a sheet of the mixed `master.mp4` exists (`--unchecked` for WIP only, never `--final`) |
+| Measure the look | `studio sheet --at a,b,c`, `--range a,b --every s`, `--stats` (exposure, blacks/whites, contrast, crushed/blown %, saturation, casts), `--reference` (distance to a look) |
+| Text behind the speaker | `studio matte <name>`: MODNet (Apache-2.0) via transformers.js on the CPU, ~0.36 s/frame; `subject()` in `lib/footage.js` composites the person on a `<canvas>`; playbook `behind-subject` |
+| Caption presets | `beast-mode`, `billboard`, `sideline`, `butter-serif` in `lib/captions.js` (`drawCaption`); `studio captions --preset/--words/--behind` |
+| Asset acquisition | `studio download "<link>"` (system yt-dlp; licence `unknown` until the founder declares rights), `studio sfx` (ElevenLabs on the founder's key), `studio transcribe` (cached word times), `silence`, `loudness`; playbook `sources`, skill `footage` |
+
+Purity notes found while testing: CSS masks load after `seek()` resolves (use canvas compositing), and reusing
+caption spans whose `transform` changed made the same `t` rasterise differently; spans are rebuilt every frame.
+Not adopted: generated video/images (Veo, Kling, etc.), a declarative TSX timeline (our film is code + `film.json`).
+
+## 14. Zero keys, zero video storage (2026-11-13, same branch)
+
+**Keyless media.** `search_media` no longer needs Pexels/Pixabay/Freesound keys. When a kind has no keyed
+provider, or the keyed ones find nothing, `deno_studio.media` falls back to Wikimedia Commons (images + video;
+CC0 / public domain / CC BY / CC BY-SA, read per file; NC/ND dropped) and the Internet Archive (`advancedsearch.php`
+filtered to `licenseurl:*publicdomain*`; the file is picked from `/metadata/<id>` at `studio fetch` time). Archive
+licences are the uploader's claim, so they are recorded as a new licence `archive-pd` (warns, never blocks). On the
+founder's machine: `studio search youtube <q>` and `studio download "ytsearch3:<q>"` (yt-dlp; YouTube's Creative
+Commons flag becomes `cc-by`, everything else stays `unknown` = drafts only), and `studio sfx` synthesizes a free
+sound (licence `synth`) when no ElevenLabs key is set (`--synth` forces it).
+
+**No MP4s on Supabase.** A version no longer needs a `review` file. `studio upload` sends a JPEG poster (≤ 300 KB)
+and a JPEG contact sheet (≤ 500 KB; typically ~100 KB) plus `film.json` in the request body: about 250 KB a
+version, so the free 1 GB holds 4,000+ versions instead of ~20. `create_upload` caps poster 400 KB, sheet 600 KB,
+captions 200 KB. `studio sheet` now records each tile's box and time (`sheet.json.index`), sent as
+`film.json.sheet_index`; the review page crops the current frame out of the sheet and scrubs it like a timeline
+(← → step tiles). `film.json.external_url` (YouTube/Vimeo, embedded via youtube-nocookie / player.vimeo) or
+`stream_url` (direct https MP4/WebM, played in the frame-exact player) give a playable copy without storing bytes:
+`studio upload --video-url https://…`. `--with-video` keeps the old behaviour. A video version with no sheet and no
+link gets a `review.nothing_to_watch` warning. CSP: `media-src` allows `https:`; `frame-src` the two embed hosts.

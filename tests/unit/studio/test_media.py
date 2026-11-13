@@ -126,8 +126,166 @@ async def test_a_failing_provider_is_a_note_not_an_error() -> None:
 
 
 async def test_unconfigured_providers_explain_themselves() -> None:
-    result = await media.search("sfx", "pop", media.MediaKeys())
+    result = await media.search("sfx", "pop", media.MediaKeys(keyless=False))
     assert result.items == [] and "synthesized" in result.notes[0]
+
+
+# ---- keyless fallbacks ---------------------------------------------------------------------------
+
+COMMONS_PAGES = {
+    "query": {
+        "pages": [
+            {
+                "pageid": 7,
+                "index": 2,
+                "title": "File:Ocean waves.webm",
+                "imageinfo": [
+                    {
+                        "url": "https://upload.wikimedia.org/w.webm",
+                        "thumburl": "https://upload.wikimedia.org/w.jpg",
+                        "descriptionurl": "https://commons.wikimedia.org/wiki/File:Ocean_waves.webm",
+                        "mime": "video/webm",
+                        "width": 1920,
+                        "height": 1080,
+                        "duration": 6.4,
+                        "extmetadata": {
+                            "License": {"value": "cc0"},
+                            "LicenseShortName": {"value": "CC0"},
+                            "Artist": {"value": '<a href="//commons.wikimedia.org/wiki/User:Ann">Ann</a>'},
+                        },
+                    }
+                ],
+            },
+            {
+                "pageid": 8,
+                "index": 1,
+                "title": "File:NC only.webm",
+                "imageinfo": [
+                    {
+                        "url": "https://upload.wikimedia.org/nc.webm",
+                        "mime": "video/webm",
+                        "extmetadata": {"License": {"value": "cc-by-nc-4.0"}},
+                    }
+                ],
+            },
+        ]
+    }
+}
+ARCHIVE_DOCS = {
+    "response": {
+        "docs": [
+            {
+                "identifier": "city_1950",
+                "title": "City at night",
+                "creator": "Prelinger",
+                "licenseurl": "http://creativecommons.org/publicdomain/mark/1.0/",
+            },
+            {"identifier": "no_licence", "title": "Nope", "licenseurl": "http://creativecommons.org/licenses/by-nc/"},
+        ]
+    }
+}
+
+
+@respx.mock
+async def test_video_search_with_no_keys_uses_commons_and_the_archive() -> None:
+    commons = respx.get("https://commons.wikimedia.org/w/api.php").respond(json=COMMONS_PAGES)
+    archive = respx.get("https://archive.org/advancedsearch.php").respond(json=ARCHIVE_DOCS)
+    result = await media.search("video", "city night", media.MediaKeys(), limit=5)
+    assert [i.id for i in result.items] == ["commons:7", "archive:video:city_1950"]  # NC files are dropped
+    c, a = result.items
+    assert c.license == "cc0" and c.credit.startswith("Ann via Wikimedia Commons") and c.ext == "webm"
+    assert a.license == "archive-pd" and a.credit == "Prelinger via Internet Archive"
+    assert "keyless" in result.notes[-1] and "studio search youtube" in result.notes[-1]
+    assert "User-Agent" in commons.calls[0].request.headers
+    assert "licenseurl:(*publicdomain*)" in archive.calls[0].request.url.params["q"]
+
+
+@respx.mock
+async def test_keyless_fills_in_when_keyed_providers_find_nothing() -> None:
+    respx.get("https://api.pexels.com/v1/search").respond(status_code=429)
+    respx.get("https://pixabay.com/api/").respond(json={"hits": []})
+    respx.get("https://commons.wikimedia.org/w/api.php").respond(
+        json={
+            "query": {
+                "pages": [
+                    {
+                        "pageid": 3,
+                        "title": "File:Desk.jpg",
+                        "imageinfo": [
+                            {
+                                "url": "https://upload.wikimedia.org/desk.jpg",
+                                "thumburl": "https://upload.wikimedia.org/1920px-desk.jpg",
+                                "mime": "image/jpeg",
+                                "extmetadata": {"License": {"value": "cc-by-4.0"}, "Artist": {"value": "Bo"}},
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+    )
+    result = await media.search("image", "desk", KEYS)
+    assert [(i.id, i.license, i.download_url) for i in result.items] == [
+        ("commons:3", "cc-by", "https://upload.wikimedia.org/1920px-desk.jpg")
+    ]
+    assert result.notes[0] == "pexels is unavailable right now (429)."
+
+
+@respx.mock
+async def test_keyed_results_skip_the_keyless_sources() -> None:
+    respx.get("https://api.pexels.com/v1/videos/search").respond(json={"videos": [PEXELS_VIDEO]})
+    respx.get("https://pixabay.com/api/videos/").respond(json={"hits": []})
+    commons = respx.get("https://commons.wikimedia.org/w/api.php").respond(json=COMMONS_PAGES)
+    result = await media.search("video", "city", KEYS)
+    assert [i.id for i in result.items] == ["pexels:v:11"] and not commons.called
+
+
+@respx.mock
+async def test_sounds_with_no_keys_come_from_the_archive_and_lookup_picks_the_mp3() -> None:
+    respx.get("https://archive.org/advancedsearch.php").respond(json=ARCHIVE_DOCS)
+    result = await media.search("sfx", "whoosh", media.MediaKeys())
+    assert [i.id for i in result.items] == ["archive:sfx:city_1950"]
+    assert "synthesized" in result.notes[-1]
+    respx.get("https://archive.org/metadata/city_1950").respond(
+        json={
+            "metadata": {"title": "City", "licenseurl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+            "files": [
+                {"name": "city.flac", "format": "Flac", "length": "52.6"},
+                {"name": "city sound.mp3", "format": "VBR MP3", "length": "00:52"},
+                {"name": "city.png", "format": "PNG"},
+            ],
+        }
+    )
+    item = await media.lookup("archive:sfx:city_1950", media.MediaKeys())
+    assert item is not None and item.kind == "sfx" and item.duration == 52.0
+    assert item.download_url == "https://archive.org/download/city_1950/city%20sound.mp3"
+    assert await media.lookup("archive:bogus:x", media.MediaKeys()) is None
+
+
+def test_archive_video_pick_prefers_hd_mp4() -> None:
+    files = [
+        {"name": "a.ogv", "format": "Ogg Video"},
+        {"name": "a_512kb.mp4", "format": "512Kb MPEG4", "height": "360"},
+        {"name": "a.mp4", "format": "h.264", "height": "1080"},
+        {"name": "a_4k.mp4", "format": "h.264", "height": "2160"},
+    ]
+    picked = media.archive_pick({"files": files}, "video")
+    assert picked is not None and picked["name"] == "a.mp4"
+    assert media.archive_pick({"files": [{"name": "x.txt"}]}, "video") is None
+
+
+@respx.mock
+async def test_commons_lookup_by_page_id() -> None:
+    respx.get("https://commons.wikimedia.org/w/api.php").respond(json=COMMONS_PAGES)
+    item = await media.lookup("commons:7", media.MediaKeys())
+    assert item is not None and item.kind == "video" and item.download_url == "https://upload.wikimedia.org/w.webm"
+
+
+@respx.mock
+async def test_keyless_failures_are_notes() -> None:
+    respx.get("https://archive.org/advancedsearch.php").respond(status_code=503)
+    result = await media.search("music", "piano", media.MediaKeys())
+    assert result.items == [] and "internet-archive is unavailable right now (503)." in result.notes
 
 
 @respx.mock

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Film } from './browser.mjs';
+import { pendingItems, sourceHash } from './timeline.mjs';
 import { formats, info, loadFilm, num, outDir, run, tc, warn, writeJSON } from './util.mjs';
 
 const SCAN = [
@@ -70,6 +71,7 @@ function textBoxes() {
     const text = n.textContent.replace(/\s+/g, ' ').trim();
     if (!text) continue;
     const el = n.parentElement;
+    if (el.closest('[data-studio-placeholder]')) continue;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) < 0.15) continue;
     let o = 1;
@@ -81,7 +83,7 @@ function textBoxes() {
     if (b.width < 1 || b.height < 1 || b.right < 0 || b.bottom < 0 || b.left > W || b.top > H) continue;
     const clipped = el.scrollWidth > el.clientWidth + 2 && ['hidden', 'clip'].includes(cs.overflowX);
     const family = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim();
-    out.push({ text: text.slice(0, 120), x: b.left, y: b.top, w: b.width, h: b.height, size: parseFloat(cs.fontSize), family, fontOk: document.fonts.check(`16px "${family}"`), clipped, id: el.dataset.clip || el.id || '' });
+    out.push({ text: text.slice(0, 120), x: b.left, y: b.top, w: b.width, h: b.height, size: parseFloat(cs.fontSize), family, fontOk: document.fonts.check(`16px "${family}"`), clipped, caption: Boolean(el.closest('[data-studio-caption]')), id: el.dataset.clip || el.id || '' });
   }
   return { W, H, boxes: out };
 }
@@ -91,6 +93,7 @@ export async function verify(dir, opts) {
   const fmts = formats(film, opts.formats);
   const findings = scanSources(dir);
   const add = (severity, rule, message, t = null, extra = {}) => findings.push({ severity, rule, message, t, ...extra });
+  for (const p of pendingItems(film)) add('block', 'pending', `${p.type} "${p.label || p.id}" (${p.start}–${p.end} s) is still a placeholder: build it, then \`studio fill ${p.id}\``, p.start);
   for (const fmt of fmts) {
     const studio = await Film.open(dir, fmt);
     try {
@@ -157,7 +160,7 @@ export async function verify(dir, opts) {
             fontWarned.add(b.family);
             add('warn', 'font', `font “${b.family}” isn't loaded; the render falls back to another font. Put it in assets/fonts and @font-face it.`, t);
           }
-          if (!isStill) {
+          if (!isStill && !b.caption) {
             const s = seen.get(b.text) || { spans: [], last: -1 };
             if (s.last >= 0 && t - s.last <= step * 1.5) s.spans[s.spans.length - 1][1] = t;
             else s.spans.push([t, t]);
@@ -169,6 +172,7 @@ export async function verify(dir, opts) {
           for (let j = i + 1; j < boxes.length; j++) {
             const a = boxes[i];
             const c = boxes[j];
+            if (a.caption && c.caption) continue;
             const ix = Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x));
             const iy = Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
             if (ix * iy > 0.25 * Math.min(a.w * a.h, c.w * c.h) && a.text !== c.text) {
@@ -196,6 +200,8 @@ export async function verify(dir, opts) {
         const b = hash(await studio.grab(page, duration));
         if (a !== b) add('warn', 'seam', 'the last frame is not the first frame: the loop will jump');
       }
+      const missing = await page.evaluate(() => [...(window.__studioMatteMissing || [])]);
+      if (missing.length) add('warn', 'matte', `behind-subject text over ${missing.join(', ')} has no person matte, so it falls back: run \`studio matte <name>\``);
       for (const e of studio.errors) add('block', 'page_error', e);
       await page.close();
     } finally {
@@ -203,7 +209,7 @@ export async function verify(dir, opts) {
     }
   }
   const blocking = findings.filter((f) => f.severity === 'block');
-  writeJSON(path.join(dir, 'out', 'verify.json'), { at: new Date().toISOString(), findings });
+  writeJSON(path.join(dir, 'out', 'verify.json'), { at: new Date().toISOString(), source: sourceHash(dir), chapter: opts.chapter || null, formats: fmts.map((f) => f.ratio), findings });
   if (!findings.length) info('verify: clean. Now look: `studio sheet`.');
   for (const f of findings) (f.severity === 'block' ? warn : info)(`${f.severity === 'block' ? 'BLOCK' : 'warn '} ${f.rule.padEnd(12)} ${f.where ? `${f.where} ` : ''}${f.message}`);
   info(`verify: ${blocking.length} blocking, ${findings.length - blocking.length} warning(s) → out/verify.json`);

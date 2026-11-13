@@ -190,10 +190,27 @@ async def test_uploads_must_be_the_callers_and_finals_need_licences(client: http
         headers=headers,
     )
     assert res.status_code == 422 and "create_upload" in res.json()["error"]["message"]
+    # No MP4 on Deno is fine (the MP4s stay on the founder's disk); with nothing to look at, it's a warning.
     no_review = await client.post(
         "/api/v1/studio/versions", json={"idea_id": project, "manifest": manifest(), "files": {}}, headers=headers
     )
-    assert no_review.status_code == 422
+    assert no_review.status_code == 201
+    assert "review.nothing_to_watch" in {c["rule_id"] for c in no_review.json()["checks"]}
+    me = uuid.UUID(str(user))
+    light = await client.post(
+        "/api/v1/studio/versions",
+        json={
+            "idea_id": project,
+            "manifest": manifest(external_url="https://youtu.be/dQw4w9WgXcQ"),
+            "files": {"poster": new_path(me, "jpg"), "sheet": new_path(me, "jpg")},
+        },
+        headers=headers,
+    )
+    assert light.status_code == 201
+    assert "review.nothing_to_watch" not in {c["rule_id"] for c in light.json()["checks"]}
+    item = (await client.get(f"/api/v1/studio/items/{light.json()['item_id']}", headers=headers)).json()
+    assert "review" not in item["versions"][0]["files"]
+    assert item["versions"][0]["manifest"]["external_url"] == "https://youtu.be/dQw4w9WgXcQ"
     nc = manifest(
         clips=[{"id": "a", "start": 0, "end": 10}],
         assets=[{"id": "freesound:9", "kind": "sfx", "license": "cc-by-nc"}],
@@ -271,5 +288,6 @@ async def test_brand_kit_and_rulebook(client: httpx.AsyncClient) -> None:
 async def test_media_without_keys_explains_itself(client: httpx.AsyncClient) -> None:
     _, headers = user_token()
     res = await client.get("/api/v1/studio/media/search?kind=sfx&q=whoosh", headers=headers)
-    assert res.status_code == 200 and res.json()["results"] == [] and res.json()["notes"]
+    # Keyless sources (Internet Archive) answer even without keys; offline, that's a note, never an error.
+    assert res.status_code == 200 and res.json()["notes"]
     assert (await client.get("/api/v1/studio/media/item?id=pexels:v:1", headers=headers)).status_code == 404
