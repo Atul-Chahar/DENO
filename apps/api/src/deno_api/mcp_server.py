@@ -27,6 +27,7 @@ from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ResourceError, ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -100,7 +101,7 @@ def _uuid(value: str, what: str) -> uuid.UUID:
     try:
         return uuid.UUID(str(value).strip())
     except ValueError:
-        raise ValueError(f"{what} must be an id from Deno (a UUID).") from None
+        raise ToolError(f"{what} must be an id from Deno (a UUID).") from None
 
 
 def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlette] | None:
@@ -143,8 +144,10 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
             await svc.hit_limit(redis(), f"mcp:{group}:{user_id}", limit, 60, "requests")
             async with maker() as session, session.begin():
                 return await work(UserScope(session, user_id), client)
+        # ToolError, not ValueError: MCP SDK 2.x shows the model only "Error executing tool <name>" for any other
+        # exception, so a founder over quota got no reason at all.
         except DenoError as exc:  # NotFound, QuotaExceeded, … : tell the model in plain words
-            raise ValueError(str(exc) or type(exc).__name__) from None
+            raise ToolError(str(exc) or type(exc).__name__) from None
 
     def idea_link(project_id: uuid.UUID) -> str:
         return f"{dashboard}/app?project={project_id}"
@@ -191,7 +194,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
 
         text = idea.strip()
         if len(text) < 20:
-            raise ValueError("Describe the idea in at least a sentence or two.")
+            raise ToolError("Describe the idea in at least a sentence or two.")
 
         async def work(scope: UserScope, client: str | None) -> dict[str, Any]:
             await scope.ensure_profile()
@@ -341,7 +344,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         from deno_api.v1.content import _check_plan_quota
 
         if not 1 <= len(briefs) <= 30:
-            raise ValueError("Give between 1 and 30 briefs.")
+            raise ToolError("Give between 1 and 30 briefs.")
 
         async def work(scope: UserScope, client: str | None) -> dict[str, Any]:
             project_id = _uuid(idea_id, "idea_id")
@@ -353,13 +356,13 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
                 try:
                     platform = Platform(str(b.get("platform", "linkedin")).lower())
                 except ValueError:
-                    raise ValueError(f"brief {i}: platform must be linkedin, reddit, x or hn.") from None
+                    raise ToolError(f"brief {i}: platform must be linkedin, reddit, x or hn.") from None
                 angle = str(b.get("angle") or "").strip()
                 if len(angle) < 10:
-                    raise ValueError(f"brief {i}: write the angle (what the post says).")
+                    raise ToolError(f"brief {i}: write the angle (what the post says).")
                 story = str(b.get("story_id") or "") or None
                 if story is not None and story not in stories:
-                    raise ValueError(f"brief {i}: story_id isn't one of the founder's stories.")
+                    raise ToolError(f"brief {i}: story_id isn't one of the founder's stories.")
                 rows.append(
                     {
                         "day": max(1, min(int(b.get("day") or i), 30)),
@@ -440,7 +443,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
 
         body = text.strip()
         if not 1 <= len(body) <= 6000:
-            raise ValueError("A post is 1-6000 characters.")
+            raise ToolError("A post is 1-6000 characters.")
 
         async def work(scope: UserScope, client: str | None) -> dict[str, Any]:
             brief = await scope.get_brief(_uuid(brief_id, "brief_id"))
@@ -503,7 +506,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
             doc = get_doc("playbooks", topic) or get_doc("styles", topic) or get_doc("skills", topic)
             if doc is None:
                 names = ", ".join(d.slug for d in list_docs("playbooks"))
-                raise ValueError(f"No playbook {topic!r}. Topics: {names}.")
+                raise ToolError(f"No playbook {topic!r}. Topics: {names}.")
             return {"name": doc.slug, "title": doc.title, "text": rulebook.apply(doc, await svc.struck_rules(scope))}
 
         return await as_founder(work)
@@ -517,7 +520,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
             if name:
                 doc = get_doc("styles", name)
                 if doc is None:
-                    raise ValueError(f"No style {name!r}. Styles: {', '.join(d.slug for d in list_docs('styles'))}.")
+                    raise ToolError(f"No style {name!r}. Styles: {', '.join(d.slug for d in list_docs('styles'))}.")
                 return {
                     "name": doc.slug,
                     "title": doc.title,
@@ -706,7 +709,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         """A Deno Studio playbook (default rules, without the founder's Rulebook changes)."""
         doc = get_doc("playbooks", topic) or get_doc("styles", topic)
         if doc is None:
-            raise ValueError(f"No playbook {topic!r}.")
+            raise ResourceError(f"No playbook {topic!r}.")
         return doc.body
 
     def _skill_prompt(skill: str, ask: str) -> str:
