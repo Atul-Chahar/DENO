@@ -61,6 +61,9 @@ Production env (`deno-api`) has: `NVIDIA_NIM_API_KEY`, `WEB_SEARCH_PROVIDER`, `T
 - **Stacked PRs:** merging a PR whose base is another feature branch does NOT reach `main` (this happened with
   #30; #31 fixed it). Retarget the base to `main` first, or open PRs against `main`. The repo does not delete
   branches on merge, so GitHub doesn't auto-retarget.
+- **MCP tool errors:** raise `ToolError` (resources: `ResourceError`), never `ValueError`. MCP SDK 2.x hides any
+  other exception's text and the model sees only "Error executing tool <name>" (a founder over the 5/month quota
+  got no reason until the fix on 2026-11-14).
 - Schemathesis can flag random fuzz edge cases on PRs; check whether a failure is the PR's fault.
 - `vercel.json` (root) is the API only; `web/vercel.json` must keep `"framework": "nextjs"`. The root
   `.vercelignore` applies to BOTH projects: never ignore `web/`.
