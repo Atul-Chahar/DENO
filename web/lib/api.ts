@@ -493,6 +493,7 @@ export const api = {
   createProject: (idea: string, authorHandle: string | null) =>
     send<Project>('POST', '/projects', { idea, author_handle: authorHandle }),
   listProjects: () => request<{ items: Project[]; next_cursor: string | null }>('/projects?limit=20'),
+  deleteProject: (projectId: string) => send<void>('DELETE', `/projects/${enc(projectId)}`),
   listRuns: (projectId: string) => request<Run[]>(`/projects/${enc(projectId)}/runs`),
   startRun: (projectId: string) =>
     send<{ run_id: string; status: RunStatus; events_url: string }>('POST', `/projects/${enc(projectId)}/runs`, undefined, {

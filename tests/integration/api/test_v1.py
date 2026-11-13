@@ -4,6 +4,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -158,6 +159,49 @@ async def test_concurrency_and_monthly_quota(
     over = await client.post(f"/api/v1/projects/{p2}/runs", headers=headers)
     assert over.status_code == 402
     assert over.json()["error"]["code"] == "quota_exceeded"
+
+
+async def test_an_idea_cannot_be_deleted_while_its_run_is_live(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    user_id, headers = user_token()
+    pid = await create_project(client, headers)
+    assert (await client.post(f"/api/v1/projects/{pid}/runs", headers=headers)).status_code == 202
+    busy = await client.delete(f"/api/v1/projects/{pid}", headers=headers)
+    assert busy.status_code == 409
+    assert busy.json()["error"]["code"] == "conflict"
+
+    async with maker() as session, session.begin():
+        await session.execute(update(m.ValidationRun).where(m.ValidationRun.user_id == user_id).values(status="failed"))
+    assert (await client.delete(f"/api/v1/projects/{pid}", headers=headers)).status_code == 204
+    assert (await client.get("/api/v1/projects", headers=headers)).json()["items"] == []
+
+
+async def test_retrying_a_failed_run_costs_no_quota(
+    client: httpx.AsyncClient, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    user_id, headers = user_token()
+    pid = await create_project(client, headers)
+    first = (await client.post(f"/api/v1/projects/{pid}/runs", headers=headers)).json()["run_id"]
+    async with maker() as session, session.begin():
+        await session.execute(update(m.ValidationRun).where(m.ValidationRun.id == first).values(status="failed"))
+        await session.execute(update(m.Profile).where(m.Profile.id == user_id).values(plan=Plan.FREE))
+        for _ in range(5):
+            session.add(m.UsageEvent(id=new_id(), user_id=user_id, kind="validation_run", units=1))
+
+    # The monthly limit is spent, but the last run broke on our side: the retry is free.
+    retry = await client.post(f"/api/v1/projects/{pid}/runs", headers=headers)
+    assert retry.status_code == 202, retry.text
+    async with maker() as session:
+        used = await UserScope(session, user_id).usage_since(UsageKind.VALIDATION_RUN, datetime.min.replace(tzinfo=UTC))
+    assert used == 6  # the first run and the 5 seeded ones; the retry added 0
+
+    # A finished run is not a failure: running it again counts as usual.
+    async with maker() as session, session.begin():
+        await session.execute(
+            update(m.ValidationRun).where(m.ValidationRun.user_id == user_id).values(status="succeeded")
+        )
+    assert (await client.post(f"/api/v1/projects/{pid}/runs", headers=headers)).status_code == 402
 
 
 async def test_internal_plan_is_not_capped_monthly(

@@ -75,6 +75,11 @@ async def update_project(project_id: uuid.UUID, body: ProjectPatch, scope: Scope
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: uuid.UUID, scope: Scope) -> Response:
+    """Delete an idea and its runs. Refused while a run is live: stop it first, so it never spends the
+    shared LLM budget on an idea nobody can see any more."""
+    runs = await scope.list_runs(project_id)
+    if any(r.status in (RunStatus.QUEUED, RunStatus.RUNNING) for r in runs):
+        raise Conflict("This idea is still being validated. Stop the run first, then delete it.")
     await scope.delete_project(project_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -84,7 +89,7 @@ async def list_runs(project_id: uuid.UUID, scope: Scope) -> list[RunOut]:
     return [RunOut.model_validate(r) for r in await scope.list_runs(project_id)]
 
 
-async def _check_quota(scope: Scope) -> None:
+async def _check_quota(scope: Scope, *, monthly: bool = True) -> None:
     profile = await scope.ensure_profile()
     plan = profile.plan or Plan.FREE
     quota = (
@@ -94,6 +99,8 @@ async def _check_quota(scope: Scope) -> None:
         return
     if await scope.count_active_runs() >= quota.max_concurrent:
         raise RateLimited("You already have a validation running. Wait for it to finish, or cancel it.")
+    if not monthly:
+        return
     month_start = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if await scope.usage_since(UsageKind.VALIDATION_RUN, month_start) >= quota.monthly_limit:
         raise QuotaExceeded(f"Your plan includes {quota.monthly_limit} validation runs a month.")
@@ -115,10 +122,16 @@ async def start_run(
             raise Conflict("That idempotency key was used for another project.")
         response.status_code = status.HTTP_200_OK
         return RunCreated(run_id=existing.id, status=existing.status, events_url=_events_url(existing.id))
-    await _check_quota(scope)
+    # The idea's last run broke on our side (worker crash, outage): retrying it doesn't use up the month.
+    latest = (await scope.latest_runs([project_id])).get(project_id)
+    retry_of = latest[0].id if latest and latest[0].status == RunStatus.FAILED else None
+    await _check_quota(scope, monthly=retry_of is None)
     await ensure_room(getattr(request.app.state, "redis", None), request.app.state.settings)
     run, _ = await scope.create_run(project_id, idempotency_key)
-    await scope.record_usage(UsageKind.VALIDATION_RUN, run_id=run.id)
+    if retry_of:
+        await scope.record_usage(UsageKind.VALIDATION_RUN, units=0, run_id=run.id, retry_of=str(retry_of))
+    else:
+        await scope.record_usage(UsageKind.VALIDATION_RUN, run_id=run.id)
     # Background tasks run after the request transaction commits, so the worker
     # always finds the row. A lost enqueue is repaired by the requeue cron.
     background.add_task(enqueue, TASK_VALIDATION_RUN, run_id=str(run.id), user_id=str(scope.user_id))
