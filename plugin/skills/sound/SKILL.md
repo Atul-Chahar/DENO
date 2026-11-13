@@ -20,8 +20,8 @@ description: Add music, sound effects and a proper mix to a studio video: beat a
 3. With a track: `studio beats assets/track.mp3`. It writes bpm, beats, downbeats and sections into
    `film.json.beatGrid` and `beats.json`. Snap cuts to downbeats.
 4. Cues: push `{t, kind}` into `window.CUES` for every visual hit (`click`, `whoosh`, `pop`, `thump`, `tick`,
-   `riser`, `chime`, `slam`). For library SFX, `search_media kind=sfx` and map a kind to a file in
-   `film.json.sfx`.
+   `riser`, `chime`, `slam`). For library SFX, `studio search sfx <query>` (Openverse
+   included, no key) and `studio fetch <id> --as <kind>` maps it to that kind in `film.json.sfx`.
    `studio sfx "<the sound>" --as <kind> --at <t>`: free synthesized sound by default (no key); with the
    founder's ElevenLabs key it generates a custom one instead (tell them it uses their credits). Talking clips: `studio silence` for dead air, `studio loudness` for levels.
 5. `studio mix` builds the mix (track, SFX from cues, voice if present), ducks, fades at cuts, normalises to

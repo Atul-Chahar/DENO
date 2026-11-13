@@ -9,7 +9,7 @@ import { matte } from './lib/matte.mjs';
 import { mix } from './lib/mix.mjs';
 import { doctor, fetchAsset, ideas, init, notes, preview, search, upload } from './lib/project.mjs';
 import { render } from './lib/render.mjs';
-import { download, generateSfx } from './lib/sources.mjs';
+import { download, generateSfx, openverseCommand } from './lib/sources.mjs';
 import { fill, place, timeline } from './lib/timeline.mjs';
 import { parseArgs, projectDir, info } from './lib/util.mjs';
 import { verify } from './lib/verify.mjs';
@@ -24,8 +24,8 @@ Shape      place <id> --start 2 --end 4.5 [--label "what it shows"] [--kind grap
 Look       sheet [--phone] [--live] [--at 1,4.5,9 | --range 10,14 --every 0.5] [--stats] [--reference ref.jpg] [--audio]
            strip --at 4.2 [--n 12] · crop --at 7 --box x,y,w,h
 Render     render [--draft] [--formats 9:16,16:9] [--from 6 --to 9] [--sub 3] · still [--pdf]
-Media      search <video|image|sfx|music|icon|youtube> <query> · fetch <id> [--as whoosh] · download "<link>"|"ytsearch3:<q>" [--license own]
-           frames <video> [--name n] · matte <name> · capture <url>
+Media      search <video|image|sfx|music|icon|youtube> <query> [--source deno|openverse] · fetch <id> [--as whoosh] · download "<link>"|"ytsearch3:<q>" [--license own]
+           frames <video> [--name n] · matte <name> · capture <url> · openverse register <email> (optional)
 Listen     transcribe <media> [--format words|text|srt|json] · silence <media> · loudness <media>
 Sound      beats <track> · voice <script.md> [--engine kokoro|elevenlabs|sarvam] · sfx "<sound>" [--as kind] [--at 2.4] (free synth; ElevenLabs if keyed)
            captions <audio> [--text script.md] [--preset beast-mode|billboard|sideline|butter-serif] · mix [--bed]
@@ -66,6 +66,7 @@ const commands = {
   silence: () => silence(projectDir(), args),
   loudness: () => loudness(projectDir(), args),
   sfx: () => generateSfx(projectDir(), args),
+  openverse: () => openverseCommand(args),
   sheet: () => sheet(projectDir(), args),
   strip: () => strip(projectDir(), args),
   crop: () => crop(projectDir(), args),

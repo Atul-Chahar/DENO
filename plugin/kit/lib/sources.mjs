@@ -1,11 +1,14 @@
 // Getting media in, with zero API keys by default:
 // - `studio search youtube <query>` / `studio download "ytsearch5:<query>"` (yt-dlp on the founder's machine);
 // - `studio download <link>` (yt-dlp, for footage the founder has the right to use);
+// - Openverse: openly licensed images and audio (CC0 / CC BY / CC BY-SA), anonymous by default;
+//   `studio openverse register <email>` raises the rate limit;
 // - `studio sfx "<sound>"`: the kit's own synthesized sounds (free, licence "synth"), or ElevenLabs on the
 //   founder's own key when one is set.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { config } from './api.mjs';
+import { config, setConfig } from './api.mjs';
 import { SFX_KINDS, SR, sfx as synthSfx } from './synth.mjs';
 import { die, info, loadFilm, num, readJSON, run, safeName, saveFilm, warn, which, writeJSON, writeWav } from './util.mjs';
 
@@ -182,4 +185,140 @@ export async function generateSfx(dir, opts) {
   fs.mkdirSync(path.join(dir, 'assets', 'sfx'), { recursive: true });
   fs.writeFileSync(path.join(dir, rel), Buffer.from(await res.arrayBuffer()));
   placeSfx(dir, film, kind, rel, 'elevenlabs', 'generated', opts);
+}
+
+// --------------------------------------------------------------------------- Openverse
+
+export const OPENVERSE = 'https://api.openverse.org/v1';
+// Openverse licence → Deno licence id. Anything else (NC, ND, sampling+) is dropped. `commercial` alone still lets
+// BY-ND through (checked live), so searches ask for `commercial,modification` and this table is the second gate.
+const OV_LICENCES = { cc0: 'cc0', pdm: 'cc0', by: 'cc-by', 'by-sa': 'cc-by-sa' };
+const OV_LENGTH = { sfx: 'shortest', music: 'short,medium' }; // < 30 s; 30 s – 10 min
+const OV_FOLDERS = { image: 'images', sfx: 'sfx', music: 'music' };
+const OV_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function extOf(r, image) {
+  const fromType = String(r.filetype || '').toLowerCase().replace('jpeg', 'jpg');
+  if (/^[a-z0-9]{2,5}$/.test(fromType)) return fromType;
+  const fromUrl = (String(r.url || '').split(/[?#]/)[0].match(/\.([a-z0-9]{2,5})$/i) || [])[1];
+  return fromUrl ? fromUrl.toLowerCase().replace('jpeg', 'jpg') : image ? 'jpg' : 'mp3';
+}
+
+/** One Openverse result in Deno's asset shape, or null when its licence can't go in marketing. */
+export function openverseItem(r, kind) {
+  const license = OV_LICENCES[String(r?.license || '').toLowerCase()];
+  if (!license || !r.id || !r.url) return null;
+  const image = kind === 'image';
+  const ms = Number(r.duration) || 0;
+  const k = image ? 'image' : kind === 'sfx' || kind === 'music' ? kind : ms >= 20_000 ? 'music' : 'sfx';
+  const tag = `${r.license}${r.license_version ? ` ${r.license_version}` : ''}`;
+  return {
+    id: `openverse:${r.id}`,
+    kind: k,
+    title: String(r.title || `Openverse ${r.id}`).slice(0, 120),
+    preview_url: r.thumbnail || r.url,
+    download_url: r.url,
+    source: 'openverse',
+    source_url: r.foreign_landing_url || null,
+    license,
+    credit: `${r.creator || 'Unknown'} via Openverse (${tag})`,
+    width: r.width || null,
+    height: r.height || null,
+    duration: ms ? Math.round(ms / 100) / 10 : null,
+    ext: extOf(r, image),
+  };
+}
+
+/** Bearer header when the founder registered (`studio openverse register`), else {} (anonymous). */
+export async function openverseHeaders(fetchImpl = fetch) {
+  const c = config();
+  if (!c.openverse_client_id || !c.openverse_client_secret) return {};
+  if (c.openverse_token && Date.now() < (c.openverse_token_expires || 0) - 60_000) return { Authorization: `Bearer ${c.openverse_token}` };
+  try {
+    const res = await fetchImpl(`${OPENVERSE}/auth_tokens/token/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: c.openverse_client_id, client_secret: c.openverse_client_secret }),
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    const t = await res.json();
+    setConfig('openverse_token', t.access_token);
+    setConfig('openverse_token_expires', Date.now() + (Number(t.expires_in) || 36_000) * 1000);
+    return { Authorization: `Bearer ${t.access_token}` };
+  } catch (err) {
+    warn(`Openverse sign-in failed (${err.message}); searching anonymously. Just registered? Click the link in Openverse's verification email first.`);
+    return {};
+  }
+}
+
+/** Build the search URL (exported for tests). */
+export function openverseUrl(kind, query, limit = 8) {
+  const params = new URLSearchParams({ q: query, page_size: String(Math.max(1, Math.min(20, limit))), license_type: 'commercial,modification' });
+  if (OV_LENGTH[kind]) params.set('length', OV_LENGTH[kind]);
+  return `${OPENVERSE}/${kind === 'image' ? 'images' : 'audio'}/?${params}`;
+}
+
+/** Search Openverse for images, sound effects or music. No key needed. */
+export async function searchOpenverse(kind, query, { limit = 8, fetchImpl = fetch, headers } = {}) {
+  if (!['image', 'sfx', 'music'].includes(kind)) throw new Error('Openverse has images, sfx and music');
+  const res = await fetchImpl(openverseUrl(kind, query, limit), { headers: headers ?? (await openverseHeaders(fetchImpl)) });
+  if (res.status === 429) throw new Error('rate limit reached (anonymous: 20 a minute, 200 a day). `studio openverse register <email>` raises it');
+  if (!res.ok) throw new Error(`Openverse ${res.status}`);
+  const body = await res.json();
+  return (body.results || []).map((r) => openverseItem(r, kind)).filter(Boolean);
+}
+
+/** `studio fetch openverse:<id>`: download into assets/ and record the credit in film.json + CREDITS.json. */
+export async function fetchOpenverse(dir, opts, fetchImpl = fetch) {
+  const id = String(opts._[1] || '');
+  const uuid = id.slice('openverse:'.length);
+  if (!OV_ID.test(uuid)) die('usage: studio fetch openverse:<id from `studio search`> [--as whoosh]');
+  const headers = await openverseHeaders(fetchImpl);
+  let item = null;
+  for (const [route, kind] of [['images', 'image'], ['audio', undefined]]) {
+    const res = await fetchImpl(`${OPENVERSE}/${route}/${uuid}/`, { headers });
+    if (res.status === 404) continue;
+    if (!res.ok) die(`Openverse ${res.status} for ${id}`);
+    const r = await res.json();
+    item = openverseItem(r, kind);
+    if (!item) die(`${id} has a licence that can't be used in marketing (${r.license || 'none'}); pick another`);
+    break;
+  }
+  if (!item) die(`Openverse has no ${id}`);
+  if (opts.as && opts.as !== true && item.kind === 'music') item.kind = 'sfx'; // asked for it as a hit
+  const file = path.join('assets', OV_FOLDERS[item.kind], `${safeName(id)}.${item.ext}`);
+  const res = await fetchImpl(item.download_url, { redirect: 'follow' });
+  if (!res.ok) die(`download failed: ${res.status} (${item.download_url})`);
+  fs.mkdirSync(path.join(dir, path.dirname(file)), { recursive: true });
+  fs.writeFileSync(path.join(dir, file), Buffer.from(await res.arrayBuffer()));
+  const film = loadFilm(dir);
+  recordAsset(dir, film, { id, kind: item.kind, file, source: 'openverse', license: item.license, credit: item.credit, source_url: item.source_url });
+  if (opts.as && opts.as !== true && item.kind === 'sfx') film.sfx = { ...(film.sfx || {}), [String(opts.as).replace(/^sfx:/, '')]: file };
+  if (item.kind === 'music' && !film.audio?.music) film.audio = { ...(film.audio || {}), music: { file, gain: -8, start: 0 } };
+  saveFilm(dir, film);
+  info(`${file} · ${item.license} · ${item.credit}${item.license !== 'cc0' ? '\nCredit required: it is in CREDITS.json; paste it in the post.' : ''}`);
+  return item;
+}
+
+/** `studio openverse register <email>`: get API credentials for a higher rate limit (optional). */
+export async function openverseCommand(opts, fetchImpl = fetch) {
+  const [, sub, email] = opts._;
+  if (sub !== 'register' || !email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(email))) {
+    die('usage: studio openverse register <your email>\n(optional: Openverse works without it; registering raises the 200-a-day anonymous limit)');
+  }
+  const res = await fetchImpl(`${OPENVERSE}/auth_tokens/register/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: `deno-studio-${crypto.randomBytes(4).toString('hex')}`,
+      description: "Deno Studio kit: finding openly licensed images and sounds for a founder's own marketing videos.",
+      email: String(email),
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.client_id || !body.client_secret) die(`Openverse registration failed (${res.status}): ${JSON.stringify(body).slice(0, 200)}`);
+  setConfig('openverse_client_id', body.client_id);
+  setConfig('openverse_client_secret', body.client_secret);
+  setConfig('openverse_token', undefined);
+  info(`Registered with Openverse. Open the email they just sent to ${email} and click the verification link.\nUntil then the kit keeps searching anonymously. Credentials are saved in ~/.deno-studio/config.json (only you can read it).`);
 }

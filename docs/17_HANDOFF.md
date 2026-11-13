@@ -39,6 +39,8 @@ presets, yt-dlp download, ElevenLabs SFX, transcribe/silence/loudness. Details: 
 Later the same day (docs/18 §14): **media search needs zero API keys** (Wikimedia Commons + Internet Archive
 fallbacks, YouTube via local yt-dlp, synthesized `studio sfx`), and **`studio upload` no longer stores MP4s**:
 poster + contact sheet JPEGs (~250 KB a version), review page scrubs the sheet or embeds `--video-url`.
+Then (docs/18 §15): **Openverse** in the kit: `studio search image|sfx|music` adds CC0/CC BY/CC BY-SA results with no
+key and no sign-in; `studio openverse register <email>` is optional (raises the 200/day anonymous limit).
 
 ## 3. Waiting on the user (check these first)
 0. **Studio PR:** review and merge; then `uv run alembic upgrade head` (0006, additive, shared DB). Optional: add
