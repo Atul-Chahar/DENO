@@ -19,12 +19,17 @@ _TABLE: dict[str, tuple[bool, bool, str]] = {
     "cc-by": (True, True, "CC BY: credit the author"),
     "licensed": (True, False, "licensed through a sublicensing provider"),
     "generated": (True, False, "generated on the founder's key; check the provider's terms"),
+    "archive-pd": (
+        True,
+        False,
+        "public domain as claimed by the Internet Archive uploader: check it isn't someone else's show or song",
+    ),
     "cc-by-sa": (True, True, "CC BY-SA: credit and share alike; avoid for marketing"),
     "cc-by-nc": (False, True, "non-commercial only: not allowed in marketing"),
     "cc-by-nd": (False, True, "no derivatives: can't be edited into a video"),
     "unknown": (False, False, "no licence recorded"),
 }
-WARN_ONLY = {"generated", "cc-by-sa"}
+WARN_ONLY = {"generated", "cc-by-sa", "archive-pd"}
 
 
 @dataclass(frozen=True)

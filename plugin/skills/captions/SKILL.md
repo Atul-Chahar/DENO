@@ -1,6 +1,6 @@
 ---
 name: captions
-description: Create captions for a studio video from its voiceover or track (word timing), burn them in for vertical formats, and write SRT/VTT sidecars. Use when a video has speech or lyrics, or will be watched muted.
+description: Create captions for a studio video from its voiceover, footage or track (word timing), in a house preset (beast-mode, billboard, sideline, butter-serif), optionally behind the speaker, burned in for vertical formats, with SRT/VTT sidecars. Use when a video has speech or lyrics, or will be watched muted.
 ---
 
 > **Deno Studio plugin.** `studio` is this plugin's command (on your PATH while the plugin is enabled; if the
@@ -8,12 +8,25 @@ description: Create captions for a studio video from its voiceover or track (wor
 > get_playbook, search_media, check_copy, save_video, get_review_notes, …) come from the `deno` server this plugin
 > adds; approve the sign-in when Claude Code asks. Prefer `get_playbook` (it leaves out rules the founder switched
 > off); offline copies are in `${CLAUDE_PLUGIN_ROOT}/skills/video/reference/`.
+>
+> **Talking to the founder:** you are their creative director. Warm, brief, plain words about the story and the
+> viewer. Keep the machinery out of chat (no command or tool names, ids, paths, JSON or render times unless they
+> asked for a file or must act on one). One or two sentences after each change. Playbook: `conversation`.
 
 # Captions
-1. `get_playbook("captions")`.
-2. `studio captions assets/voice.wav` transcribes with word timings (local Whisper). If you know the exact words
-   (a script or lyrics), add `--text script.md` to align them instead of trusting the transcript.
-3. It writes `captions.json` (words with times), `captions.srt`, `captions.vtt`, and fills `film.json.captions`.
-4. Burned-in: `await loadCaptions()` from `lib/captions.js` before `film(...)`, then in `seek(t)` draw
-   `captionAt(t)` (the current group of 1–4 words and the index of the word being spoken).
-5. `check_copy(kind="captions", text=<all caption lines>)` and fix what it flags.
+1. `get_playbook("captions")`; for text behind a person also `get_playbook("behind-subject")`.
+2. Choose a preset by the film's energy and say it in one line to the founder ("bold, word-by-word captions
+   for a fast reel"): `beast-mode` (loud reels), `billboard` (huge, behind the speaker, for the hook or key
+   lines), `sideline` (talking heads, explainers), `butter-serif` (calm founder stories).
+3. `studio captions <audio or footage> --preset <name>` transcribes with word timings (local Whisper). With a
+   known script or lyrics add `--text script.md` to align the exact words. `--words n` overrides words per caption.
+   It writes `captions.json`, `captions.srt`, `captions.vtt` and fills `film.json.captions`.
+4. Burned-in: `await loadCaptions()` from `lib/captions.js` before `film(...)`, then in `seek(t)`:
+   `drawCaption(el, t, { preset })` into an empty element inside `#stage`.
+5. Behind the speaker: `studio frames` + `studio matte <name>` on the footage, layers back image → caption element →
+   front canvas, and `await subject({ back, front, text: el }, name, lt)` before `drawCaption`. Look at a sheet at
+   the moments the head crosses the words.
+6. Read the transcript for names and homophones and fix them in `captions.json`. Then
+   `check_copy(kind="captions", text=<all caption lines>)` and fix what it flags.
+7. `studio verify`, then `studio sheet --live --at <a few caption moments>` and read it before telling the
+   founder captions are in.

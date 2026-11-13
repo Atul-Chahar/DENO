@@ -30,7 +30,13 @@ from deno_sources.website import SiteUnavailable
 from deno_studio import brand as brand_mod
 from deno_studio import licences, media, rulebook
 from deno_studio.copycheck import CopyKind, check_video_copy
-from deno_studio.manifest import FilmManifest, asset_findings, timing_findings
+from deno_studio.manifest import (
+    FilmManifest,
+    asset_findings,
+    pending_findings,
+    review_findings,
+    timing_findings,
+)
 
 log = get_logger(__name__)
 
@@ -43,6 +49,9 @@ UPLOAD_KINDS = {
     "source": ("zip",),
     "captions": ("vtt", "srt"),
 }
+# Dashboard files stay tiny (docs/18): a 50 MB review copy per version would fill Supabase's free 1 GB after
+# ~20 videos, while poster + sheet + manifest is ~250 KB (4,000+ projects). The MP4s stay on the founder's disk.
+LIGHT_MAX_BYTES = {"poster": 400 * 1024, "sheet": 600 * 1024, "captions": 200 * 1024}
 QUICK_TAGS = ("pacing", "text", "motion", "sound", "brand", "lost-interest", "facts", "composition")
 
 
@@ -284,14 +293,21 @@ async def create_upload(scope: UserScope, settings: Settings, role: str, ext: st
     ext = ext.lower().lstrip(".").replace("jpeg", "jpg")
     if ext not in UPLOAD_KINDS[role]:
         raise InvalidInput(f"A {role} file must be {' or '.join(UPLOAD_KINDS[role])}.")
-    if size <= 0 or size > settings.studio_upload_max_bytes:
-        mb = settings.studio_upload_max_bytes // (1024 * 1024)
-        raise InvalidInput(f"Files must be under {mb} MB. Upload the 720p review copy, not the master.")
+    cap = max_bytes(settings, role)
+    if size <= 0 or size > cap:
+        if role in LIGHT_MAX_BYTES:
+            raise InvalidInput(f"A {role} must be under {cap // 1024} KB: send a JPEG (the kit does this for you).")
+        mb = cap // (1024 * 1024)
+        raise InvalidInput(f"Files must be under {mb} MB. Keep the master on your disk.")
     storage = storage_for(settings)
     if not storage.configured:
         raise Conflict("File storage isn't configured on this Deno server.")
     signed = await storage.sign_upload(new_path(scope.user_id, ext))
-    return {**signed.as_dict(), "role": role, "max_bytes": settings.studio_upload_max_bytes}
+    return {**signed.as_dict(), "role": role, "max_bytes": cap}
+
+
+def max_bytes(settings: Settings, role: str) -> int:
+    return min(LIGHT_MAX_BYTES.get(role, settings.studio_upload_max_bytes), settings.studio_upload_max_bytes)
 
 
 def _parse_manifest(raw: dict[str, Any] | str) -> FilmManifest:
@@ -336,15 +352,14 @@ async def save_version(
                     raise InvalidInput(
                         f"{role}: {path} hasn't been uploaded yet. PUT the file to its upload_url first."
                     )
-                if size > settings.studio_upload_max_bytes:
+                if size > max_bytes(settings, "page" if role == "pages" else role):
                     raise InvalidInput(f"{role}: the file is over the size limit.")
         clean_files[role] = paths if role == "pages" else paths[0]
-    if film.kind == "video" and "review" not in clean_files:
-        raise InvalidInput("A video version needs a review copy (role 'review', 720p mp4).")
     if film.kind == "still" and "pages" not in clean_files and "poster" not in clean_files:
         raise InvalidInput("A still needs its pages (role 'pages') or a poster.")
 
-    findings = timing_findings(film) + asset_findings(film, final=final)
+    findings = timing_findings(film) + asset_findings(film, final=final) + pending_findings(film, final=final)
+    findings += review_findings(film, clean_files)
     copy = "\n".join(t for _k, t in film.copy_lines())
     if copy:
         report = await check_copy(scope, copy, "on_screen", project_id)
@@ -573,20 +588,24 @@ async def notes_for_ai(
     statuses = None if include_closed else [NoteStatus.OPEN]
     notes = await scope.list_review_notes(item_id, statuses=statuses)
     current = await scope.get_studio_version(item_id) if item.current_version else None
-    poster: str | None = None
-    if current is not None and isinstance(current.files.get("review"), str):
-        signed = (
-            await storage_for(settings).signed_urls([current.files["review"]])
-            if storage_for(settings).configured
-            else {}
-        )
-        poster = signed.get(current.files["review"])
+    review_url: str | None = None
+    sheet_url: str | None = None
+    if current is not None:
+        storage = storage_for(settings)
+        wanted = [p for p in (current.files.get("review"), current.files.get("sheet")) if isinstance(p, str)]
+        signed = await storage.signed_urls(wanted) if wanted and storage.configured else {}
+        review = current.files.get("review")
+        review_url = signed.get(review) if isinstance(review, str) else None
+        review_url = review_url or FilmManifest.model_validate(current.manifest).playable_url()
+        sheet = current.files.get("sheet")
+        sheet_url = signed.get(sheet) if isinstance(sheet, str) else None
     return {
         "item_id": str(item.id),
         "title": item.title,
         "status": item.status.value,
         "current_version": item.current_version,
-        "review_copy_url": poster,
+        "review_copy_url": review_url,
+        "sheet_url": sheet_url,
         "notes": [note_view(n) for n in notes],
         "how": "Fix one note at a time; keep everything else exactly as it is. Upload a new version, then "
         "reply_note(note_id, 'fixed', '<one line>') or 'wontfix' with the reason. Notes by 'system' are automated checks.",

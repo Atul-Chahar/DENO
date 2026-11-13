@@ -52,6 +52,7 @@ class Clip(_Base):
     label: str = Field(default="", max_length=300)
     reads: list[Span] = Field(default_factory=list, max_length=50)
     text: list[Span] = Field(default_factory=list, max_length=100)
+    pending: bool = Field(default=False, description="a placeholder whose content isn't built yet (studio place)")
 
 
 class Chapter(_Base):
@@ -60,6 +61,7 @@ class Chapter(_Base):
     start: float = Field(ge=0)
     end: float = Field(ge=0)
     file: str | None = Field(default=None, max_length=200)
+    pending: bool = False
 
 
 class Caption(_Base):
@@ -81,6 +83,27 @@ class Asset(_Base):
     license: str = Field(default="unknown", max_length=64)
     credit: str = Field(default="", max_length=300)
     source_url: str | None = Field(default=None, max_length=1000)
+
+
+class SheetFrame(_Base):
+    """One tile of the uploaded contact sheet: its time and its box in the sheet image (pixels)."""
+
+    t: float = Field(ge=0)
+    x: float = Field(ge=0)
+    y: float = Field(ge=0)
+    w: float = Field(gt=0)
+    h: float = Field(gt=0)
+
+
+class SheetIndex(_Base):
+    """Where each frame sits in ``sheet.jpg``, so the review page can scrub the sheet like a timeline."""
+
+    w: float = Field(gt=0, description="sheet width in px when the boxes were measured")
+    h: float = Field(gt=0)
+    frames: list[SheetFrame] = Field(default_factory=list, max_length=120)
+
+
+_PLAYABLE = re.compile(r"^https://[^\s]{4,990}$")
 
 
 class BeatGrid(_Base):
@@ -105,6 +128,11 @@ class FilmManifest(_Base):
     captions: list[Caption] = Field(default_factory=list, max_length=2000)
     cues: list[Cue] = Field(default_factory=list, max_length=2000)
     assets: list[Asset] = Field(default_factory=list, max_length=300)
+    # The MP4s stay on the founder's disk. A playable copy, if any, lives elsewhere (YouTube unlisted, R2, a
+    # tunnel) and the review page embeds it; Deno stores only the poster, the contact sheet and this manifest.
+    external_url: str | None = Field(default=None, max_length=1000, description="a page that plays the video")
+    stream_url: str | None = Field(default=None, max_length=1000, description="a direct MP4/WebM/HLS link")
+    sheet_index: SheetIndex | None = None
 
     model_config = ConfigDict(extra="allow", populate_by_name=True, str_strip_whitespace=True)
 
@@ -115,6 +143,18 @@ class FilmManifest(_Base):
             if f.ratio not in RATIOS and not (f.w and f.h):
                 raise ValueError(f"unknown ratio {f.ratio!r}; use one of {', '.join(RATIOS)} or give w and h")
         return v
+
+    @field_validator("external_url", "stream_url")
+    @classmethod
+    def _https(cls, v: str | None) -> str | None:
+        if v in (None, ""):
+            return None
+        if not _PLAYABLE.match(v):
+            raise ValueError("a video link must be a full https:// URL")
+        return v
+
+    def playable_url(self) -> str | None:
+        return self.stream_url or self.external_url
 
     def locate(self, t: float) -> dict[str, str | None]:
         """The chapter and clip on screen at ``t`` (the latest-starting clip that covers it)."""
@@ -258,3 +298,35 @@ def asset_findings(film: FilmManifest, *, final: bool) -> list[dict[str, Any]]:
                 }
             )
     return out
+
+
+def pending_findings(film: FilmManifest, *, final: bool) -> list[dict[str, Any]]:
+    """Placeholders (``pending`` chapters and clips) still in the film: a draft may show them, a final may not."""
+    items = [("chapter", c.id, c.title, c.start) for c in film.chapters if c.pending] + [
+        ("clip", c.id, c.label, c.start) for c in film.clips if c.pending
+    ]
+    return [
+        {
+            "rule_id": "film.pending",
+            "severity": "block" if final else "warn",
+            "t": start,
+            "message": f"{kind} {label or ident} is still a placeholder",
+            "fix": "build it, then `studio fill <id>`",
+        }
+        for kind, ident, label, start in items
+    ]
+
+
+def review_findings(film: FilmManifest, files: dict[str, Any]) -> list[dict[str, Any]]:
+    """A video version needs no MP4 on Deno; it only needs *something* the founder can look at."""
+    if film.kind != "video" or files.get("review") or files.get("sheet") or film.playable_url():
+        return []
+    return [
+        {
+            "rule_id": "review.nothing_to_watch",
+            "severity": "warn",
+            "t": None,
+            "message": "this version has no contact sheet and no video link, so the review page can only show the poster",
+            "fix": "run `studio sheet` before `studio upload`, or pass --video-url with an unlisted link",
+        }
+    ]

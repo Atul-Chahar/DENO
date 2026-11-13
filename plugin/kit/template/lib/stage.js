@@ -30,13 +30,52 @@ export function stage() {
   return el;
 }
 
+// Place before you fill: chapters and clips marked `pending` in film.json (`studio place`) are drawn as labelled
+// striped blocks, so the shape of the film shows in previews and draft renders before their content exists.
+// A full render refuses while any are pending, so they never reach a final.
+let placeholders = [];
+async function loadPlaceholders() {
+  try {
+    const f = await (await fetch('film.json', { cache: 'no-store' })).json();
+    placeholders = [...(f.chapters || []), ...(f.clips || [])].filter((c) => c.pending);
+  } catch {
+    placeholders = [];
+  }
+}
+function paintPlaceholders(t) {
+  let layer = document.getElementById('studio-placeholders');
+  const live = placeholders.filter((p) => t >= p.start && t < p.end);
+  if (!live.length) {
+    if (layer) layer.style.display = 'none';
+    return;
+  }
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'studio-placeholders';
+    layer.dataset.studioPlaceholder = '1';
+    layer.style.cssText = 'position:absolute;inset:0;z-index:99;display:flex;flex-direction:column;gap:2%;padding:6%;box-sizing:border-box;pointer-events:none';
+    document.getElementById('stage').appendChild(layer);
+  }
+  layer.style.display = 'flex';
+  const u = Math.min(FORMAT.w, FORMAT.h);
+  const shift = (t * 60) % 56; // a slow shimmer, still a pure function of t
+  layer.innerHTML = live
+    .map((p) => `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;border:${u * 0.004}px dashed #101613;background:repeating-linear-gradient(135deg,#E9E4D8 ${shift}px,#E9E4D8 ${shift + 28}px,#F6F2E8 ${shift + 28}px,#F6F2E8 ${shift + 56}px);color:#101613;font:600 ${u * 0.045}px ui-monospace,monospace;text-align:center"><div>${String(p.label || p.id).replace(/[<&]/g, '')}</div><div style="opacity:.6;font-size:${u * 0.03}px">${p.kind || 'chapter'} · ${p.start}–${p.end} s · placeholder</div></div>`)
+    .join('');
+}
+
 /** Wire the contract and, outside render mode, a preview player with frame keys. */
-export function film({ duration, seek, cues = [], chapters = [], fps = 30, assets = [] }) {
+export function film({ duration, seek: paint, cues = [], chapters = [], fps = 30, assets = [] }) {
+  const seek = async (t) => {
+    await paint(t);
+    paintPlaceholders(t);
+  };
   window.DURATION = duration;
   window.CUES = cues;
   window.CHAPTERS = chapters;
   window.seek = seek;
   window.ready = (async () => {
+    await loadPlaceholders();
     await document.fonts.ready;
     await Promise.all(assets.map((src) => new Promise((ok) => {
       const img = new Image();
