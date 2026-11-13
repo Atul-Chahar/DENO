@@ -402,3 +402,88 @@ after Deno's (`--source deno|openverse` picks one); `studio fetch openverse:<uui
 - Not done: Openverse in the server's `search_media` (the MCP). The kit covers Claude Code users; MCP-only
   clients (claude.ai, ChatGPT) still get Commons + Internet Archive.
 
+
+## 16. Gap analysis: mexicat/pdoom-video vs our Studio (2026-11-13)
+
+[mexicat/pdoom-video](https://github.com/mexicat/pdoom-video) is a 2 min 37 s music video ("I'm Upping My
+P(doom)") that Claude (Opus 5.5) built in Claude Code: concept, lyric alignment, audio analysis, renderer, 17
+scenes and the renders. MIT code; read at commit `fa164b7` (Revision 6, 2026-10-05). Paths below are in that repo.
+
+### 16.1 How it was made
+
+**No special tooling.** The repo has no `CLAUDE.md`, `.claude/`, skills, plugins, agents or `.mcp.json`. What it
+does have is two documents written *for Claude*, and a strict engine. Our read of the process (from the docs and
+commit messages; skills used privately can't be ruled out):
+
+| Technique | Where | What it does for quality |
+|---|---|---|
+| **Style bible + plate-by-plate treatment** | `docs/TREATMENT.md` | One-paragraph idea; tone (incl. "funny the way a straight-faced scientist is funny"); a 7-colour palette with one rare accent "owned by one moment" (~2 s); 3 type families + a single-stroke font, each with a role; karaoke rules; 6 recurring motifs that *transform* across the film (the spark becomes loss curve → stock chart → paperclip → fuse → detonation); a long "not slop" list; then each scene described beat by beat. |
+| **Revision log inside the treatment** | `docs/TREATMENT.md` ("Revision 2…5"), commit `fa164b7` | Client notes become permanent rules: "the client found it uncanny" → the realistic eye is retired everywhere; "no outlined or haloed type". Six revision rounds in 11 days. |
+| **Engine guide for scene authors** | `docs/ENGINE.md` | Written for parallel sub-agents: "Don't edit files outside your scene… ask the lead", ownership table A1–A8 / B1 / lead in TREATMENT. Exact API, budgets (< 25 ms/frame, ≤ 3 Canvas2D layers), and the loop: "Stills (the main way to check your work — then LOOK at the PNGs with the Read tool)". `--only <scene>` isolates an author from others' broken scenes. |
+| **Deterministic renderer** | `app/src/engine/engine.ts`, `scene.ts` | Every frame is a pure function of song time; seeded noise; `frameIdx(t)` for per-frame jitter; stateful scenes flagged. Preview = export. |
+| **Custom GPU stack** | `app/src/engine/gl.ts`, `post.ts`, `lines.ts`, `glsl/common.ts` | three.js + GLSL: linear HDR targets, bloom only above 0.85 (only the orange signal glows; type never blooms), halation, chromatic aberration, tone shoulder, grain, vignette; GPU capsule line batches (10k–200k hairlines); `hatch()`/`engrave()` shaders for an engraving look; raymarched 3D rooms. |
+| **Typography craft** | `app/src/engine/type.ts`, `stroke.ts`, commit `cc0e84d` | Variable Archivo (width 62–125, weight 300–900) animated for expression; per-glyph kerned `layout()`/`glyphX()` so pieces keep their kerns; curly punctuation; glyphs missing from the families are drawn; single-stroke plotter fonts with optical kerning for "written by the spark" text. |
+| **Edit derived from data, not hard-coded** | `app/src/timeline.ts` | Scene windows are `cut('line text')`: the last beat before the line's first word. Scenes look words up by content (`lyrics.get('sudden drop').words[3].start`), never by time. Re-time the audio and the whole edit follows. |
+| **Deep audio analysis** | `analysis/align.py`, `analyze.py`, `data/audio.json` | Demucs stems; CTC forced alignment from two acoustic models cross-checked with Whisper; manual anchors chosen by *looking at QA spectrogram plots* (`qa_plot.py`, `zoom.py`); beat grid, downbeats, sections; 100 fps envelopes (rms/low/mid/high + per stem); kick/snare/hat onsets. Scenes get `f.a.kick`, `hit('snare', t, halfLife)`, `env('vocal', t)`. |
+| **Motion blur done properly** | `app/scripts/render.ts`, `docs/ENGINE.md` "Motion blur and sampling" | Shutter 0.2 of a frame, **centred** on the frame time, averaged in linear light before post; adaptive sub-frame count per 32×32 tile (12 still … 324 for whips). |
+| **Delivery** | `render.ts` | 1080p60 or true 4K60, x264 CRF 16 `-tune grain`, BT.709 tagged; two headless Chromes feed one ffmpeg in order. |
+| **Contact sheets at every cut** | `render.ts sheet --cuts` | Frames at each scene boundary, to judge transitions. |
+
+**Scale of the effort:** ~19,800 lines of scene code + ~2,700 lines of engine for 157 s, six revision rounds over
+11 days, a 57-minute 4K render on an M5 Pro. The quality comes mostly from that time and the treatment's
+specificity; the tooling makes the time productive.
+
+### 16.2 What our Studio already does as well
+
+Our process is already the same shape (§12–13 were built on the same ideas):
+
+- **Render contract:** `window.seek(t)` pure function of `t`, seeded `rand`/`boil`, no clocks (template `CLAUDE.md`,
+  `lib/motion.js`), and `studio verify` *checks* purity, which pdoom does not.
+- **Treatment before code** (`TREATMENT.md` template, playbook `preproduction`), one named style, one accent owned
+  by one thing, an avoid-list (playbook `style`) close to pdoom's "not slop" list.
+- **Lead + parallel authors:** `director` / `scene-builder` agents, "edit only your chapter file, report shared
+  bugs", waves, `--chapter` isolation = pdoom's `--only` (playbook `multi-agent`).
+- **Look, don't trust:** `studio sheet --live --at`, `strip`, `crop`, `--phone`, `--stats`, `--reference`, and an
+  independent `reviewer` agent with a 7-score rubric. pdoom has no rubric and no automated checks.
+- **Preview keys** (space, ←/→, `,`/`.`, `[`/`]`, `l`) match pdoom's.
+- **Beat grid** (`studio beats`), word times (`studio voice`, `studio captions`), BT.709-tagged H.264 at CRF 16.
+- **Things pdoom lacks:** partial re-render by chunk, place-before-fill placeholders, the done gate in
+  `studio upload`, licences and credits, a sound mix to −14 LUFS, a review page with frame notes.
+
+### 16.3 Gaps, prioritised
+
+Effort: S ≤ ½ day, M 1–2 days, L 3–5 days. "Needed?" is about 15–60 s marketing films, our actual output.
+
+| # | Change | Where | Effort | Needed? |
+|---|---|---|---|---|
+| 1 | **Fix motion-blur shutter.** `render.mjs` places sub-frames *before* the frame time (a trailing shutter of (n−1)/n of a frame: ½ at 2 samples, ¾ at 4), so the blurred image lags the frame (and the sound) and the shutter changes with the sample count; it averages JPEG sub-frames in gamma space with `tmix`. Centre the sub-frames on the frame time with a 0.5 shutter (180°, film look) and average PNGs; default `samples` 4 for fast moves. | `plugin/kit/lib/render.mjs` | S | **Yes**: every film with motion. |
+| 2 | **Deeper treatment template.** Add: idea in one paragraph; tone, including the humour and what the film is *not*; each colour's job and the rare accent's one moment; type families with a role each; a motif that *transforms* across shots; per shot, how the words are integrated graphically (not subtitles on top); a **Revisions** section where each founder note becomes a rule. | `plugin/kit/template/TREATMENT.md`, playbook `preproduction` | S | **Yes**: biggest quality lever for least work. |
+| 3 | **Revision rounds as rules.** Playbook `review` + director: after each founder round, write the note into TREATMENT "Revisions" as a rule that applies to the whole film (e.g. "no realistic faces"), not just the one timestamp. | playbooks `review`, `multi-agent`; `plugin/agents/director.md` | S | Yes. |
+| 4 | **Typography craft rules.** Kerning when type is drawn in pieces (sung/unsung, wipes): draw the whole word and clip, never offset by measured slices; no outlined or haloed type; draw glyphs the font lacks; variable-font width/weight as expression; one role per family. | playbook `typography`, style `swiss-kinetic` | S | Yes. |
+| 5 | **Default `GUIDE.md` for scene authors.** Ship pdoom-style engine notes in the template (API, per-frame budget, layers, `rand(frameIdx)` vs continuous noise, how to check your chapter and read the PNGs), so the director edits it instead of writing it from scratch. | `plugin/kit/template/GUIDE.md`, agents | S | Yes for multi-chapter films. |
+| 6 | **Anchor the edit to words and beats.** Template helpers: `word('text', n)` → `{start,end}` from `voice.json`/captions, `wordProgress(w, t)`, `cutBefore('text')` = last beat before that word, `beatAt(t)`, `hit(t, halfLife)`; `studio place --at-word "…"`. A re-recorded voiceover then re-times the film. | `plugin/kit/template/lib/`, `lib/timeline.mjs` | M | Yes when there is voiceover or lyrics. |
+| 7 | **Richer audio data.** `studio beats` adds 100 fps envelopes (rms, low, mid, high) and kick/snare/hat onsets by band, so motion can react to the track (`env('low', t)`). | `plugin/kit/lib/beats.mjs` | M | Nice-to-have; music-led reels. |
+| 8 | **`studio sheet --cuts`.** Frames just before and after every chapter/clip boundary. | `plugin/kit/lib/look.mjs` | S | Yes; cheap transition review. |
+| 9 | **Optional WebGL layer.** `lib/gl.js`: a fullscreen shader pass on a `<canvas>`, `hatch`/`engrave`/noise/SDF helpers, a hairline batch, and a post pass (bloom on the accent only, halation, vignette). Plus one style that uses it (an engraving/plate look). DOM screenshots already capture WebGL canvases. | `plugin/kit/template/lib/`, a new style in `content/styles/` | L | **Optional.** Only for looks DOM/CSS can't do. Most launch films don't need it. |
+| 10 | **Scene-builder on Opus for hero chapters.** `scene-builder` is `model: sonnet`; pdoom was Opus throughout. Let the director pick Opus for the hook and the hardest chapter. | `plugin/agents/scene-builder.md`, playbook `multi-agent` | S | Optional (cost). |
+| 11 | Per-tile adaptive sampling, 4K60, two-Chrome pipeline | — | L | **No.** Platforms re-encode to 1080p; our films are 15–60 s. |
+| 12 | Demucs + CTC forced alignment, QA spectrograms | — | L | **No.** We generate the voice from known text; Whisper + script alignment is enough. Kinetic-lyric over a sung track is rare for founders. |
+| 13 | Animated film grain, `-tune grain` | — | — | **No.** Our avoid-list bans it on purpose: it breaks platform re-encodes. pdoom targets a 4K YouTube master. |
+
+Suggested order: 1, 2, 3, 4, 8 (one PR, ~2 days), then 5 and 6 (one PR, ~2 days). 9 only if a founder wants a
+look that needs it. All content edits go in `packages/studio/src/deno_studio/content/` and are regenerated with
+`uv run python scripts/build_plugin.py`.
+
+### 16.4 Can we reach that standard?
+
+- **The process: no changes needed.** Treatment → place → build → look at stills → independent review → revise
+  is already our loop, with more checks than pdoom has.
+- **The craft of a 15–60 s marketing film: small changes.** Items 1–6 and 8 (about 4 days) close the gaps
+  that show in every film: blur, treatment specificity, revisions, type, words-on-beats.
+- **pdoom's specific look** (engraving shaders, raymarched 3D, HDR bloom): **a big change** (item 9) *and* days
+  of work per film. It is not a default for launch films.
+- **The honest limit is time per film, not tools.** pdoom is ~22,000 lines and six revision rounds over 11 days
+  for 2.5 minutes. A founder's Claude making a 30 s film in one sitting won't match that whatever we ship. What
+  we can do is make each hour count (items 1–8) and tell founders that a hero film needs several review rounds.
+
+Nothing is implemented yet: Atul picks from 16.3.
