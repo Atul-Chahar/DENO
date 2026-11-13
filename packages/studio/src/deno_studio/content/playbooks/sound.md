@@ -10,6 +10,9 @@ tags: [sound, music, sfx]
 - Run `studio beats track.mp3` and put the result in `film.json.beatGrid`. Snap cuts to it.
 - **SFX come from the picture.** Every cue in `window.CUES` (`{t, kind}`) gets one sound: click, whoosh, pop,
   thump, tick, riser, chime. Place it about 0.03 s before the contact. One sound per action, not a constant bed.
+- **A sound nothing else has:** `studio sfx "<the sound>" --as <kind> --at <t>` generates it with ElevenLabs on the
+  founder's key (playbook `sources`). Describe material and motion, keep it short, reuse it per kind.
+- **Speech clips:** `studio silence` finds dead air to cut; `studio loudness` checks a clip before mixing.
 - **Mix:** duck music under voice (-10 dB), 30 ms fades at every cut, master to -14 LUFS integrated and -1 dB
   true peak, AAC 192 kbps. `studio mix` does all of this.
 - Never record audio from the browser. Picture and sound are joined by ffmpeg.

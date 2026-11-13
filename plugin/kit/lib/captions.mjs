@@ -70,7 +70,10 @@ const round = (x) => Math.round(x * 1000) / 1000;
 // Words a caption shouldn't end on: they belong with what follows ("for a" / "review." reads badly).
 const WEAK = new Set(['a', 'an', 'the', 'to', 'for', 'of', 'and', 'or', 'but', 'in', 'on', 'at', 'with', 'by', 'from', 'your', 'our', 'my', 'is', 'are']);
 
-export function group(words, { vertical }) {
+// Words per caption for each burned-in preset in template/lib/captions.js.
+export const PRESET_WORDS = { billboard: 3, sideline: 6, 'beast-mode': 3, 'butter-serif': 7 };
+
+export function group(words, { vertical, max = 0 }) {
   const out = [];
   let cur = [];
   const push = (ws) => {
@@ -81,7 +84,7 @@ export function group(words, { vertical }) {
     const prev = cur[cur.length - 1];
     const text = [...cur, w].map((x) => x.text).join(' ');
     const gap = prev ? w.start - prev.end : 0;
-    const full = vertical ? cur.length >= 4 : text.length > 84 || w.end - (cur[0]?.start ?? w.start) > 6;
+    const full = max ? cur.length >= max : vertical ? cur.length >= 4 : text.length > 84 || w.end - (cur[0]?.start ?? w.start) > 6;
     if (cur.length && (full || gap > 0.35)) {
       // Carry trailing weak words into the next caption (but never empty this one).
       const carry = [];
@@ -139,7 +142,9 @@ export async function transcribe(file, { model, language } = {}) {
 export async function captions(dir, opts) {
   const film = loadFilm(dir);
   const file = opts._[1];
-  if (!file) throw new Error('usage: studio captions <audio> [--text script.md] [--model id] [--language en]');
+  if (!file) throw new Error('usage: studio captions <audio> [--text script.md] [--preset beast-mode|billboard|sideline|butter-serif] [--words 3] [--behind <footage name>] [--language en]');
+  const preset = opts.preset && opts.preset !== true ? String(opts.preset) : film.captionStyle?.preset;
+  if (preset && !PRESET_WORDS[preset]) throw new Error(`--preset is one of ${Object.keys(PRESET_WORDS).join(', ')}`);
   const heard = await transcribe(path.resolve(dir, file), { model: opts.model, language: opts.language });
   const words = opts.text ? align(scriptWords(fs.readFileSync(path.resolve(dir, opts.text), 'utf8')), heard) : heard;
   const offset = num(opts.offset, num(film.audio?.voice?.start, 0));
@@ -148,11 +153,14 @@ export async function captions(dir, opts) {
     w.end = round(w.end + offset);
   }
   const vertical = formats(film).some((f) => f.h > f.w);
-  const groups = group(words, { vertical });
+  const groups = group(words, { vertical, max: num(opts.words, preset ? PRESET_WORDS[preset] : 0) });
   writeJSON(path.join(dir, 'captions.json'), { words, groups });
   fs.writeFileSync(path.join(dir, 'captions.srt'), srt(groups));
   fs.writeFileSync(path.join(dir, 'captions.vtt'), vtt(groups));
   film.captions = groups.map((g) => ({ start: g.start, end: g.end, text: g.text }));
+  if (preset || opts.behind) {
+    film.captionStyle = { ...(film.captionStyle || {}), ...(preset ? { preset } : {}), ...(opts.behind && opts.behind !== true ? { behind: String(opts.behind) } : {}) };
+  }
   saveFilm(dir, film);
   info(`${words.length} words → ${groups.length} captions · captions.json (word times for burned-in captions via lib/captions.js), captions.srt, captions.vtt. Check them: check_copy(kind="captions").`);
   return words;

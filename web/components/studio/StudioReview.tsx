@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, ApiError, type FilmManifest, type ReviewNote, type StudioItem, type StudioVersion } from '@/lib/api';
+import { api, ApiError, type FilmManifest, type ReviewNote, type SheetIndex, type StudioItem, type StudioVersion } from '@/lib/api';
 import { fmtTime, STATUS_LABEL, StudioShell } from './StudioShell';
 
 const TAGS = ['pacing', 'text', 'motion', 'sound', 'brand', 'lost-interest', 'facts', 'composition'];
@@ -14,6 +14,48 @@ const EMPTY: Draft = { text: '', t: null, t_end: null, x: null, y: null, page: n
 function film(v: StudioVersion | undefined): FilmManifest | null {
   const m = v?.manifest as FilmManifest | undefined;
   return m && typeof m === 'object' && 'fps' in m ? m : null;
+}
+
+/** An embeddable player for an unlisted YouTube or Vimeo link; null for anything else. */
+function embedUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return null;
+    const host = u.hostname.replace(/^(www|m)\./, '');
+    if (host === 'youtu.be' || host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      const id = host === 'youtu.be' ? u.pathname.slice(1) : (u.searchParams.get('v') ?? u.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]+)/)?.[1] ?? '');
+      return /^[\w-]{6,20}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    }
+    if (host === 'vimeo.com') {
+      const m = u.pathname.match(/^\/(\d+)(?:\/(\w+))?/);
+      return m ? `https://player.vimeo.com/video/${m[1]}${m[2] ? `?h=${m[2]}` : ''}` : null;
+    }
+    if (host === 'player.vimeo.com') return u.toString();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/** Index of the sheet frame on screen at `t` (the last one that starts at or before it). */
+function sheetFrameAt(index: SheetIndex | null, t: number): number {
+  if (!index) return 0;
+  let at = 0;
+  index.frames.forEach((f, i) => {
+    if (f.t <= t + 1e-3) at = i;
+  });
+  return at;
+}
+
+/** One frame cut out of the contact sheet, shown at stage size. */
+function SheetFrame({ src, index, at }: { src: string; index: SheetIndex; at: number }) {
+  const f = index.frames[Math.min(at, index.frames.length - 1)];
+  return (
+    <div className="st-sheet-frame" style={{ aspectRatio: `${f.w} / ${f.h}`, maxWidth: `calc(66vh * ${f.w / f.h})` }}>
+      <img src={src} alt={`Frame at ${f.t.toFixed(2)} s`} style={{ width: `${(index.w / f.w) * 100}%`, left: `${(-f.x / f.w) * 100}%`, top: `${(-f.y / f.h) * 100}%` }} />
+    </div>
+  );
 }
 
 /** Review one video or still: frame-exact transport, notes pinned to frames, ranges and spots (docs/18 §7 F). */
@@ -65,6 +107,13 @@ export function StudioReview({ id }: { id: string }) {
   const isStill = item?.kind === 'still';
   const pages = (version?.files.pages ?? []).filter((p): p is string => Boolean(p));
   const frame = Math.floor(t * fps + 1e-3);
+  // The MP4s stay on the founder's disk: play a stored review copy or their own link if there is one,
+  // otherwise review from the contact sheet (one frame per tile, scrubbed like a timeline).
+  const sheetIndex = !isStill && fm?.sheet_index?.frames?.length && version?.files.sheet ? fm.sheet_index : null;
+  const streamSrc = version?.files.review ?? fm?.stream_url ?? null;
+  const embed = streamSrc ? null : embedUrl(fm?.external_url);
+  const sheetMode = !isStill && !streamSrc && sheetIndex != null;
+  const sheetAt = sheetFrameAt(sheetIndex, t);
 
   // ---- transport -------------------------------------------------------------------------------
 
@@ -93,6 +142,11 @@ export function StudioReview({ id }: { id: string }) {
   }
   function stepFrames(n: number) {
     pause();
+    if (sheetMode && sheetIndex) {
+      const next = sheetIndex.frames[Math.max(0, Math.min(sheetIndex.frames.length - 1, sheetAt + n))];
+      seek(next.t);
+      return;
+    }
     // Land mid-frame so the decoder shows exactly that frame.
     seek((Math.max(0, frame + n) + 0.5) / fps);
   }
@@ -263,7 +317,7 @@ export function StudioReview({ id }: { id: string }) {
   // ---- pins on the frame -----------------------------------------------------------------------
 
   function onStageClick(e: ReactMouseEvent<HTMLDivElement>) {
-    const media = (isStill ? e.currentTarget.querySelector('img.st-page') : video.current) as HTMLElement | null;
+    const media = (isStill ? e.currentTarget.querySelector('img.st-page') : (video.current ?? e.currentTarget.querySelector('.st-sheet-frame, img.st-page'))) as HTMLElement | null;
     if (!media) return;
     const box = media.getBoundingClientRect();
     const x = (e.clientX - box.left) / box.width;
@@ -374,10 +428,10 @@ export function StudioReview({ id }: { id: string }) {
               )}
               <div className="st-stage" onClick={onStageClick} style={{ cursor: 'crosshair' }}>
                 <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
-                  {version.files.review ? (
+                  {streamSrc ? (
                     <video
                       ref={video}
-                      src={version.files.review}
+                      src={streamSrc}
                       poster={version.files.poster ?? undefined}
                       playsInline
                       preload="auto"
@@ -389,6 +443,19 @@ export function StudioReview({ id }: { id: string }) {
                       onSeeked={() => video.current && setT(video.current.currentTime)}
                       onEnded={() => setPlaying(false)}
                     />
+                  ) : embed ? (
+                    <iframe
+                      className="st-embed"
+                      src={embed}
+                      title={`${item.title}, round ${version.version}`}
+                      style={{ aspectRatio: (fm?.formats?.[0]?.ratio ?? '16:9').replace(':', ' / ') }}
+                      allow="fullscreen; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : sheetMode && sheetIndex && version.files.sheet ? (
+                    <SheetFrame src={version.files.sheet} index={sheetIndex} at={sheetAt} />
+                  ) : version.files.poster ? (
+                    <img className="st-page" src={version.files.poster} alt="Poster frame" />
                   ) : (
                     <span className="dv-mono" style={{ color: 'var(--paper)', padding: 40, display: 'block' }}>NO REVIEW COPY</span>
                   )}
@@ -414,7 +481,7 @@ export function StudioReview({ id }: { id: string }) {
             <>
               <div className="st-transport">
                 <button className="st-key" onClick={() => stepFrames(-1)} title="One frame back (←)">◀︎ 1F</button>
-                <button className={`st-key${playing ? ' on' : ''}`} onClick={toggle} title="Play / pause (space)">{playing ? 'PAUSE' : 'PLAY'}</button>
+                {streamSrc && <button className={`st-key${playing ? ' on' : ''}`} onClick={toggle} title="Play / pause (space)">{playing ? 'PAUSE' : 'PLAY'}</button>}
                 <button className="st-key" onClick={() => stepFrames(1)} title="One frame forward (→)">1F ▶︎</button>
                 <span className="st-tc">{fmtTime(t, fps)} · F{frame}</span>
                 <button className="st-key" onClick={() => setRange((r) => ({ a: t, b: r.b != null && r.b > t ? r.b : null }))} title="Range start ([)">[ IN</button>
@@ -422,7 +489,7 @@ export function StudioReview({ id }: { id: string }) {
                 {previous?.files.review && (
                   <button className={`st-key${compare ? ' on' : ''}`} onClick={() => setCompare((c) => !c)} title="Show the previous round side by side">COMPARE v{previous.version}</button>
                 )}
-                <span className="st-meta" style={{ marginLeft: 'auto' }}>← → frame · ⇧ ±1 s · type to note</span>
+                <span className="st-meta" style={{ marginLeft: 'auto' }}>{sheetMode ? '← → sheet frame · ⇧ ±1 s · type to note' : '← → frame · ⇧ ±1 s · type to note'}</span>
               </div>
               <div
                 className="st-scrub"
@@ -454,6 +521,24 @@ export function StudioReview({ id }: { id: string }) {
                   ))}
                 <div className="st-scrub-head" style={{ left: `${duration ? (t / duration) * 100 : 0}%` }} />
               </div>
+              {sheetIndex && version.files.sheet && (
+                <div className="st-sheet" aria-label="Contact sheet: pick a frame">
+                  <img src={version.files.sheet} alt="Contact sheet" />
+                  {sheetIndex.frames.map((f, i) => (
+                    <button
+                      key={`${f.t}-${i}`}
+                      className={`st-sheet-cell${sheetMode && i === sheetAt ? ' on' : ''}`}
+                      style={{ left: `${(f.x / sheetIndex.w) * 100}%`, top: `${(f.y / sheetIndex.h) * 100}%`, width: `${(f.w / sheetIndex.w) * 100}%`, height: `${(f.h / sheetIndex.h) * 100}%` }}
+                      title={fmtTime(f.t, fps)}
+                      aria-label={`Frame at ${fmtTime(f.t, fps)}`}
+                      onClick={() => {
+                        pause();
+                        seek(f.t);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
               {fm?.chapters && fm.chapters.length > 0 && (
                 <div className="st-chapters">
                   {fm.chapters.map((c) => (
@@ -597,6 +682,9 @@ export function StudioReview({ id }: { id: string }) {
             )}
             {version.files.review && (
               <a className="dv-link" href={version.files.review} target="_blank" rel="noreferrer">Review copy ↗</a>
+            )}
+            {!version.files.review && (fm?.external_url || fm?.stream_url) && (
+              <a className="dv-link" href={(fm.external_url || fm.stream_url) as string} target="_blank" rel="noreferrer">Watch the video ↗</a>
             )}
             <button className="dv-link" style={{ marginLeft: 'auto', color: 'var(--red-ink)', borderColor: 'var(--red-ink)' }} onClick={del}>Delete item</button>
           </div>

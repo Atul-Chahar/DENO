@@ -4,6 +4,14 @@ import test from 'node:test';
 import { analyse } from '../lib/beats.mjs';
 import { align, group, scriptWords, srt, vtt } from '../lib/captions.mjs';
 import { bed, sfx, SFX_KINDS, SR } from '../lib/synth.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { parseSilence } from '../lib/listen.mjs';
+import { modelSize } from '../lib/matte.mjs';
+import { formatSelector, generateSfx, licenceFromSite, pairDownloads, synthKindFor } from '../lib/sources.mjs';
+import { distance, frameStats, notes, pool } from '../lib/stats.mjs';
+import { pendingItems, readiness, sourceHash } from '../lib/timeline.mjs';
 import { formats, parseArgs, safeName, tc } from '../lib/util.mjs';
 
 function clickTrack(bpm, seconds, start = 0.3, rate = 22050) {
@@ -79,4 +87,132 @@ test('util: formats, args, names, timecodes', () => {
   assert.deepEqual(parseArgs(['render', '--from', '2', '--draft', '--formats=9:16']), { _: ['render'], from: '2', draft: true, formats: '9:16' });
   assert.equal(safeName('pexels:v:123'), 'pexels-v-123');
   assert.equal(tc(61.5, 30), '01:01:15');
+});
+
+const solid = (n, r, g, b) => Uint8Array.from({ length: n * 3 }, (_, i) => [r, g, b][i % 3]);
+
+test('stats: exposure, clipping, contrast and casts', () => {
+  const half = new Uint8Array([...solid(50, 0, 0, 0), ...solid(50, 255, 255, 255)]);
+  const s = frameStats(half);
+  assert.equal(s.crushed, 0.5);
+  assert.equal(s.blown, 0.5);
+  assert.ok(s.contrast > 0.95);
+  assert.ok(notes(s).some((n) => n.includes('pure black')));
+  const warm = frameStats(solid(100, 200, 120, 60));
+  assert.ok(warm.cast.mids.warm > 0.4 && warm.saturation > 0.6);
+  assert.ok(notes(warm).some((n) => n.includes('warm')));
+  const grey = frameStats(solid(100, 128, 128, 128));
+  assert.equal(distance(grey, grey), 0);
+  assert.ok(distance(grey, warm) > 0.15);
+  assert.deepEqual(pool([grey, grey]).median, grey.median);
+});
+
+test('listen: silence parsing closes an open stretch at the end', () => {
+  const err = '[silencedetect] silence_start: 1.5\n[silencedetect] silence_end: 2.25 | silence_duration: 0.75\n[silencedetect] silence_start: 9.1\n';
+  assert.deepEqual(parseSilence(err, 10), [{ start: 1.5, end: 2.25, length: 0.75 }, { start: 9.1, end: 10, length: 0.9 }]);
+  assert.deepEqual(parseSilence('nothing here'), []);
+});
+
+test('matte: model size keeps aspect in multiples of 32', () => {
+  assert.deepEqual(modelSize(1920, 1080), { mw: 672, mh: 384 });
+  assert.deepEqual(modelSize(1080, 1920), { mw: 384, mh: 672 });
+  const { mw, mh } = modelSize(1000, 1000, 500);
+  assert.equal(mw % 32, 0);
+  assert.equal(mw, mh);
+});
+
+test('download: format selector prefers H.264/AAC under the height cap', () => {
+  assert.match(formatSelector(1080, false), /^bv\*\[vcodec\^=avc1\]\[height<=1080\]\+ba\[acodec\^=mp4a\]/);
+  assert.equal(formatSelector(0, true), 'ba[acodec^=mp4a]/ba');
+});
+
+test('captions: a preset caps words per caption', () => {
+  const words = 'one two three four five six seven'.split(' ').map((text, i) => ({ text, start: i * 0.3, end: i * 0.3 + 0.25 }));
+  assert.ok(group(words, { vertical: false, max: 3 }).every((g) => g.words.length <= 3));
+  assert.equal(group(words, { vertical: false, max: 7 }).length, 1);
+});
+
+test('timeline: placeholders, source fingerprint and the done gate', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-test-'));
+  try {
+    const film = { kind: 'video', clips: [{ id: 'a', start: 0, end: 1, pending: true }, { id: 'b', start: 1, end: 2 }], chapters: [{ id: 'c', start: 0, end: 2, pending: true }], deno: { item_id: 'x' } };
+    fs.writeFileSync(path.join(dir, 'film.json'), JSON.stringify(film));
+    fs.writeFileSync(path.join(dir, 'index.html'), '<p>hi</p>');
+    assert.deepEqual(pendingItems(film).map((p) => p.id), ['c', 'a']);
+    const h = sourceHash(dir);
+    // Deno ids don't change what's drawn; the page code does.
+    fs.writeFileSync(path.join(dir, 'film.json'), JSON.stringify({ ...film, deno: { item_id: 'y' } }));
+    assert.equal(sourceHash(dir), h);
+    fs.writeFileSync(path.join(dir, 'index.html'), '<p>changed</p>');
+    assert.notEqual(sourceHash(dir), h);
+    const out = path.join(dir, 'out', '9x16');
+    const why = readiness(dir, film, out);
+    assert.ok(why.some((w) => w.includes('pending')));
+    assert.ok(why.some((w) => w.includes('verify')));
+    assert.ok(why.some((w) => w.includes('sheet')));
+    const done = { kind: 'video', clips: [{ id: 'b', start: 0, end: 2 }] };
+    fs.writeFileSync(path.join(dir, 'film.json'), JSON.stringify(done));
+    fs.mkdirSync(out, { recursive: true });
+    fs.writeFileSync(path.join(out, 'master.mp4'), 'x');
+    fs.writeFileSync(path.join(dir, 'out', 'verify.json'), JSON.stringify({ source: sourceHash(dir), findings: [] }));
+    fs.writeFileSync(path.join(out, 'sheet.json'), JSON.stringify({ from: 'encoded', encoded: 'master.mp4', encodedMtimeMs: fs.statSync(path.join(out, 'master.mp4')).mtimeMs }));
+    assert.deepEqual(readiness(dir, done, out), []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('sfx: free text maps to a synthesized kind', () => {
+  assert.equal(synthKindFor('soft paper whoosh'), 'whoosh');
+  assert.equal(synthKindFor('UI button click'), 'click');
+  assert.equal(synthKindFor('success chime'), 'chime');
+  assert.equal(synthKindFor('heavy impact'), 'slam');
+  assert.equal(synthKindFor('something odd'), 'pop');
+  for (const t of ['whoosh', 'click', 'chime', 'slam', 'pop', 'riser', 'thump', 'tick', 'swoosh out']) assert.ok(SFX_KINDS.includes(synthKindFor(t)), t);
+});
+
+test('sfx: with no key (or --synth) the kit synthesizes a free WAV and places it on cues', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-sfx-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'film.json'), JSON.stringify({ kind: 'video', assets: [], cues: [] }));
+    await generateSfx(dir, { _: ['sfx', 'soft', 'paper', 'whoosh'], synth: true, at: '1.5,3' });
+    const film = JSON.parse(fs.readFileSync(path.join(dir, 'film.json'), 'utf8'));
+    assert.equal(film.sfx.whoosh, path.join('assets', 'sfx', 'synth-whoosh.wav'));
+    assert.deepEqual(film.cues.map((c) => [c.t, c.kind]), [[1.5, 'whoosh'], [3, 'whoosh']]);
+    const asset = film.assets.find((a) => a.id === 'gen:sfx:whoosh');
+    assert.equal(asset.license, 'synth');
+    const wav = fs.readFileSync(path.join(dir, film.sfx.whoosh));
+    assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
+    assert.equal(wav.readUInt32LE(24), SR);
+    assert.ok(wav.length > 44 + 1000);
+    const credits = JSON.parse(fs.readFileSync(path.join(dir, 'CREDITS.json'), 'utf8'));
+    assert.equal(credits[0].license, 'synth');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('download: YouTube Creative Commons is read; several search results pair with their files', () => {
+  assert.equal(licenceFromSite('Creative Commons Attribution license (reuse allowed)'), 'cc-by');
+  assert.equal(licenceFromSite(''), 'unknown');
+  assert.equal(licenceFromSite('NA'), 'unknown');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-dl-'));
+  try {
+    const a = path.join(dir, 'a.mp4');
+    const b = path.join(dir, 'b.mp4');
+    fs.writeFileSync(a, '');
+    fs.writeFileSync(b, '');
+    const out = [
+      'Clip A\tAnn\t12\thttps://youtu.be/a\tYoutube\tCreative Commons Attribution license (reuse allowed)',
+      '[download] noise',
+      a,
+      'Clip B\tBo\t9\thttps://youtu.be/b\tYoutube\tNA',
+      b,
+      '/does/not/exist.mp4',
+    ].join('\n');
+    const got = pairDownloads(out);
+    assert.deepEqual(got.map((d) => [d.title, d.file, d.license]), [['Clip A', a, 'Creative Commons Attribution license (reuse allowed)'], ['Clip B', b, '']]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

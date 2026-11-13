@@ -293,6 +293,18 @@ export interface FilmManifest {
   chapters?: { id: string; title?: string; start: number; end: number }[];
   clips?: FilmClip[];
   captions?: { start: number; end: number; text: string }[];
+  /** An unlisted page that plays the video (YouTube, Vimeo, …): embedded, never stored on Deno. */
+  external_url?: string | null;
+  /** A direct MP4/WebM link (R2, a tunnel): played in the review player. */
+  stream_url?: string | null;
+  /** Where each frame sits in the uploaded contact sheet (px of a w×h sheet). */
+  sheet_index?: SheetIndex | null;
+}
+
+export interface SheetIndex {
+  w: number;
+  h: number;
+  frames: { t: number; x: number; y: number; w: number; h: number }[];
 }
 
 export interface StudioVersion {

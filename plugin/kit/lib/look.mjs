@@ -4,10 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Film } from './browser.mjs';
 import { ensure, requireDep, chromiumPath } from './deps.mjs';
-import { ffprobeDuration, formats, info, loadFilm, num, outDir, run, safeName, saveFilm, tc, warn } from './util.mjs';
+import { distance, measure, notes, pool, statsRow } from './stats.mjs';
+import { ffprobeDuration, formats, info, loadFilm, num, outDir, run, safeName, saveFilm, tc, warn, writeJSON } from './util.mjs';
 
 /** Lay images out in a labelled grid and screenshot it (Chromium does the layout; no font setup needed). */
 async function tile(files, out, { cols = 6, width = 320, label = [] } = {}) {
+  cols = Math.max(1, Math.min(cols, files.length));
   await ensure('core');
   const { chromium } = requireDep('playwright-core');
   const browser = await chromium.launch({ executablePath: await chromiumPath() });
@@ -26,15 +28,37 @@ async function tile(files, out, { cols = 6, width = 320, label = [] } = {}) {
       `<style>body{margin:0;background:#fff;font:600 13px ui-monospace,monospace}main{display:grid;grid-template-columns:repeat(${cols},${width}px);gap:8px;padding:8px}figure{margin:0;border:1.5px solid #101613}img{display:block;width:${width}px}figcaption{padding:3px 6px;background:#101613;color:#fff}</style><main>${cells}</main>`,
     );
     await page.waitForFunction(() => [...document.images].every((i) => i.complete));
+    // Each frame's box inside the sheet, so the review page can show one frame and scrub the rest.
+    const grid = await page.evaluate(() => {
+      const main = document.querySelector('main').getBoundingClientRect();
+      const r = (v) => Math.round(v * 10) / 10;
+      return {
+        w: r(main.width),
+        h: r(main.height),
+        cells: [...document.images].map((img) => {
+          const b = img.getBoundingClientRect();
+          return { x: r(b.left - main.left), y: r(b.top - main.top), w: r(b.width), h: r(b.height) };
+        }),
+      };
+    });
     await page.locator('main').screenshot({ path: out });
     for (const f of small) fs.rmSync(f, { force: true });
+    return grid;
   } finally {
     await browser.close();
   }
 }
 
 function sampleTimes(film, duration, opts) {
-  if (opts.times) return String(opts.times).split(',').map(Number);
+  const list = opts.at ?? opts.times;
+  if (list !== undefined && list !== true) return String(list).split(',').map(Number).filter((t) => Number.isFinite(t) && t >= 0 && t < duration);
+  if (opts.range && opts.range !== true) {
+    const [a, b] = String(opts.range).split(',').map(Number);
+    const every = num(opts.every, 1);
+    const out = [];
+    for (let t = Math.max(0, a); t <= Math.min(b, duration - 0.01) + 1e-6; t += every) out.push(Math.round(t * 1000) / 1000);
+    return out.slice(0, 120);
+  }
   const every = num(opts.every, 0);
   if (every > 0) return Array.from({ length: Math.floor(duration / every) + 1 }, (_, i) => Math.min(duration - 0.01, i * every));
   if (film.beatGrid?.bpm && !opts.seconds) {
@@ -58,6 +82,7 @@ export async function sheet(dir, opts) {
   const phone = Boolean(opts.phone);
   const files = [];
   const labels = [];
+  const seconds = [];
   if (film.kind === 'still') {
     const pages = fs.readdirSync(out).filter((f) => /^page-\d+\.png$/.test(f)).sort();
     if (!pages.length) return warn('no pages yet: run `studio still` first.');
@@ -73,6 +98,7 @@ export async function sheet(dir, opts) {
       await run('ffmpeg', ['-v', 'error', '-y', '-ss', t.toFixed(3), '-i', encoded, '-frames:v', '1', f]);
       files.push(f);
       labels.push(tc(t, film.fps || 30));
+      seconds.push(t);
     }
     info(`sheet from the encoded file ${path.relative(dir, encoded)} (what viewers will see)`);
   } else {
@@ -93,13 +119,41 @@ export async function sheet(dir, opts) {
         fs.writeFileSync(f, await studio.grab(page, t));
         files.push(f);
         labels.push(tc(t, film.fps || 30));
+        seconds.push(t);
       }
     } finally {
       await studio.close();
     }
   }
   const dest = path.join(out, phone ? 'phone.png' : 'contact.png');
-  await tile(files, dest, phone ? { cols: 5, width: 360, label: labels } : { cols: num(opts.cols, 6), width: num(opts.width, 320), label: labels });
+  if (!files.length) throw new Error('no frames to show: check --at / --range against the film length');
+  const grid = await tile(files, dest, phone ? { cols: 5, width: 360, label: labels } : { cols: num(opts.cols, 6), width: num(opts.width, 320), label: labels });
+  const from = film.kind === 'still' ? 'pages' : encoded && !opts.live && !opts.chapter ? 'encoded' : 'live';
+  const record = { at: Date.now(), from, sheet: path.basename(dest), frames: labels };
+  if (grid && seconds.length === grid.cells.length) {
+    record.index = { w: grid.w, h: grid.h, frames: grid.cells.map((c, i) => ({ t: Math.round(seconds[i] * 1000) / 1000, ...c })) };
+  }
+  if (from === 'encoded') Object.assign(record, { encoded: path.basename(encoded), encodedMtimeMs: fs.statSync(encoded).mtimeMs });
+  if (opts.stats || opts.reference) {
+    const rows = [];
+    for (const [i, f] of files.entries()) rows.push({ at: labels[i], ...(await measure(f)) });
+    const all = pool(rows);
+    info(`look, all frames: ${statsRow(all)}`);
+    for (const r of rows) info(`  ${String(r.at).padEnd(9)} ${statsRow(r)}`);
+    for (const n of notes(all)) info(`  note: ${n}`);
+    record.stats = { all, frames: rows };
+    if (opts.reference && opts.reference !== true) {
+      const ref = path.resolve(dir, String(opts.reference));
+      if (!fs.existsSync(ref)) throw new Error(`no reference file ${opts.reference}`);
+      const isVideo = /\.(mp4|mov|webm|mkv|m4v)$/i.test(ref);
+      const refStats = isVideo ? pool(await Promise.all([0.1, 0.3, 0.5, 0.7, 0.9].map(async (p) => measure(ref, p * (await ffprobeDuration(ref)))))) : await measure(ref);
+      const d = distance(all, refStats);
+      info(`reference ${path.basename(ref)}: ${statsRow(refStats)}`);
+      info(`distance to reference: ${d} (0 = same look; under 0.05 is close; over 0.15 is clearly different)`);
+      record.reference = { file: path.basename(ref), stats: refStats, distance: d };
+    }
+  }
+  writeJSON(path.join(out, phone ? 'sheet-phone.json' : 'sheet.json'), record);
   if (opts.audio && encoded && film.kind !== 'still') {
     const wave = path.join(out, 'waveform.png');
     try {

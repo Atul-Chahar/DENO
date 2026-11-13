@@ -31,10 +31,19 @@ notes) plus 5 prompts and a playbook resource; new `packages/studio`; migration 
 (library, review player, Rulebook) and Connected apps on Account; the `deno-studio` Claude Code plugin with the
 local `studio` kit. Branch `feat/studio`.
 
+## 2c. 2026-11-13 (later): Studio director upgrade
+Branch `feat/studio-director-upgrade` (stacked on `feat/studio`): creative-director persona, place-before-fill
+placeholders, a hard done gate in `studio upload`, sheet colour stats, behind-the-speaker mattes, four caption
+presets, yt-dlp download, ElevenLabs SFX, transcribe/silence/loudness. Details: docs/18 §13. Merge PR #29 first.
+`docs/reference/cardboard/` is private reference material: never commit it.
+Later the same day (docs/18 §14): **media search needs zero API keys** (Wikimedia Commons + Internet Archive
+fallbacks, YouTube via local yt-dlp, synthesized `studio sfx`), and **`studio upload` no longer stores MP4s**:
+poster + contact sheet JPEGs (~250 KB a version), review page scrubs the sheet or embeds `--video-url`.
+
 ## 3. Waiting on the user (check these first)
-0. **Studio PR:** review and merge; then `uv run alembic upgrade head` (0006, additive, shared DB) and add
-   `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY` to `deno-api` (Vercel → Settings → Environment
-   Variables, production + preview). Try it: `/plugin marketplace add Atul-Chahar/DENO`, `/plugin install
+0. **Studio PR:** review and merge; then `uv run alembic upgrade head` (0006, additive, shared DB). Optional: add
+   `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY` to `deno-api` for more stock choice (search works
+   without them). Try it: `/plugin marketplace add Atul-Chahar/DENO`, `/plugin install
    deno-studio@deno`, `studio doctor --install`, `studio login`.
 1. ~~Merge PR #27~~ (merged).
 2. **Vercel → deno-api → Environment Variables:** set `WEB_SEARCH_PROVIDER=exa` (production + preview; it's

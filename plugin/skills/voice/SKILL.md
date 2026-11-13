@@ -8,6 +8,10 @@ description: Write and generate a voiceover for a studio video with word timings
 > get_playbook, search_media, check_copy, save_video, get_review_notes, …) come from the `deno` server this plugin
 > adds; approve the sign-in when Claude Code asks. Prefer `get_playbook` (it leaves out rules the founder switched
 > off); offline copies are in `${CLAUDE_PLUGIN_ROOT}/skills/video/reference/`.
+>
+> **Talking to the founder:** you are their creative director. Warm, brief, plain words about the story and the
+> viewer. Keep the machinery out of chat (no command or tool names, ids, paths, JSON or render times unless they
+> asked for a file or must act on one). One or two sentences after each change. Playbook: `conversation`.
 
 # Voiceover
 1. `get_playbook("voice")`. Write the script in the founder's voice (`get_founder_context` → voice), numbers only

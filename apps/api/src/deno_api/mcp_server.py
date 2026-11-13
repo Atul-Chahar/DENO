@@ -590,8 +590,9 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         kind: Literal["review", "poster", "sheet", "page", "source", "captions"], ext: str, size: int
     ) -> dict[str, Any]:
         """A signed URL to PUT one file to Deno's storage (the studio kit does this for you with `studio
-        upload`). kind: review (720p mp4 under 50 MB), poster, sheet, page (still pages), source (zip),
-        captions (vtt/srt). Then pass the returned path to save_video."""
+        upload`). Default to the light files only: poster (jpg, < 400 KB) and sheet (contact sheet jpg,
+        < 600 KB); the MP4s stay on the founder's disk. Also: page (still pages), captions (vtt/srt), and only
+        if the founder asks, review (720p mp4) or source (zip). Then pass the returned path to save_video."""
 
         async def work(scope: UserScope, _client: str | None) -> dict[str, Any]:
             return await svc.create_upload(scope, settings, kind, ext, size)
@@ -610,8 +611,10 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         final: bool = False,
     ) -> dict[str, Any]:
         """Save a rendered video or still to the founder's Deno Studio (usually done by `studio upload`).
-        manifest = the project's film.json. files = {"review": path, "poster": path, "sheet": path,
-        "captions": path, "pages": [paths]} from create_upload. item_id = add a new version to an existing item.
+        manifest = the project's film.json (optionally with external_url / stream_url: an unlisted video link
+        the review page embeds, and sheet_index: the contact sheet's frame boxes). files = {"poster": path,
+        "sheet": path, "captions": path, "pages": [paths]} from create_upload; "review" (an mp4) is optional
+        and not needed. item_id = add a new version to an existing item.
         summary = what changed in this version. final=true refuses to save if an asset lacks a commercial
         licence or credit. Returns the review link and Deno's checks (reading time, words per screen, licences,
         copy gates)."""
