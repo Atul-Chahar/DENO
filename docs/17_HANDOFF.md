@@ -42,6 +42,12 @@ poster + contact sheet JPEGs (~250 KB a version), review page scrubs the sheet o
 Then (docs/18 §15): **Openverse** in the kit: `studio search image|sfx|music` adds CC0/CC BY/CC BY-SA results with no
 key and no sign-in; `studio openverse register <email>` is optional (raises the 200/day anonymous limit).
 
+## 2d. Burst readiness (docs/19)
+Fair run line in Redis (`deno_core/runqueue.py`): `RUN_QUEUE_CAPACITY` runs per NIM key execute, the rest wait
+first-come with their place shown (web log line, MCP `queue_position`); polite 503 past `RUN_QUEUE_MAX_WAITING`.
+Optional `NVIDIA_NIM_EXTRA_API_KEYS` (each run bound to one key). Friendly Supabase Auth errors. Before a demo,
+the owner must change Supabase Auth rate limits + SMTP and the Google consent screen status (docs/19 §2).
+
 ## 3. Waiting on the user (check these first)
 0. **Studio PR:** review and merge; then `uv run alembic upgrade head` (0006, additive, shared DB). Optional: add
    `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY` to `deno-api` for more stock choice (search works

@@ -391,7 +391,8 @@ function IntakeScreen({
           }
         } else if (ev.type === 'source') {
           setLog(`${ev.source}: ${ev.error === 'blocked_by_policy' ? 'skipped (site disallows bots)' : ev.error ? `partial · ${ev.error}` : `${ev.count} posts`}`);
-        } else if (ev.type === 'log' && ev.message) {
+        } else if ((ev.type === 'log' || ev.type === 'queue') && ev.message) {
+          // 'queue': waiting its turn in Deno's fair line ("2 ahead of you · about 4 min").
           setLog(ev.message);
         } else if (ev.type === 'status' && ev.status && TERMINAL.includes(ev.status)) {
           void finish(ev.status, ev.error_code as string | null | undefined);
@@ -419,9 +420,11 @@ function IntakeScreen({
     lastEvent.current = 0;
     setStageState(STAGES.map(() => ({ status: 'queued' })));
     setLog('saving your idea…');
+    let savedId: string | null = null;
     try {
       const reuse = retryProject && retryProject.idea.trim() === text ? retryProject.id : null;
       const project = reuse ? { id: reuse } : await api.createProject(text, handle.trim() || null);
+      savedId = project.id;
       setRetryProject(null);
       setLog('request received · starting a research worker (the first one can take ~30–60 s)…');
       setPct((p) => Math.max(p, 3));
@@ -432,6 +435,8 @@ function IntakeScreen({
       await follow(project.id, run.run_id);
     } catch (err) {
       setFailed(true);
+      // The idea is saved even when the run couldn't start (busy, quota): pressing Run again reuses it.
+      if (savedId) setRetryProject({ id: savedId, idea: text });
       setLog(err instanceof Error ? err.message : String(err));
     } finally {
       setRunning(false);
@@ -644,7 +649,7 @@ function VerdictScreen({
           } catch {
             return;
           }
-          if (ev.type === 'log' && ev.message) setProgress(ev.message);
+          if ((ev.type === 'log' || ev.type === 'queue') && ev.message) setProgress(ev.message);
           if (ev.type === 'node_finished' && ev.node === 'brief_planner') setProgress(`${String(ev.briefs)} posts planned · writing and gating drafts…`);
           if (ev.type === 'node_finished' && ev.node === 'draft') setProgress(`${++drafted} drafts written and gated…`);
           if (ev.type === 'status' && (ev.status === 'succeeded' || ev.status === 'failed' || ev.status === 'cancelled')) controller.abort();

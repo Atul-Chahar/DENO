@@ -772,7 +772,7 @@ async def _execute_plan(ctx: RunContext, settings: Any) -> dict[str, Any]:
         plan.status = RunStatus.RUNNING
         thread_id, project_id, run_id, days = plan.thread_id, plan.project_id, plan.run_id, plan.days
     await ctx.emit("status", status="running")
-    deps = ContentDeps(ctx=ctx, stack=build_stack(settings, ctx.events.redis))
+    deps = ContentDeps(ctx=ctx, stack=build_stack(settings, ctx.events.redis, seed=str(ctx.run_id)))
     # max_concurrency: drafts fan out one branch per brief; each holds a DB connection and calls NIM
     # (40 req/min), so run a few at a time instead of all 14.
     config: RunnableConfig = {

@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Header, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Header, Query, Request, Response, status
 from sqlalchemy import select
 
 from deno_api.deps import Scope
@@ -23,6 +23,7 @@ from deno_core.db.enums import Plan, RunStatus, UsageKind
 from deno_core.db.models import Quota
 from deno_core.errors import Conflict, QuotaExceeded, RateLimited
 from deno_core.jobs import TASK_VALIDATION_RUN, enqueue
+from deno_core.runqueue import ensure_room
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -102,6 +103,7 @@ async def _check_quota(scope: Scope) -> None:
 async def start_run(
     project_id: uuid.UUID,
     scope: Scope,
+    request: Request,
     response: Response,
     background: BackgroundTasks,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", max_length=128)] = None,
@@ -114,6 +116,7 @@ async def start_run(
         response.status_code = status.HTTP_200_OK
         return RunCreated(run_id=existing.id, status=existing.status, events_url=_events_url(existing.id))
     await _check_quota(scope)
+    await ensure_room(getattr(request.app.state, "redis", None), request.app.state.settings)
     run, _ = await scope.create_run(project_id, idempotency_key)
     await scope.record_usage(UsageKind.VALIDATION_RUN, run_id=run.id)
     # Background tasks run after the request transaction commits, so the worker

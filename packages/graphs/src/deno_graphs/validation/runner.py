@@ -117,7 +117,7 @@ async def _run(ctx: RunContext, settings: Settings) -> RunOutcome:
         ),
         cache=ValkeyCache(redis),
     )
-    stack = build_stack(settings, redis)
+    stack = build_stack(settings, redis, seed=str(ctx.run_id))
     deps = GraphDeps(ctx=ctx, settings=settings, stack=stack, fetcher=fetcher)
     # max_concurrency bounds parallel source/analyst branches (DB connections, NIM rate limit).
     config: RunnableConfig = {

@@ -6,7 +6,7 @@ import uuid
 from collections.abc import AsyncIterable
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -26,6 +26,7 @@ from deno_core.db.repositories import UserScope
 from deno_core.errors import Conflict
 from deno_core.events import RunEvent
 from deno_core.jobs import TASK_VALIDATION_RUN, enqueue
+from deno_core.runqueue import run_queue
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -82,7 +83,7 @@ def _sse(event: RunEvent) -> ServerSentEvent:
 
 
 @router.post("/{run_id}/cancel", status_code=status.HTTP_202_ACCEPTED)
-async def cancel_run(run_id: uuid.UUID, scope: Scope, events: Events) -> RunOut:
+async def cancel_run(run_id: uuid.UUID, scope: Scope, events: Events, request: Request) -> RunOut:
     run = await scope.get_run(run_id)
     if run.status in (RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED):
         raise Conflict("That run has already finished.")
@@ -93,6 +94,8 @@ async def cancel_run(run_id: uuid.UUID, scope: Scope, events: Events) -> RunOut:
     await events.request_cancel(str(run_id))
     if run.status == RunStatus.QUEUED:
         run.status = RunStatus.CANCELLED  # never started; the worker will skip it
+        if (redis := getattr(request.app.state, "redis", None)) is not None:
+            await run_queue(redis, request.app.state.settings).release(str(run_id))  # free its place in line
     return RunOut.model_validate(run)
 
 

@@ -44,6 +44,7 @@ Legend for the **Prod** column: 🔒 = a secret Vercel env var, `—` = not set 
 | Variable | Default | Prod | Purpose |
 |---|---|---|---|
 | `NVIDIA_NIM_API_KEY` | — | 🔒 `nim-key` | One key for every LLM, embedding and rerank call (40 req/min hard cap) |
+| `NVIDIA_NIM_EXTRA_API_KEYS` | empty | 🔒 optional | More NIM keys, comma-separated. Each has its own 40/min budget; each run is bound to one key; the run line grows by `RUN_QUEUE_CAPACITY` per key. The only lever that raises validations per hour (~15/h per key) |
 | `NVIDIA_NIM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | same | OpenAI-compatible endpoint |
 | `LLM_MODEL_FAST` | `nvidia/nemotron-3.5-super-vl-120b-a12b` | — | `Role.FAST`: short structured calls (max 1500 tokens, ½ timeout) |
 | `LLM_MODEL_STRONG` | same | — | `Role.STRONG`: long reasoning (max 3000 tokens, 1.5× timeout) |
@@ -105,6 +106,9 @@ Legend for the **Prod** column: 🔒 = a secret Vercel env var, `—` = not set 
 | Variable | Default | Prod | Purpose |
 |---|---|---|---|
 | `TASK_RUNNER` | `taskiq` | `vercel_queue` | `taskiq` = Valkey queue + local worker; `vercel_queue` = one Vercel Queues message per run, run by the push subscriber |
+| `RUN_QUEUE_CAPACITY` | `2` | — | Graph runs executing at once **per NIM key**; the rest wait in a fair first-come line with their place shown (docs/19) |
+| `RUN_QUEUE_MAX_WAITING` | `60` | — | When this many runs are already waiting, new ones get a polite 503 ("try again in about N min; your idea is saved") |
+| `RUN_QUEUE_AVG_RUN_S` | `240` | — | Average run length, only for the "about N min" estimate |
 | `RUN_TIME_BUDGET_S` | `270` | — | Seconds a run may use per function invocation before handing off to the next delivery (Hobby functions stop at 300 s) |
 | `CRON_SECRET` | empty | 🔒 | Vercel Cron's bearer token for `/internal/cron/*`; empty = those endpoints answer 404 |
 
