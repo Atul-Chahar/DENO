@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from './browser.mjs';
 import { apiUrl, call, putFile } from './api.mjs';
-import { youtubeSearch } from './sources.mjs';
+import { fetchOpenverse, searchOpenverse, youtubeSearch } from './sources.mjs';
 import { DEPS, chromiumPath, ensure, missing } from './deps.mjs';
 import { readiness } from './timeline.mjs';
 import { RATIOS, die, formats, info, loadFilm, num, outDir, readJSON, run, safeName, saveFilm, warn, which, writeJSON } from './util.mjs';
@@ -106,18 +106,34 @@ export async function search(opts) {
   const [, kind, ...q] = opts._;
   if (!kind || !q.length) die('usage: studio search <video|image|sfx|music|icon|youtube> <query> [--orientation portrait] [--max-duration 10]');
   if (kind === 'youtube' || kind === 'web') return youtubeSearch(opts);
-  const params = new URLSearchParams({ kind, q: q.join(' '), limit: String(num(opts.limit, 8)) });
-  if (opts.orientation) params.set('orientation', opts.orientation);
-  if (opts['max-duration']) params.set('max_duration', String(opts['max-duration']));
-  const res = await call('GET', `/studio/media/search?${params}`);
+  const query = q.join(' ');
+  const limit = num(opts.limit, 8);
+  // Openverse (CC0 / CC BY / CC BY-SA images and audio) runs from this machine, keyless; Deno's search runs
+  // on the server. `--source openverse` or `--source deno` picks one.
+  const withOpenverse = ['image', 'sfx', 'music'].includes(kind) && opts.source !== 'deno';
+  let res = { results: [], notes: [] };
+  if (opts.source !== 'openverse') {
+    const params = new URLSearchParams({ kind, q: query, limit: String(limit) });
+    if (opts.orientation) params.set('orientation', opts.orientation);
+    if (opts['max-duration']) params.set('max_duration', String(opts['max-duration']));
+    try {
+      res = await call('GET', `/studio/media/search?${params}`);
+    } catch (err) {
+      if (!withOpenverse) throw err;
+      warn(`Deno's media search is unavailable (${err.message}); showing Openverse only.`);
+    }
+  }
+  const ov = withOpenverse ? await searchOpenverse(kind, query, { limit }).catch((err) => (warn(`Openverse: ${err.message}`), [])) : [];
   for (const n of res.notes || []) warn(n);
-  for (const r of res.results) info(`${r.id.padEnd(26)} ${String(r.width ? `${r.width}×${r.height}` : '').padEnd(10)} ${r.duration ? `${r.duration}s`.padEnd(6) : ''.padEnd(6)} ${r.license.padEnd(8)} ${r.title}`);
-  if (res.results.length) info('Download one: studio fetch <id>');
+  for (const r of [...res.results, ...ov]) info(`${r.id.padEnd(26)} ${String(r.width ? `${r.width}×${r.height}` : '').padEnd(10)} ${r.duration ? `${r.duration}s`.padEnd(6) : ''.padEnd(6)} ${r.license.padEnd(8)} ${r.title}`);
+  if (res.results.length || ov.length) info('Download one: studio fetch <id>');
+  else info('Nothing found. Try other words, `studio search youtube <query>`, or the kit\'s synthesized sounds (`studio sfx`).');
 }
 
 export async function fetchAsset(dir, opts) {
   const id = opts._[1];
   if (!id) die('usage: studio fetch <media id from search_media> [--as sfx:whoosh]');
+  if (String(id).startsWith('openverse:')) return fetchOpenverse(dir, opts);
   const item = await call('GET', `/studio/media/item?id=${encodeURIComponent(id)}`);
   const folder = { video: 'footage', image: 'images', sfx: 'sfx', music: 'music', icon: 'icons' }[item.kind] || 'media';
   const file = path.join('assets', folder, `${safeName(id)}.${item.ext || 'bin'}`);

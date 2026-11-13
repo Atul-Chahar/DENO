@@ -1,7 +1,7 @@
 ---
 title: Getting footage, sound and words
 summary: Where each kind of asset comes from, in order of preference, with the rights rule for each. Works out of the box with zero API keys; word-timed transcripts for cutting.
-tags: [media, footage, sfx, music, voice, licences, free, keyless]
+tags: [media, footage, sfx, music, voice, licences, free, keyless, openverse]
 ---
 # Getting footage, sound and words
 
@@ -9,10 +9,18 @@ Media search works out of the box: **no API key is needed for anything below**. 
 Freesound on the Deno server; ElevenLabs on the founder's machine) only add more choice. Without them the same
 commands fall back to free, keyless sources by themselves, so never ask the founder for a key before trying.
 
+**Openverse** is the biggest free source: hundreds of millions of openly licensed images and audio tracks (CC0,
+public domain, CC BY, CC BY-SA), searched from the founder's machine with no key and no Deno sign-in.
+`studio search image|sfx|music <query>` shows Openverse results (ids `openverse:…`) next to Deno's;
+`--source openverse` shows only those. Only files that allow commercial use *and* editing come back; NC and ND
+never do. Anonymous use allows 20 searches a minute and 200 a day; if the founder hits that,
+`studio openverse register <their email>` (optional) raises it after they click the link in Openverse's email.
+
 ## Footage and images
 - **The founder's own product:** `studio capture <url>` (real UI, best evidence there is).
-- **Free stock:** `search_media kind=video|image` (or `studio search video <query>`), then `studio fetch <id>`.
-  Licence and credit are recorded for you. Sources, in order: Pexels and Pixabay when the server has keys,
+- **Free stock:** `search_media kind=video|image` (or `studio search video|image <query>`), then
+  `studio fetch <id>`. Licence and credit are recorded for you (film.json and `CREDITS.json`). Images: Openverse
+  first is fine; a CC BY or CC BY-SA file needs its credit pasted in the post. Sources, in order: Pexels and Pixabay when the server has keys,
   otherwise Wikimedia Commons (CC0, public domain, CC BY; paste the credit) and the Internet Archive
   (public-domain film). Internet Archive licences are the uploader's claim (`archive-pd`, a warning on review):
   skip anything that looks like a TV show, a film studio's work or a famous song.
@@ -33,12 +41,12 @@ commands fall back to free, keyless sources by themselves, so never ask the foun
   licensed `synth`. With the founder's ElevenLabs key it generates a custom one instead (their credits; 0.5–30 s;
   `--synth` forces the free path). Describe the material and motion ("soft paper slide, close"), not the
   emotion. One sound per kind; reuse it on every cue of that kind.
-- Library: `search_media kind=sfx` + `studio fetch <id> --as whoosh` (Freesound CC0 with a key, otherwise the
-  Internet Archive).
+- Library: `studio search sfx <query>` + `studio fetch <id> --as whoosh` (Openverse, mostly Freesound CC0, from the
+  kit; plus Freesound with a server key, otherwise the Internet Archive).
 
 ## Music
-- Best: the founder's own licensed track. Then a library track (`search_media kind=music`: Freesound CC0 or the
-  Internet Archive). Then the kit's synthesized bed (`studio mix --bed`). Then silence with captions. Say which
+- Best: the founder's own licensed track. Then a library track (`studio search music <query>`: Openverse, Freesound CC0
+  or the Internet Archive). Then the kit's synthesized bed (`studio mix --bed`). Then silence with captions. Say which
   one you chose.
 - Run `studio beats` on any track and cut on its downbeats.
 

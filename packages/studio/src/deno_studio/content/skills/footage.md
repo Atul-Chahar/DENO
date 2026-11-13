@@ -8,6 +8,8 @@ description: Bring real footage into a studio video, from the founder's files, s
    - A file the founder has: copy it into `assets/footage/`.
    - Stock: `search_media kind=video`, then `studio fetch <id>` (no keys needed: Wikimedia Commons and the
      Internet Archive answer when the server has no Pexels/Pixabay key).
+   - Images: `studio search image <query>` includes Openverse (CC0 / CC BY / CC BY-SA, no key), then
+     `studio fetch openverse:<id>`; the credit lands in `CREDITS.json`.
    - Web footage with no Google key: `studio search youtube <query>`, then `studio download "<url>"` (or
      `studio download "ytsearch3:<query>"`).
    - A link: `studio download "<link>"` (quote it; `--browser chrome` for posts that need a sign-in,

@@ -381,3 +381,24 @@ captions 200 KB. `studio sheet` now records each tile's box and time (`sheet.jso
 `stream_url` (direct https MP4/WebM, played in the frame-exact player) give a playable copy without storing bytes:
 `studio upload --video-url https://…`. `--with-video` keeps the old behaviour. A video version with no sheet and no
 link gets a `review.nothing_to_watch` warning. CSP: `media-src` allows `https:`; `frame-src` the two embed hosts.
+
+## 15. Openverse in the kit (2026-11-13, branch `feat/studio-openverse`)
+
+`plugin/kit/lib/sources.mjs` searches Openverse (`api.openverse.org/v1/images/` and `/audio/`) from the founder's
+machine, so it needs no key and not even a Deno sign-in. `studio search image|sfx|music` shows Openverse results
+after Deno's (`--source deno|openverse` picks one); `studio fetch openverse:<uuid>` downloads into
+`assets/images|sfx|music/` and records the credit in `film.json` and `CREDITS.json`.
+
+- Licence gate: searches send `license_type=commercial,modification`. `commercial` alone still returned a BY-ND
+  file in a live check, and ND can't be edited into a video. Mapped licences: `cc0`/`pdm` → `cc0`, `by` →
+  `cc-by`, `by-sa` → `cc-by-sa` (Deno's own ids, so the server's licence checks understand them); everything
+  else is dropped. Credit: `<creator> via Openverse (<licence> <version>)`.
+- Audio length: Openverse leaves `category` empty, so SFX use `length=shortest` (< 30 s) and music
+  `length=short,medium` (30 s–10 min).
+- Limits: anonymous 20 requests/min, 200/day (response headers). `studio openverse register <email>` calls
+  `/v1/auth_tokens/register/`, stores client id + secret in `~/.deno-studio/config.json` (0600); after the
+  founder clicks Openverse's verification link, searches use a client-credentials bearer token (cached; a
+  failed token call falls back to anonymous).
+- Not done: Openverse in the server's `search_media` (the MCP). The kit covers Claude Code users; MCP-only
+  clients (claude.ai, ChatGPT) still get Commons + Internet Archive.
+

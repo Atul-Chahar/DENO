@@ -134,7 +134,15 @@ def test_sources_playbook_promises_zero_keys() -> None:
     assert doc is not None
     body = doc.body
     assert "no API key is needed" in body
-    for needle in ("Wikimedia Commons", "Internet Archive", "studio search youtube", "ytsearch3:", "synth"):
+    for needle in (
+        "Wikimedia Commons",
+        "Internet Archive",
+        "Openverse",
+        "studio openverse register",
+        "studio search youtube",
+        "ytsearch3:",
+        "synth",
+    ):
         assert needle in body, needle
 
 
