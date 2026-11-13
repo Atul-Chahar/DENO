@@ -17,7 +17,7 @@ from deno_api.health import register_readiness_check
 from deno_api.health import router as health_router
 from deno_api.mcp_server import build_mcp
 from deno_api.middleware import BodySizeLimitMiddleware, RequestContextMiddleware
-from deno_api.v1 import billing, content, me, projects, runs, takedowns
+from deno_api.v1 import billing, content, me, projects, runs, studio, takedowns
 from deno_api.v1.schemas import ERROR_RESPONSES
 from deno_core.db.session import build_engine
 from deno_core.logging import configure_logging, get_logger
@@ -85,6 +85,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(takedowns.router)
     v1.include_router(content.router)
     v1.include_router(billing.router)
+    v1.include_router(studio.router)
+    v1.include_router(studio.brand_router)
     app.include_router(v1)
     app.include_router(health_router)
     app.include_router(cron.router)

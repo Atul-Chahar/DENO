@@ -37,6 +37,8 @@ jobs:
         run: uv run ruff check . && uv run ruff format --check .
       - name: typecheck
         run: uv run mypy
+      - name: plugin skills match the Studio content (docs/18 §4.4)
+        run: uv run python scripts/build_plugin.py --check
       - name: unit + integration tests
         run: uv run pytest -m "not live" --cov --cov-report=term-missing:skip-covered
       - name: gates eval (FPR <= 10% on real posts, catch >= 90% on AI posts)
@@ -55,6 +57,17 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
+      - name: kit syntax
+        run: for f in plugin/kit/cli.mjs plugin/kit/lib/*.mjs plugin/kit/workers/*.mjs plugin/bin/studio; do node --check "$f"; done
+      - name: kit unit tests
+        run: node --test plugin/kit/test/*.test.mjs
 
   secrets:
     runs-on: ubuntu-latest

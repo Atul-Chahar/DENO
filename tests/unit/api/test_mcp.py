@@ -22,6 +22,27 @@ INIT = {
     "method": "initialize",
     "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1"}},
 }
+EXPECTED_TOOLS = {
+    "list_ideas",
+    "validate_idea",
+    "get_validation",
+    "get_report",
+    "get_founder_context",
+    "check_copy",
+    "create_content_plan",
+    "list_briefs",
+    "save_draft",
+    "get_playbook",
+    "list_styles",
+    "search_recipes",
+    "set_brand_kit",
+    "search_media",
+    "create_upload",
+    "save_video",
+    "list_studio",
+    "get_review_notes",
+    "reply_note",
+}
 HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
 
 
@@ -83,8 +104,28 @@ async def _test_a_signed_in_founder_sees_the_tools(client: httpx.AsyncClient) ->
         "/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, headers={**HEADERS, **auth}
     )
     assert listed.status_code == 200, listed.text
-    names = {t["name"] for t in listed.json()["result"]["tools"]}
-    assert names == {"list_ideas", "validate_idea", "get_validation", "get_report", "get_founder_context"}
+    tools = listed.json()["result"]["tools"]
+    names = {t["name"] for t in tools}
+    assert names == EXPECTED_TOOLS
+    assert len(tools) <= 22, "keep the tool list short; models pick worse past ~25"
+    read_only = {t["name"] for t in tools if (t.get("annotations") or {}).get("readOnlyHint")}
+    assert {"list_ideas", "get_playbook", "search_media", "get_review_notes"} <= read_only
+    assert not read_only & {"validate_idea", "save_draft", "save_video", "create_content_plan", "reply_note"}
+
+    prompts = await client.post(
+        "/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "prompts/list"}, headers={**HEADERS, **auth}
+    )
+    assert {p["name"] for p in prompts.json()["result"]["prompts"]} == {
+        "launch_video",
+        "reel",
+        "explainer",
+        "carousel",
+        "content_week",
+    }
+    templates = await client.post(
+        "/mcp", json={"jsonrpc": "2.0", "id": 4, "method": "resources/templates/list"}, headers={**HEADERS, **auth}
+    )
+    assert [t["uriTemplate"] for t in templates.json()["result"]["resourceTemplates"]] == ["deno://playbooks/{topic}"]
 
 
 async def test_api_routes_still_win_over_the_mount() -> None:

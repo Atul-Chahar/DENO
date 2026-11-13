@@ -1,0 +1,10 @@
+[project]
+name = "deno-studio"
+version = "0.1.0"
+description = "Deno Studio: playbooks, styles, recipes, film manifests, on-screen copy checks, licensed media search, brand kits"
+requires-python = ">=3.12"
+dependencies = ["deno-sources", "deno-gates", "pydantic>=2.13,<3", "httpx>=0.28,<0.29", "selectolax>=0.4.12,<0.5"]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

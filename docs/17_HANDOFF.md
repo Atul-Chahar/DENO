@@ -22,11 +22,21 @@ Details: docs/16 (BYO AI), docs/12 + docs/13 (video), docs/14 (money).
 | **MCP server live** at `/mcp`: list_ideas, validate_idea, get_validation, get_report, get_founder_context; Supabase OAuth + consent page | PR #24, `apps/api/src/deno_api/mcp_server.py`, `web/app/(auth)/oauth/consent` |
 | User connected Claude to the MCP and confirmed it works | |
 | Contributor PR #26: keyless **Exa** web search → X, LinkedIn posts, Product Hunt work again (verified live: X 20, LinkedIn 10, PH 10 in a 257 s run) | main |
-| Follow-up PR #27: Exa's documented API when `EXA_API_KEY` is set; optional-text-field limit bug (Schemathesis) fixed | **open, CI green** |
+| Follow-up PR #27: Exa's documented API when `EXA_API_KEY` is set; optional-text-field limit bug (Schemathesis) fixed | merged |
 | Research/strategy docs 12–16 | docs/ |
 
+## 2b. Done on 2026-11-13: the Creation Studio (docs/18 §12)
+MCP grew from 5 to 19 tools (posts, brand kit, playbooks, styles, recipes, licensed media, uploads, versions, review
+notes) plus 5 prompts and a playbook resource; new `packages/studio`; migration 0006; Studio pages on deno-web
+(library, review player, Rulebook) and Connected apps on Account; the `deno-studio` Claude Code plugin with the
+local `studio` kit. Branch `feat/studio`.
+
 ## 3. Waiting on the user (check these first)
-1. **Merge PR #27** (CI green).
+0. **Studio PR:** review and merge; then `uv run alembic upgrade head` (0006, additive, shared DB) and add
+   `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY` to `deno-api` (Vercel → Settings → Environment
+   Variables, production + preview). Try it: `/plugin marketplace add Atul-Chahar/DENO`, `/plugin install
+   deno-studio@deno`, `studio doctor --install`, `studio login`.
+1. ~~Merge PR #27~~ (merged).
 2. **Vercel → deno-api → Environment Variables:** set `WEB_SEARCH_PROVIDER=exa` (production + preview; it's
    still `none` from the migration, so X/LinkedIn/PH are OFF in prod), and add `EXA_API_KEY` (free Exa account).
    The next deploy (merging #27) picks them up.
@@ -36,7 +46,11 @@ Details: docs/16 (BYO AI), docs/12 + docs/13 (video), docs/14 (money).
 5. **Create a separate production Supabase project** (dev and prod share one DB today: the biggest risk).
 6. For billing later: Dodo Payments product IDs, API key, webhook secret.
 
-## 4. Next steps (agreed order)
+## 4. Next steps
+**Current plan: docs/18_CREATION_STUDIO_PLAN.md** (MCP hardening → posts via MCP → Studio plugin + local kit →
+media sources → sound/captions/voice/stills → review loop → library). It reorders the list below: creation
+first, BYO validation after. The original order, for reference:
+
 1. **MCP hardening** (small): per-user rate limits on MCP tools; record the calling app ("via Claude") on
    runs; "Connected apps" list on the account page.
 2. **BYO-AI validation (docs/16 phase 2)**: the founder's AI writes brief + queries → Deno runs

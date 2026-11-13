@@ -232,13 +232,17 @@ def extract(html: str, url: str) -> SiteFacts:
     return SiteFacts(url=url, title=title, description=description, headings=headings, pricing=pricing, text=text)
 
 
-async def fetch_site(
+async def fetch_page(
     url: str,
     *,
+    accept: str = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
+    want: tuple[str, ...] = ("html",),
     resolver: Resolver = system_resolver,
     transport: httpx.AsyncBaseTransport | None = None,
     request_timeout_s: float = 10.0,
-) -> SiteFacts:
+) -> tuple[str, str]:
+    """One public page (or stylesheet) as ``(final_url, text)``, with every guard above applied to each hop.
+    ``want`` lists content-type fragments that are acceptable."""
     current = _normalise(url)
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(request_timeout_s, connect=5.0), follow_redirects=False, transport=transport
@@ -246,9 +250,7 @@ async def fetch_site(
         for _ in range(MAX_REDIRECTS + 1):
             if not await _robots_allow(client, current, resolver):
                 raise SiteUnavailable(f"{urlsplit(current).hostname} asks automated readers not to read this page")
-            status, headers, body = await _pinned_get(
-                client, current, resolver, accept="text/html,application/xhtml+xml;q=0.9,*/*;q=0.1"
-            )
+            status, headers, body = await _pinned_get(client, current, resolver, accept=accept)
             if status in (301, 302, 303, 307, 308) and headers.get("location"):
                 current = _normalise(urljoin(current, headers["location"]))
                 continue
@@ -259,14 +261,26 @@ async def fetch_site(
             if status >= 400:
                 raise SiteUnavailable(f"{urlsplit(current).hostname} answered {status}")
             ctype = headers.get("content-type", "")
-            if "html" not in ctype:
-                raise SiteUnavailable("that link isn't a web page (not HTML)")
+            if not any(w in ctype for w in want):
+                raise SiteUnavailable(
+                    "that link isn't a web page (not HTML)" if want == ("html",) else "unexpected content type"
+                )
             charset = "utf-8"
             if m := re.search(r"charset=([\w-]+)", ctype, re.IGNORECASE):
                 charset = m.group(1)
             try:
-                html = body.decode(charset, "replace")
+                return current, body.decode(charset, "replace")
             except LookupError:
-                html = body.decode("utf-8", "replace")
-            return extract(html, current)
+                return current, body.decode("utf-8", "replace")
     raise SiteUnavailable("too many redirects")
+
+
+async def fetch_site(
+    url: str,
+    *,
+    resolver: Resolver = system_resolver,
+    transport: httpx.AsyncBaseTransport | None = None,
+    request_timeout_s: float = 10.0,
+) -> SiteFacts:
+    final, html = await fetch_page(url, resolver=resolver, transport=transport, request_timeout_s=request_timeout_s)
+    return extract(html, final)

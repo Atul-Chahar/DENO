@@ -83,6 +83,7 @@ class LatestRunOut(BaseModel):
     finished_at: datetime | None
     verdict: VerdictKind | None = None
     confidence: float | None = None
+    client_name: str | None = Field(default=None, description="AI app that started it through the MCP; null = web app")
 
 
 class ProjectOut(_Out):
@@ -118,6 +119,7 @@ class RunOut(_Out):
     finished_at: datetime | None
     error_code: str | None
     created_at: datetime
+    client_name: str | None = Field(default=None, description="AI app that started it through the MCP; null = web app")
 
 
 class ResumeRequest(BaseModel):

@@ -1,0 +1,15 @@
+{
+  "name": "deno-studio-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deno Studio local kit: render, check, caption, voice and mix code-rendered videos on the founder's machine (docs/18).",
+  "type": "module",
+  "bin": { "studio": "./cli.mjs" },
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/" },
+  "studioDeps": {
+    "core": { "playwright-core": "1.63.0" },
+    "voice": { "kokoro-js": "1.2.1", "@huggingface/transformers": "3.8.1" },
+    "captions": { "@huggingface/transformers": "3.8.1" }
+  }
+}

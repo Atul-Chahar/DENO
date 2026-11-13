@@ -1,0 +1,26 @@
+{
+  "name": "deno-studio",
+  "displayName": "Deno Studio",
+  "version": "0.1.0",
+  "description": "Make launch videos, reels, carousels and posts from your validated idea: Deno's founder context, playbooks, licensed media and anti-slop gates, rendered on your machine and reviewed frame by frame on your Deno dashboard.",
+  "author": {
+    "name": "Deno",
+    "url": "https://deno-web-eight.vercel.app"
+  },
+  "homepage": "https://deno-web-eight.vercel.app/app/studio",
+  "repository": "https://github.com/Atul-Chahar/DENO",
+  "keywords": [
+    "video",
+    "motion-graphics",
+    "marketing",
+    "launch",
+    "captions",
+    "voiceover",
+    "carousel",
+    "mcp"
+  ],
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/Atul-Chahar/DENO/blob/main/plugin/README.md",
+  "privacyPolicyUrl": "https://deno-web-eight.vercel.app/legal/privacy",
+  "termsOfServiceUrl": "https://deno-web-eight.vercel.app/legal/terms"
+}

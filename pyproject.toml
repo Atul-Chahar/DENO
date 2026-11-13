@@ -3,7 +3,7 @@ name = "deno-workspace"
 version = "0.1.0"
 description = "Deno — evidence-grounded idea validation and human-voice distribution (monorepo root)"
 requires-python = ">=3.12"
-dependencies = ["deno-api", "deno-core", "deno-gates", "deno-graphs", "deno-llm", "deno-rag", "deno-sources", "deno-worker"]
+dependencies = ["deno-api", "deno-core", "deno-gates", "deno-graphs", "deno-llm", "deno-rag", "deno-sources", "deno-studio", "deno-worker"]
 
 [tool.uv]
 package = false
@@ -28,6 +28,7 @@ deno-graphs = { workspace = true }
 deno-llm = { workspace = true }
 deno-rag = { workspace = true }
 deno-sources = { workspace = true }
+deno-studio = { workspace = true }
 deno-worker = { workspace = true }
 
 [dependency-groups]
@@ -75,7 +76,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S", "PT", "RET"]
 ignore = ["E501", "RUF001", "RUF002", "RUF003", "UP042"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["deno_api", "deno_core", "deno_gates", "deno_sources", "deno_worker", "deno_rag", "deno_llm", "deno_graphs", "tests"]
+known-first-party = ["deno_api", "deno_core", "deno_gates", "deno_sources", "deno_worker", "deno_rag", "deno_llm", "deno_graphs", "deno_studio", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "PT011", "PT018", "SLF001"]
@@ -88,5 +89,5 @@ python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
-files = ["packages/core/src", "packages/sources/src", "packages/llm/src", "packages/rag/src", "packages/graphs/src", "packages/gates/src", "apps/api/src/deno_api", "apps/worker/src"]
+files = ["packages/core/src", "packages/sources/src", "packages/llm/src", "packages/rag/src", "packages/graphs/src", "packages/gates/src", "packages/studio/src", "apps/api/src/deno_api", "apps/worker/src"]
 

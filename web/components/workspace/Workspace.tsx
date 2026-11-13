@@ -52,7 +52,7 @@ const PAST_VERDICT: Record<string, { word: string; cls: string }> = {
 function pastState(p: Project, now: number): { badge: string; sub?: string; cls: string; meta: string; go: string; live: boolean } {
   const run = p.latest_run;
   if (!run) return { badge: 'NOT RUN', cls: 'idle', meta: `Added ${ago(p.created_at, now)}`, go: 'RUN →', live: false };
-  const when = ago(run.finished_at ?? run.created_at, now);
+  const when = ago(run.finished_at ?? run.created_at, now) + (run.client_name ? ` · via ${run.client_name}` : '');
   if (run.verdict) {
     const v = PAST_VERDICT[run.verdict] ?? PAST_VERDICT.insufficient_evidence;
     const conf = run.confidence != null ? ` · ${Math.round(run.confidence * 100)}% confidence` : '';
@@ -164,6 +164,7 @@ export function Workspace() {
               <span className="dv-dot" />
               {connected === null ? 'CONNECTING' : connected ? 'CONNECTED' : 'API UNREACHABLE'}
             </div>
+            <a href="/app/studio" className="dv-tab" style={{ textDecoration: 'none' }}>STUDIO</a>
             <a href="/app/account" className="dv-tab" style={{ textDecoration: 'none' }}>ACCOUNT</a>
           </div>
         </div>
