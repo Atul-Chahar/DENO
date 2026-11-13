@@ -19,7 +19,9 @@ from typing import Any, Literal
 
 from redis.asyncio import Redis
 
-EventType = Literal["status", "node_started", "node_finished", "source", "progress", "log", "interrupt", "error"]
+EventType = Literal[
+    "status", "node_started", "node_finished", "source", "progress", "log", "interrupt", "error", "queue"
+]
 TERMINAL_STATUSES = frozenset({"succeeded", "failed", "cancelled", "awaiting_review"})
 STREAM_MAXLEN = 2000
 STREAM_TTL_SECONDS = 24 * 3600

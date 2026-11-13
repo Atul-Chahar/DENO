@@ -44,6 +44,27 @@ interface Props {
   authEnabled: boolean;
 }
 
+/**
+ * Supabase Auth errors in plain words. Many people signing up from one network (a classroom, an event) share
+ * one IP address, so Supabase's per-IP limits and its email-sending limit are the likely failures: say what
+ * happened and offer the path that avoids it (Google sign-in sends no email).
+ */
+export function friendlyAuthError(err: { message: string; code?: string; status?: number }): string {
+  const code = err.code ?? '';
+  const text = err.message.toLowerCase();
+  if (code === 'over_email_send_rate_limit' || text.includes('email rate limit') || text.includes('error sending')) {
+    return "We can't send more confirmation emails right now (too many sign-ups at once). Use Continue with Google: it needs no email. Or try again in an hour.";
+  }
+  if (code === 'over_request_rate_limit' || err.status === 429 || text.includes('rate limit') || text.includes('too many')) {
+    return 'Too many sign-ins from this network right now (everyone here shares one internet address). Wait a minute and try again, or use Continue with Google.';
+  }
+  if (code === 'email_not_confirmed') return 'Confirm your email first: open the link we sent you. No email? Use Continue with Google.';
+  if (code === 'user_already_exists' || text.includes('already registered')) return 'That email already has an account. Switch to Log in.';
+  if (code === 'invalid_credentials') return 'Wrong email or password.';
+  if (err.status !== undefined && err.status >= 500) return 'Sign-in is having trouble right now. Try again in a minute, or use Continue with Google.';
+  return err.message;
+}
+
 export function AuthScreen({ initialMode, next, initialError, authEnabled }: Props) {
   const [mode, setModeState] = useState<AuthMode>(initialMode);
   const [showPw, setShowPw] = useState(false);
@@ -98,7 +119,7 @@ export function AuthScreen({ initialMode, next, initialError, authEnabled }: Pro
       if (isLogin) {
         setRememberPreference(remember);
         const { error: signInError } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
-        if (signInError) return showError(signInError.message);
+        if (signInError) return showError(friendlyAuthError(signInError));
         setPending({
           label: 'AUTHENTICATING',
           title: 'Opening your workspace…',
@@ -114,7 +135,7 @@ export function AuthScreen({ initialMode, next, initialError, authEnabled }: Pro
         password,
         options: { data: { full_name: trimmedName }, emailRedirectTo: callbackUrl(next) },
       });
-      if (signUpError) return showError(signUpError.message);
+      if (signUpError) return showError(friendlyAuthError(signUpError));
       if (data.session) {
         // Email confirmation is off for this project: already signed in.
         window.location.assign(next);
@@ -139,7 +160,7 @@ export function AuthScreen({ initialMode, next, initialError, authEnabled }: Pro
       provider: 'google',
       options: { redirectTo: callbackUrl(next) },
     });
-    if (oauthError) showError(oauthError.message);
+    if (oauthError) showError(friendlyAuthError(oauthError));
   }
 
   return (

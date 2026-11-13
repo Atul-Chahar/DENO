@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.routing import Match
 
 from deno_core.errors import (
+    Busy,
     Conflict,
     DenoError,
     InvalidInput,
@@ -36,6 +37,7 @@ STATUS_BY_ERROR: dict[type[DenoError], int] = {
     QuotaExceeded: 402,
     RateLimited: 429,
     UpstreamUnavailable: 503,
+    Busy: 503,
 }
 
 CODE_BY_STATUS = {

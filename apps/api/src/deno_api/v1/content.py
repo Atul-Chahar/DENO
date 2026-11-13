@@ -22,6 +22,7 @@ from deno_core.db.repositories import UserScope, community_rules
 from deno_core.errors import Conflict, InvalidInput, QuotaExceeded, UpstreamUnavailable
 from deno_core.events import RunEvent
 from deno_core.jobs import TASK_CONTENT_PLAN, enqueue
+from deno_core.runqueue import ensure_room
 from deno_core.settings import get_settings
 from deno_core.text import CleanText, clean_text
 from deno_gates import (
@@ -348,10 +349,11 @@ async def _check_plan_quota(scope: UserScope) -> None:
 
 @router.post("/projects/{project_id}/content-plans", status_code=status.HTTP_202_ACCEPTED)
 async def create_plan(
-    project_id: uuid.UUID, body: PlanCreate, scope: Scope, background: BackgroundTasks
+    project_id: uuid.UUID, body: PlanCreate, scope: Scope, background: BackgroundTasks, request: Request
 ) -> PlanCreated:
     await scope.get_project(project_id)
     await _check_plan_quota(scope)
+    await ensure_room(getattr(request.app.state, "redis", None), request.app.state.settings)
     run_id = body.run_id
     if run_id is not None:
         run = await scope.get_run(run_id)

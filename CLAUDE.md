@@ -66,6 +66,7 @@ migrations/                Alembic (head: 0006)   scripts/  run_validation.py, p
 
 ## Doc map
 - `docs/17_HANDOFF.md` — **current state + next steps (read first)**
+- `docs/19_DEMO_DAY.md` — many users at once: fair run line, NIM key pool, Supabase Auth settings for one shared Wi-Fi
 - `docs/09_FREE_DEPLOYMENT.md` — deploy runbook (Vercel)   ·  `docs/10_CONFIGURATION.md` — every env var
 - `docs/15_SERVERLESS_MIGRATION.md` — why/how GCP was replaced
 - `docs/18_CREATION_STUDIO_PLAN.md` — **current build plan**: MCP + Studio plugin + local kit + media sources

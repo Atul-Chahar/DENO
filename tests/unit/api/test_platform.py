@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from deno_api.errors import install_error_handlers
 from deno_api.middleware import RequestContextMiddleware
-from deno_core.errors import NotFound, UpstreamUnavailable
+from deno_core.errors import Busy, NotFound, UpstreamUnavailable
 
 
 class Body(BaseModel):
@@ -29,6 +29,10 @@ def make_app() -> FastAPI:
     @app.get("/upstream")
     async def upstream() -> None:
         raise UpstreamUnavailable()
+
+    @app.get("/busy")
+    async def busy() -> None:
+        raise Busy("Deno is very busy: 60 validations are already waiting. Try again in about 120 min.")
 
     @app.post("/validate")
     async def validate(body: Body) -> dict[str, int]:
@@ -58,6 +62,9 @@ def test_domain_errors_map_to_status_and_code() -> None:
         "request_id": res.headers["x-request-id"],
     }
     assert client.get("/upstream").status_code == 503
+    busy = client.get("/busy")
+    assert busy.status_code == 503 and busy.json()["error"]["code"] == "busy"
+    assert "60 validations are already waiting" in busy.json()["error"]["message"]
 
 
 def test_unknown_route_uses_envelope() -> None:

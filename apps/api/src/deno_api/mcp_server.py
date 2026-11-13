@@ -40,6 +40,7 @@ from deno_core.db.repositories import UserScope
 from deno_core.errors import DenoError
 from deno_core.jobs import TASK_VALIDATION_RUN, enqueue
 from deno_core.logging import get_logger
+from deno_core.runqueue import Place, ensure_room, run_queue
 from deno_core.settings import Settings
 from deno_gates import GateContext, compute_adaptive_threshold, run_gates, score_quality
 from deno_studio import get_doc, list_docs, media, rulebook, search_docs
@@ -196,6 +197,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
             await scope.ensure_profile()
             project = await scope.create_project(text[:4000], None)
             await _check_quota(scope)
+            await ensure_room(redis(), settings)
             run, _ = await scope.create_run(project.id, None, client_name=client)
             await scope.record_usage(UsageKind.VALIDATION_RUN, run_id=run.id)
             return {"idea_id": str(project.id), "run_id": str(run.id), "user_id": str(scope.user_id)}
@@ -217,7 +219,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         async def work(scope: UserScope, _client: str | None) -> dict[str, Any]:
             run = await scope.get_run(_uuid(run_id, "run_id"))
             done = run.status in (RunStatus.AWAITING_REVIEW, RunStatus.SUCCEEDED)
-            return {
+            out: dict[str, Any] = {
                 "run_id": str(run.id),
                 "status": run.status.value,
                 "done": done,
@@ -225,6 +227,19 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
                 "dashboard_url": idea_link(run.project_id),
                 "next": "Call get_report." if done else "Check again in a minute.",
             }
+            r = redis()
+            if run.status == RunStatus.QUEUED and r is not None:
+                place = await run_queue(r, settings).position(str(run.id))
+                if place is not None:
+                    eta = Place(granted=False, position=place).eta_minutes(
+                        settings.run_queue_avg_run_s, settings.run_queue_slots
+                    )
+                    out["queue_position"] = place
+                    out["next"] = (
+                        f"Waiting in line (place {place}, about {eta} min): Deno runs a few validations at a time. "
+                        "Tell the founder, and check again in a few minutes."
+                    )
+            return out
 
         return await as_founder(work)
 

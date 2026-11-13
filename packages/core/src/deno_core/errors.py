@@ -51,6 +51,13 @@ class RateLimited(DenoError):
     message = "Too many requests. Slow down and try again shortly."
 
 
+class Busy(DenoError):
+    """Deno is at capacity (too many runs waiting). Temporary: the message says when to come back."""
+
+    code = "busy"
+    message = "Deno is very busy right now. Try again in a few minutes."
+
+
 class UpstreamUnavailable(DenoError):
     code = "upstream_unavailable"
     message = "A service we depend on is unavailable. Try again shortly."

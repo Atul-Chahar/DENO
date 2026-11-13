@@ -55,8 +55,10 @@ class LLMRouter:
         *,
         limiter: Limiter | None = None,
         callbacks: Sequence[BaseCallbackHandler] = (),
+        api_key: str | None = None,
     ) -> None:
         self.settings = settings
+        self._api_key = api_key or settings.nvidia_nim_api_key.get_secret_value()
         self._rate = SharedRateLimiter(limiter or NullLimiter())
         self.callbacks = list(callbacks)
         self._cache: dict[tuple[str, Role, float | None], BaseChatModel] = {}
@@ -71,7 +73,7 @@ class LLMRouter:
             kwargs: dict[str, Any] = {
                 "model_provider": s.llm_provider,
                 "base_url": s.nvidia_nim_base_url,
-                "api_key": s.nvidia_nim_api_key.get_secret_value() or "unset",
+                "api_key": self._api_key or "unset",
                 "timeout": s.llm_timeout_seconds * ROLE_TIMEOUT_FACTOR[role],
                 "max_retries": 1,
                 "rate_limiter": self._rate,

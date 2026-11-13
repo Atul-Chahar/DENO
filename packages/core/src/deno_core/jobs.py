@@ -75,6 +75,11 @@ async def enqueue(task_name: str, broker: AsyncBroker | None = None, **kwargs: A
     if broker is None and settings.task_runner == "vercel_queue":
         from vercel.queue import send
 
+        from deno_core.runqueue import join_line
+
+        if run_id := kwargs.get("run_id") or kwargs.get("plan_id"):
+            await join_line(settings, str(run_id))
+
         key = f"{task_name}:{json.dumps(kwargs, sort_keys=True)}"
         message_id = await send(GRAPH_RUNS_TOPIC, {"task": task_name, "kwargs": kwargs}, idempotency_key=key)
         return message_id or key

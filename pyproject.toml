@@ -42,6 +42,7 @@ dev = [
   "schemathesis>=4.28,<5",
   "types-defusedxml>=0.7",
   "types-pyyaml>=6.0",
+  "fakeredis[lua]>=2.26,<3",
 ]
 # Phase 0 spike scripts (spikes/)
 spikes = [

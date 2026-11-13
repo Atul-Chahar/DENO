@@ -35,6 +35,9 @@ class Settings(BaseSettings):
 
     # --- LLM provider (NVIDIA NIM, ADR-008) ---
     nvidia_nim_api_key: SecretStr = SecretStr("")
+    # More keys = more throughput: each key has its own 40/min cap, runs are spread across them, and the run
+    # line (run_queue_capacity) grows with them. Comma-separated; only keys you're allowed to use.
+    nvidia_nim_extra_api_keys: SecretStr = SecretStr("")
     nvidia_nim_base_url: str = "https://integrate.api.nvidia.com/v1"
     llm_model_fast: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
     llm_model_strong: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
@@ -80,6 +83,11 @@ class Settings(BaseSettings):
     # A run hands itself off before the function limit (300 s on Vercel Hobby): the delivery ends,
     # the queue redelivers it, and the graph resumes from its Postgres checkpoint.
     run_time_budget_s: int = Field(default=270, ge=30)
+    # Fair line for graph runs (deno_core.runqueue): all runs share one NIM key, so only this many execute at
+    # once and the rest wait their turn with a visible place in line instead of all slowing down and failing.
+    run_queue_capacity: int = Field(default=2, ge=1, le=20)
+    run_queue_max_waiting: int = Field(default=60, ge=1, description="beyond this, new runs are refused (503)")
+    run_queue_avg_run_s: int = Field(default=240, ge=30, description="for the 'about N min' estimate")
     # Vercel Cron sends "Authorization: Bearer $CRON_SECRET" to /internal/cron/*. Empty = 404.
     cron_secret: SecretStr = SecretStr("")
 
@@ -150,6 +158,19 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return {h.strip().lower() for h in value.split(",") if h.strip()}
         return value
+
+    def nim_keys(self) -> list[str]:
+        """The primary NIM key first, then the extra ones; blanks and duplicates dropped."""
+        raw = [
+            self.nvidia_nim_api_key.get_secret_value(),
+            *self.nvidia_nim_extra_api_keys.get_secret_value().split(","),
+        ]
+        return list(dict.fromkeys(k.strip() for k in raw if k.strip()))
+
+    @property
+    def run_queue_slots(self) -> int:
+        """Runs that execute at once: ``run_queue_capacity`` per NIM key."""
+        return self.run_queue_capacity * max(1, len(self.nim_keys()))
 
     @model_validator(mode="after")
     def _production_requirements(self) -> Settings:
