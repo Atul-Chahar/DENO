@@ -86,6 +86,7 @@ migrations/                Alembic (head: 0006)   scripts/  run_validation.py, p
 
 ## Doc map
 - `docs/17_HANDOFF.md` — **current state + next steps (read first)**
+- `docs/20_BACKLOG.md` — **agreed fixes not started yet** (setup, BYO validation, validation/video/post quality); `/backlog` shows them
 - `docs/18_CREATION_STUDIO_PLAN.md` — Studio: MCP tools, plugin, kit, media sources, review (§13 director upgrade,
   §14 zero keys + no MP4 storage, §15 Openverse)
 - `docs/19_DEMO_DAY.md` — many users at once: fair run line, NIM key pool, Supabase Auth settings for one shared Wi-Fi
