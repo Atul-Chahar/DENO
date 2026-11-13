@@ -87,6 +87,8 @@ export function Workspace() {
   const [report, setReport] = useState<Report | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // "Run again" on the verdict screen: the intake screen picks this up and starts a fresh run of the idea.
+  const [rerun, setRerun] = useState<{ id: string; idea: string } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
   const showToast = useCallback((message: string) => {
@@ -142,6 +144,21 @@ export function Workspace() {
     return () => clearInterval(id);
   }, [anyLive, refreshProjects]);
 
+  const deleteProject = useCallback(
+    async (id: string) => {
+      await api.deleteProject(id);
+      setProjects((list) => list.filter((p) => p.id !== id));
+      if (id === projectId) {
+        setProjectId(null);
+        setRunId(null);
+        setReport(null);
+        setPlan(null);
+      }
+      showToast('Idea deleted.');
+    },
+    [projectId, showToast],
+  );
+
   const enabled = [true, Boolean(report), Boolean(plan), true];
 
   return (
@@ -187,6 +204,9 @@ export function Workspace() {
               return { open: true, run: opened.latest } as const;
             }}
             onChanged={refreshProjects}
+            onDelete={deleteProject}
+            rerun={rerun}
+            onRerunTaken={() => setRerun(null)}
             onValidated={(pid, rid, r) => {
               refreshProjects();
               setProjectId(pid);
@@ -203,6 +223,12 @@ export function Workspace() {
             projectId={projectId}
             runId={runId}
             onReport={setReport}
+            onRerun={() => {
+              const project = projects.find((p) => p.id === projectId);
+              if (!project) return showToast('Could not find this idea. Open it from Intake and run it again.');
+              setRerun({ id: project.id, idea: project.idea });
+              setScreen(0);
+            }}
             onPlan={(p) => {
               setPlan(p);
               setScreen(2);
@@ -260,6 +286,9 @@ function IntakeScreen({
   currentProjectId,
   onOpenProject,
   onChanged,
+  onDelete,
+  rerun,
+  onRerunTaken,
   onValidated,
 }: {
   projects: Project[];
@@ -267,6 +296,10 @@ function IntakeScreen({
   onOpenProject: (id: string) => Promise<{ open: false } | { open: true; run: Run | null }>;
   /** A run started or ended without a verdict: reload the list so its status is current. */
   onChanged: () => void;
+  onDelete: (id: string) => Promise<void>;
+  /** Set by "Run again" on the verdict screen: start a fresh run of that idea right away. */
+  rerun: { id: string; idea: string } | null;
+  onRerunTaken: () => void;
   onValidated: (projectId: string, runId: string, report: Report | null) => void;
 }) {
   const [idea, setIdea] = useState('');
@@ -284,12 +317,47 @@ function IntakeScreen({
   const [showAll, setShowAll] = useState(false);
   // Set when a past idea without a finished run is opened: "Run validation" re-runs that project.
   const [retryProject, setRetryProject] = useState<{ id: string; idea: string } | null>(null);
+  // Two-step delete: the first click asks, the second deletes. Holds the id being confirmed.
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const abort = useRef<AbortController | null>(null);
   // Progress creeps toward this ceiling between events, so a slow stage never looks frozen.
   const cap = useRef(0);
   const lastEvent = useRef(0);
 
   useEffect(() => () => abort.current?.abort(), []);
+
+  // "Run again" from the verdict screen: take the request once and start the run.
+  useEffect(() => {
+    if (!rerun || running) return;
+    onRerunTaken();
+    void Promise.resolve().then(() => {
+      setIdea(rerun.idea);
+      setHandle('');
+      return start(rerun.idea, rerun.id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start is recreated each render; run once per request
+  }, [rerun]);
+
+  async function removeProject(id: string) {
+    setDeleting(true);
+    try {
+      await onDelete(id);
+      if (retryProject?.id === id) {
+        setRetryProject(null);
+        setIdea('');
+        setFailed(false);
+        setPct(0);
+        setStageState(STAGES.map(() => ({ status: 'queued' })));
+        setLog('waiting for an idea');
+      }
+    } catch (err) {
+      setLog(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(null);
+    }
+  }
 
   useEffect(() => {
     if (!running) return;
@@ -320,7 +388,7 @@ function IntakeScreen({
       cap.current = 9;
       lastEvent.current = clockNow();
       setLog('reconnecting to the running validation…');
-      void follow(project.id, run.id).finally(() => setRunning(false));
+      void follow(project.id, run.id, project.idea).finally(() => setRunning(false));
       return;
     }
     setPct(0);
@@ -328,7 +396,7 @@ function IntakeScreen({
     setFailed(Boolean(run && run.status === 'failed'));
     setLog(
       run && run.status === 'failed'
-        ? `last run failed (${run.error_code ?? 'error'}) · press Run validation to retry this idea`
+        ? `last run failed (${run.error_code ?? 'error'}) · nothing was lost · retrying is free`
         : run && run.status === 'cancelled'
           ? 'last run was cancelled · press Run validation to run it again'
           : 'not validated yet · press Run validation',
@@ -338,7 +406,7 @@ function IntakeScreen({
   const elapsed = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
-  async function follow(projectId: string, runId: string): Promise<void> {
+  async function follow(projectId: string, runId: string, ideaText: string): Promise<void> {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
@@ -352,7 +420,9 @@ function IntakeScreen({
       if (status === 'failed' || status === 'cancelled') {
         setFailed(true);
         setStageState((s) => s.map((x) => (x.status === 'running' ? { status: 'failed' } : x)));
-        setLog(status === 'failed' ? `run failed (${String(errorCode ?? 'error')}) · try again in a minute` : 'cancelled');
+        setLog(status === 'failed' ? `run failed (${String(errorCode ?? 'error')}) · nothing was lost · retrying is free` : 'cancelled');
+        // The idea is saved: "Retry this idea" (or Run validation) starts a new run of the same project.
+        setRetryProject({ id: projectId, idea: ideaText });
         onChanged();
         return;
       }
@@ -408,8 +478,8 @@ function IntakeScreen({
     }
   }
 
-  async function start() {
-    const text = idea.trim();
+  async function start(ideaText?: string, projectId?: string) {
+    const text = (ideaText ?? idea).trim();
     if (text.length < 5) return;
     setRunning(true);
     setFailed(false);
@@ -422,7 +492,7 @@ function IntakeScreen({
     setLog('saving your idea…');
     let savedId: string | null = null;
     try {
-      const reuse = retryProject && retryProject.idea.trim() === text ? retryProject.id : null;
+      const reuse = projectId ?? (retryProject && retryProject.idea.trim() === text ? retryProject.id : null);
       const project = reuse ? { id: reuse } : await api.createProject(text, handle.trim() || null);
       savedId = project.id;
       setRetryProject(null);
@@ -432,7 +502,7 @@ function IntakeScreen({
       const run = await api.startRun(project.id);
       onChanged();
       lastEvent.current = clockNow();
-      await follow(project.id, run.run_id);
+      await follow(project.id, run.run_id, text);
     } catch (err) {
       setFailed(true);
       // The idea is saved even when the run couldn't start (busy, quota): pressing Run again reuses it.
@@ -471,7 +541,7 @@ function IntakeScreen({
               <input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="u/yourhandle" style={{ border: 0, background: 'transparent', fontSize: 14, color: 'var(--ink)', outline: 'none', padding: 0 }} />
             </div>
             <button
-              onClick={start}
+              onClick={() => void start()}
               disabled={running || idea.trim().length < 5}
               style={{ flex: 'none', background: 'var(--lime)', border: 0, fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 700, padding: '14px 24px', cursor: running ? 'wait' : 'pointer', color: 'var(--ink)', opacity: idea.trim().length < 5 ? 0.55 : 1 }}
             >
@@ -504,27 +574,53 @@ function IntakeScreen({
             <div className="dv-past">
               {(showAll ? projects : projects.slice(0, PAST_LIMIT)).map((p) => {
                 const st = pastState(p, now);
-                return (
-                  <button
-                    key={p.id}
-                    className={`dv-past-item${p.id === currentProjectId ? ' on' : ''}`}
-                    onClick={() => void openPast(p)}
-                    disabled={running}
-                    title={p.idea}
-                  >
-                    <span className={`dv-past-badge ${st.cls}`}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        {st.live && <span className="dv-orb" aria-hidden />}
-                        {st.badge}
+                if (confirmDelete === p.id) {
+                  return (
+                    <div key={p.id} className="dv-past-row confirm" role="group" aria-label={`Delete ${p.title}?`}>
+                      <span className="dv-past-body">
+                        <span className="dv-past-title">Delete “{p.title}”?</span>
+                        <span className="dv-past-meta">Its verdict, evidence and content plans go with it. This can&apos;t be undone.</span>
                       </span>
-                      {st.sub && <small>{st.sub}</small>}
-                    </span>
-                    <span className="dv-past-body">
-                      <span className="dv-past-title">{p.title}</span>
-                      <span className="dv-past-meta">{st.meta}</span>
-                    </span>
-                    <span className="dv-past-go" aria-hidden>{st.go}</span>
-                  </button>
+                      <span className="dv-past-actions">
+                        <button className="dv-btn danger sm" disabled={deleting} onClick={() => void removeProject(p.id)}>
+                          {deleting ? 'Deleting…' : 'Delete'}
+                        </button>
+                        <button className="dv-btn ghost sm" disabled={deleting} onClick={() => setConfirmDelete(null)}>Keep</button>
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={p.id} className="dv-past-row">
+                    <button
+                      className={`dv-past-item${p.id === currentProjectId ? ' on' : ''}`}
+                      onClick={() => void openPast(p)}
+                      disabled={running}
+                      title={p.idea}
+                    >
+                      <span className={`dv-past-badge ${st.cls}`}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {st.live && <span className="dv-orb" aria-hidden />}
+                          {st.badge}
+                        </span>
+                        {st.sub && <small>{st.sub}</small>}
+                      </span>
+                      <span className="dv-past-body">
+                        <span className="dv-past-title">{p.title}</span>
+                        <span className="dv-past-meta">{st.meta}</span>
+                      </span>
+                      <span className="dv-past-go" aria-hidden>{st.go}</span>
+                    </button>
+                    <button
+                      className="dv-past-del"
+                      onClick={() => setConfirmDelete(p.id)}
+                      disabled={running || st.live}
+                      aria-label={`Delete ${p.title}`}
+                      title={st.live ? 'Still running. Stop it before deleting.' : 'Delete this idea'}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 );
               })}
               {projects.length > PAST_LIMIT && (
@@ -557,6 +653,11 @@ function IntakeScreen({
             {log}
             {running && quiet && ' · still working, the AI queue is slow right now'}
           </p>
+          {failed && !running && retryProject && (
+            <button className="dv-btn lime sm" style={{ margin: '-8px 0 22px' }} onClick={() => { setIdea(retryProject.idea); void start(retryProject.idea, retryProject.id); }}>
+              Retry this idea →
+            </button>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {STAGES.map((stage, i) => {
               const st = stageState[i];
@@ -596,6 +697,7 @@ function VerdictScreen({
   projectId,
   runId,
   onReport,
+  onRerun,
   onPlan,
   onToast,
 }: {
@@ -603,6 +705,8 @@ function VerdictScreen({
   projectId: string | null;
   runId: string | null;
   onReport: (r: Report) => void;
+  /** Start a fresh validation of the same idea (back on the intake screen, with live progress). */
+  onRerun: () => void;
   onPlan: (p: Plan) => void;
   onToast: (m: string) => void;
 }) {
@@ -683,6 +787,11 @@ function VerdictScreen({
           <span className="dv-kicker ink">VERDICT · STAGE 1 COMPLETE</span>
           <div className="dv-serif" style={{ fontSize: 'clamp(56px,8vw,110px)', lineHeight: 0.9, letterSpacing: '-.03em', margin: '18px 0 10px' }}>{VERDICT_WORD[v?.verdict ?? 'insufficient_evidence']}</div>
           <p style={{ margin: 0, fontSize: 'clamp(15px,1.3vw,18px)', lineHeight: 1.45, fontWeight: 600, maxWidth: 520 }}>{v?.rationale ?? 'No verdict was recorded for this run.'}</p>
+          {(!v || v.verdict === 'insufficient_evidence') && (
+            <button className="dv-btn ink sm" style={{ marginTop: 20 }} disabled={generating || !projectId} onClick={onRerun}>
+              Run this idea again →
+            </button>
+          )}
         </div>
         <div className="dv-pad" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14 }}>
@@ -766,6 +875,7 @@ function VerdictScreen({
           <div style={{ marginTop: 22, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <button className="dv-btn ink" disabled={generating || !projectId} onClick={generate}>{generating ? progress || 'Writing drafts…' : 'Generate 14-day plan →'}</button>
             <button className="dv-btn ghost" onClick={toggleRadar}>{radar ? 'Hide community radar' : 'Community radar'}</button>
+            <button className="dv-btn ghost" disabled={generating || !projectId} onClick={onRerun}>Run again ↻</button>
           </div>
         </div>
       </div>
