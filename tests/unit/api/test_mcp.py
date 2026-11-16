@@ -135,3 +135,26 @@ async def test_api_routes_still_win_over_the_mount() -> None:
 
 async def _test_api_routes_still_win_over_the_mount(client: httpx.AsyncClient) -> None:
     assert (await client.get("/api/v1/openapi.json")).status_code == 200
+
+
+async def test_an_anticipated_tool_error_reaches_the_model() -> None:
+    async with serve() as client:
+        await _test_an_anticipated_tool_error_reaches_the_model(client)
+
+
+async def _test_an_anticipated_tool_error_reaches_the_model(client: httpx.AsyncClient) -> None:
+    # MCP SDK 2.x hides the text of any exception other than ToolError ("Error executing tool <name>"), so a
+    # founder over quota saw no reason. Tools must raise ToolError for failures the model should read.
+    _user, auth = user_token()
+    assert (await client.post("/mcp", json=INIT, headers={**HEADERS, **auth})).status_code == 200
+    call = {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {"name": "validate_idea", "arguments": {"idea": "too short"}},
+    }
+    res = await client.post("/mcp", json=call, headers={**HEADERS, **auth})
+    assert res.status_code == 200, res.text
+    result = res.json()["result"]
+    assert result["isError"] is True
+    assert "Describe the idea in at least a sentence or two." in result["content"][0]["text"]
