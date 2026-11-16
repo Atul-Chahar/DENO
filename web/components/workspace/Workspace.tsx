@@ -181,6 +181,7 @@ export function Workspace() {
               <span className="dv-dot" />
               {connected === null ? 'CONNECTING' : connected ? 'CONNECTED' : 'API UNREACHABLE'}
             </div>
+            <a href="/app/home" className="dv-tab" style={{ textDecoration: 'none' }}>HOME</a>
             <a href="/app/studio" className="dv-tab" style={{ textDecoration: 'none' }}>STUDIO</a>
             <a href="/app/account" className="dv-tab" style={{ textDecoration: 'none' }}>ACCOUNT</a>
           </div>

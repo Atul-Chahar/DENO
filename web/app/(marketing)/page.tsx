@@ -1,317 +1,332 @@
-import type { CSSProperties } from 'react';
-import { DeepDive } from '@/components/landing/DeepDive';
-import { Faq } from '@/components/landing/Faq';
+import { CodeBlock } from '@/components/setup/CodeBlock';
 import { ScrollReveal } from '@/components/landing/ScrollReveal';
+import { SetupPrompt } from '@/components/setup/SetupPrompt';
+import { SetupTabs } from '@/components/setup/SetupTabs';
+import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
+import { PLANS, planHref } from '@/lib/plans';
+import { MCP_URL } from '@/lib/site';
 
-const wallTitle: CSSProperties = { fontSize: 'clamp(26px,2.6vw,34px)' };
-const inkTag: CSSProperties = { background: 'var(--ink)', color: 'var(--paper)' };
+const FRAMES: { t: string; bg?: string; cls?: string; pin?: boolean }[] = [
+  { t: '00:00', cls: 'm-frame--ink' },
+  { t: '00:02', bg: 'var(--green-soft)' },
+  { t: '00:04', bg: 'var(--lime)', pin: true },
+  { t: '00:07', bg: 'var(--peach)' },
+  { t: '00:10', bg: 'var(--blue-soft)' },
+  { t: '00:13', cls: 'm-frame--ink' },
+  { t: '00:16', bg: 'var(--amber-soft)' },
+  { t: '00:19', cls: 'm-frame--ink' },
+];
+
+const COMPARE: [string, string][] = [
+  ["Guesses the customer's pain", 'Quotes pains from real posts, with the link'],
+  ['Invents numbers that sound good', "Blocks any number that isn't in your evidence"],
+  ['Writes in the house AI voice', 'Matches your writing samples and your stories'],
+  ['Grabs any image it finds', 'Uses licensed media and writes the credits file'],
+  ['Forgets your notes next chat', 'Remembers every fix you asked for as your taste'],
+];
+
+const FAQ: { q: string; a: string }[] = [
+  { q: 'Do I need to pay for Claude or ChatGPT too?', a: 'Posts work on a free AI plan. Video is heavy work, so we recommend Claude Pro or Max. Deno never charges you for AI usage.' },
+  { q: 'What is MCP? Do I need to understand it?', a: 'No. MCP is the standard way AI apps connect to other products. You paste one prompt or one address, sign in, and your AI can use Deno.' },
+  { q: 'Where do my videos go?', a: 'They stay on your computer. Deno stores a poster image and a contact sheet so you can review, plus your notes.' },
+  { q: 'Will Deno post for me?', a: 'Never. Deno does not post, vote or message. You copy the post and press send yourself.' },
+  { q: 'Can I use it without Claude Code?', a: 'Yes. Validation, posts and content plans work in claude.ai, Claude Desktop, ChatGPT and the Deno dashboard. Making video needs Claude Code today.' },
+];
+
+const TEASER = PLANS.filter((p) => p.id !== 'launch');
 
 export default function LandingPage() {
   return (
     <>
       <SiteHeader />
 
-      <section className="announce">
-        <a href="#pricing" className="announce__pill">
-          <span className="tag tag--green" style={{ background: 'var(--green)', color: '#fff', borderColor: 'var(--green)' }}>New</span>
-          <span className="announce__text">The beta is open. Everything is free while we build.</span>
-          <span className="announce__cta">See what&apos;s included →</span>
+      <section className="m-wrap m-hero">
+        <a href="/docs/quickstart" className="m-pill">
+          <span className="m-pill__new">NEW</span>
+          <span>Deno now works inside Claude and ChatGPT</span>
+          <span className="m-pill__go">Set up in 2 minutes →</span>
         </a>
-      </section>
-
-      <section className="hero">
-        <h1 className="display hero__title">Know if it&apos;s worth building.<br />Then go get your first 100 users.</h1>
-        <p className="prose hero__sub">Research agents read what people actually posted about your problem on Reddit, Hacker News, X and Product Hunt, and every claim links to the post it came from. Then Deno drafts up to thirty days of posts in your voice, each one checked before you press send.</p>
-        <div className="hero__actions">
-          <a href="/auth?mode=signup" className="btn btn--lime btn--lg btn--raised">Validate an idea — free</a>
-          <a href="#receipts" className="btn btn--ghost btn--lg">Read a sample verdict</a>
+        <h1 className="display m-hero__title">Edit your marketing by talking to your AI.</h1>
+        <p className="m-hero__sub">
+          Deno plugs into the Claude or ChatGPT you already pay for. Say what you want changed in a post, a reel or a
+          launch video. Your AI makes the edit. Deno gives it your evidence, your voice and licensed media, and stops
+          anything that reads as AI.
+        </p>
+        <div className="m-hero__actions">
+          <a href="/auth?mode=signup" className="btn btn--lime btn--lg btn--raised">Connect your AI. It&apos;s free</a>
+          <a href="/docs/quickstart" className="btn btn--ghost btn--lg">Read the setup guide</a>
         </div>
-        <p className="mono-plain hero__note">NO CARD · NO AUTO-POSTING · EVER</p>
+        <p className="m-mono m-hero__note">No card · No AI credits to buy · Never posts for you</p>
       </section>
 
-      <section className="hero-strip-wrap">
-        <div className="hero-strip slab">
-          <div className="hero-strip__grid">
-
-            <div className="hero-strip__card">
-              <div className="hero-strip__card-head">
-                <span className="mono" style={{ color: 'var(--muted)' }}>Example run</span>
-                <span className="pulse-dot"></span>
+      <section className="m-wrap m-mock-wrap" aria-label="Example: editing a launch reel">
+        <div className="m-mock">
+          <div className="m-chat">
+            <div className="m-chat__head">
+              <span>YOUR AI · CLAUDE CODE</span>
+              <span className="m-chat__ok">deno connected</span>
+            </div>
+            <div className="m-chat__body">
+              <div className="m-chat__me">The hook is slow. Cut scene 3 and make the first line land inside 2 seconds.</div>
+              <div className="m-chat__calls">
+                <div><b>✓</b><span>deno · Read review notes · 3 open</span></div>
+                <div><b>✓</b><span>deno · Check copy against Deno&apos;s gates · pass</span></div>
+                <div><b>✓</b><span>studio render · on your machine</span></div>
+                <div><b>✓</b><span>deno · Save a video version · v4</span></div>
               </div>
-              <div className="display" style={{ fontSize: 'clamp(30px,3.4vw,44px)' }}>PIVOT</div>
-              <div className="hero-strip__confidence">
-                <span className="display" style={{ fontSize: 30, color: 'var(--green)' }}>65%</span>
-                <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>confidence, computed from the evidence</span>
-              </div>
-              <div className="hero-strip__agents">
-                <div><span style={{ color: 'var(--green)' }}>✓</span> Sources collected · 89 posts</div>
-                <div><span style={{ color: 'var(--green)' }}>✓</span> Citation judge · 21 claims verified</div>
-                <div><span style={{ color: 'var(--green)' }}>✓</span> Critic (adversarial)</div>
-                <div style={{ color: 'var(--muted)' }}><span>⟳</span> Verdict</div>
-                <div className="hero-strip__bar"><span style={{ width: '76%' }}></span></div>
-              </div>
-            </div>
-
-            <div className="hero-strip__card hero-strip__card--lime">
-              <span className="mono">Day 06 · r/SideProject</span>
-              <div className="display" style={{ fontSize: 'clamp(22px,2.2vw,28px)', margin: '12px 0' }}>I spent $14,000 building a feature nobody used. Here&apos;s the teardown.</div>
-              <div style={{ fontSize: 13, lineHeight: 1.5 }}>Pulled from your Story Bank · 1 metric, 1 scar, 0 outbound links.</div>
-              <div className="hero-strip__score">
-                <span className="mono" style={{ color: 'var(--on-dark)' }}>Ban Risk</span>
-                <span className="display" style={{ fontSize: 26, color: 'var(--lime)' }}>91</span>
-              </div>
-            </div>
-
-            <div className="hero-strip__card hero-strip__card--art grid-wash grid-wash--blue">
-              <div className="hero-strip__art-tag">u/yourhandle · 1.2k karma</div>
-            </div>
-
-            <div className="hero-strip__card hero-strip__card--peach">
-              <span className="mono">Slop scrub · 20 patterns</span>
-              <div className="hero-strip__scrub">
-                <div><span className="hero-strip__strike">In today&apos;s fast-paced world</span> −5</div>
-                <div><span className="hero-strip__strike">It&apos;s not just X — it&apos;s Y</span> −5</div>
-                <div><span className="hero-strip__strike">Let&apos;s dive in 🚀</span> −5</div>
-              </div>
-              <div style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 'auto' }}>Every flag points at the exact words and says what to change.</div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      <section id="how" className="walls">
-        <span className="tag tag--peach">The two walls</span>
-        <h2 className="display walls__title">Building got cheap. Being believed got expensive.</h2>
-        <p className="prose walls__sub">Every unfunded founder hits the same two walls in the same order. Deno is built as two stages, in that order — and the first one costs nothing.</p>
-
-        <div className="walls__grid">
-          <div className="wall-card" style={{ background: 'var(--green-soft)' }}>
-            <div className="wall-card__head">
-              <span className="display" style={wallTitle}>Stage 1 — Validation</span>
-              <span className="tag tag--ink">Free</span>
-            </div>
-            <div className="wall-card__art grid-wash grid-wash--green">
-              <div className="wall-card__block-a"></div>
-              <div className="wall-card__block-b"></div>
-              <div className="wall-card__block-c"></div>
-              <span className="mono-plain" style={{ position: 'absolute', right: 28, bottom: 22, color: 'var(--green)' }}>SOURCE LEDGER</span>
-            </div>
-            <div className="wall-card__body">
-              <p className="prose" style={{ color: 'var(--ink-2)' }}>Paste the idea. Deno collects real posts, analysts argue from what they find, a critic attacks the result, and a judge checks every claim against the post it cites. Claims it can&apos;t verify are dropped.</p>
-              <a href="/app" className="link-mono">Run the DAG →</a>
+              <div className="m-chat__ai">Done. Scene 3 is gone and the hook lands at 1.8 s. Version 4 is on your Deno dashboard with all three notes answered.</div>
             </div>
           </div>
 
-          <div className="wall-card" style={{ background: 'var(--peach)' }}>
-            <div className="wall-card__head">
-              <span className="display" style={wallTitle}>Stage 2 — Distribution</span>
-              <span className="tag tag--ink" style={inkTag}>Free in beta</span>
+          <div className="m-review">
+            <div className="m-review__head">
+              <span>DENO REVIEW · LAUNCH REEL</span>
+              <span className="m-review__ver">V4 · VIA CLAUDE</span>
             </div>
-            <div className="wall-card__art grid-wash grid-wash--peach">
-              <div className="wall-card__bar-1"></div>
-              <div className="wall-card__bar-2"></div>
-              <div className="wall-card__bar-3"></div>
-              <div className="wall-card__dot"></div>
+            <div className="m-frames">
+              {FRAMES.map((f) => (
+                <div key={f.t} className={`m-frame${f.cls ? ` ${f.cls}` : ''}${f.pin ? ' m-frame--pin' : ''}`} style={f.bg ? { background: f.bg } : undefined}>
+                  {f.pin && <i>1</i>}
+                  <span>{f.t}</span>
+                </div>
+              ))}
             </div>
-            <div className="wall-card__body">
-              <p className="prose" style={{ color: '#3A2A22' }}>A 7, 14 or 30-day calendar with irregular cadence, at most one promotional post in ten, and none in communities that ban promotion. Checked against your own writing samples, not a house voice.</p>
-              <a href="/app" className="link-mono">See the calendar →</a>
+            <div className="m-notes">
+              <div><span className="m-chip m-chip--red">00:04</span><span><strong>You:</strong> the logo is too small on this frame.</span></div>
+              <div><span className="m-chip m-chip--green">FIXED</span><span><strong>Claude:</strong> the logo is larger from 00:03 to 00:06 in v4.</span></div>
             </div>
-          </div>
-
-          <div className="wall-card" style={{ background: 'var(--blue-soft)' }}>
-            <div className="wall-card__head">
-              <span className="display" style={wallTitle}>The guardrail</span>
-              <span className="tag tag--ink" style={inkTag}>0–100</span>
-            </div>
-            <div className="wall-card__art grid-wash grid-wash--blue">
-              <div className="wall-card__score-box">
-                <span className="display" style={{ fontSize: 58 }}>88</span>
-                <span className="mono-plain" style={{ textAlign: 'center', color: 'var(--blue)' }}>SAFE<br />TO<br />SEND</span>
-              </div>
-            </div>
-            <div className="wall-card__body">
-              <p className="prose" style={{ color: '#1E2A38' }}>Twenty structural slop patterns, word-density checks and the rules of the community you&apos;re posting in — itemised with what to fix, before your account is on the line.</p>
-              <a href="#risk" className="link-mono">Open the Studio →</a>
+            <div className="m-review__foot">
+              <span><b>PASS</b> · reads human</span>
+              <span><b>PASS</b> · every clip licensed</span>
+              <span><b>PASS</b> · no invented numbers</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="deepdive">
-        <DeepDive />
+      <section className="m-works" aria-label="Works inside">
+        <div className="m-wrap m-works__row">
+          <span className="m-mono">Works inside</span>
+          <span className="m-works__app">Claude Code</span>
+          <span className="m-works__app">Claude Desktop</span>
+          <span className="m-works__app">claude.ai</span>
+          <span className="m-works__app">ChatGPT</span>
+          <span className="m-works__app">Cursor</span>
+          <span className="m-works__more">and any app that speaks MCP</span>
+        </div>
       </section>
 
-      <section id="risk" className="riskband">
-        <div className="riskband__inner slab">
-          <div className="riskband__grid">
+      <section id="how" className="m-wrap m-sec">
+        <span className="m-label m-label--peach">How it works</span>
+        <h2 className="display m-title">You give the notes. Your AI does the edit.</h2>
+        <p className="m-sub">No new editor to learn and no timeline to drag. The work happens in the chat you already use, and every version lands on your Deno dashboard.</p>
+        <div className="m-grid m-grid--3">
+          <div className="m-step" style={{ background: 'var(--green-soft)' }}>
+            <span className="m-step__n">1</span>
+            <h3>Connect once</h3>
+            <p>Paste one prompt into Claude or ChatGPT and sign in to Deno. There is no API key to copy.</p>
+            <div className="m-step__eg m-step__eg--code">{MCP_URL}</div>
+          </div>
+          <div className="m-step" style={{ background: 'var(--peach)' }}>
+            <span className="m-step__n">2</span>
+            <h3>Ask in plain words</h3>
+            <p>Your AI reads your idea, your proof and your voice from Deno, then writes the post or builds the video.</p>
+            <div className="m-step__eg">&ldquo;Make a 20 second reel about the pain my last validation found.&rdquo;</div>
+          </div>
+          <div className="m-step" style={{ background: 'var(--blue-soft)' }}>
+            <span className="m-step__n">3</span>
+            <h3>Review, then say what&apos;s off</h3>
+            <p>Press play on your dashboard and type a note. It pins to that frame. Your AI reads the notes and fixes them one by one.</p>
+            <div className="m-step__eg"><span className="m-chip m-chip--red">00:04</span><span>&ldquo;Logo is too small here.&rdquo;</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="make" className="m-band m-band--ink">
+        <div className="m-wrap m-sec">
+          <span className="m-label m-label--lime">What you can make</span>
+          <h2 className="display m-title">One launch. Every format it needs.</h2>
+          <p className="m-sub">Each one starts from a ready prompt inside your AI. Pick one, answer five questions once, approve the treatment.</p>
+          <div className="m-grid m-grid--5">
+            <div className="m-make">
+              <div className="m-make__art" style={{ background: 'var(--lime)' }}>
+                <svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="#101613"><path d="M7 4v16l13-8z" /></svg>
+              </div>
+              <h3>Launch video</h3>
+              <p>The film for your launch day, with sound mixed and captions timed.</p>
+              <span className="m-make__meta">16:9 · CLAUDE CODE</span>
+            </div>
+            <div className="m-make">
+              <div className="m-make__art" style={{ background: 'var(--ink-2)' }}>
+                <div style={{ width: '22%', aspectRatio: '9 / 16', background: 'var(--flare)' }} />
+              </div>
+              <h3>Vertical reel</h3>
+              <p>A short hook for Reels, Shorts and TikTok, cut to the beat.</p>
+              <span className="m-make__meta">9:16 · CLAUDE CODE</span>
+            </div>
+            <div className="m-make">
+              <div className="m-make__art" style={{ background: 'var(--blue-soft)', alignItems: 'flex-end', gap: 4, padding: 14 }}>
+                {[30, 70, 45, 90, 55, 35, 75].map((h, i) => (
+                  <div key={i} style={{ width: 6, height: `${h}%`, background: 'var(--blue)' }} />
+                ))}
+              </div>
+              <h3>Explainer with voiceover</h3>
+              <p>Your script, read by a voice that runs on your machine or your own ElevenLabs key.</p>
+              <span className="m-make__meta">16:9 · CLAUDE CODE</span>
+            </div>
+            <div className="m-make">
+              <div className="m-make__art" style={{ background: 'var(--peach)' }}>
+                <div style={{ width: '20%', aspectRatio: '4 / 5', background: 'var(--ink)' }} />
+                <div style={{ width: '20%', aspectRatio: '4 / 5', background: 'var(--paper)', border: '1px solid var(--ink)' }} />
+                <div style={{ width: '20%', aspectRatio: '4 / 5', background: 'var(--paper)', border: '1px solid var(--ink)' }} />
+              </div>
+              <h3>LinkedIn carousel</h3>
+              <p>Still pages in your brand colours, each line checked against the slop rules.</p>
+              <span className="m-make__meta">4:5 · CLAUDE CODE</span>
+            </div>
+            <div className="m-make">
+              <div className="m-make__art" style={{ background: 'var(--amber-soft)', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4, padding: 14, alignItems: 'stretch' }}>
+                {['var(--ink)', 'var(--amber)', '', 'var(--ink)', '', 'var(--amber)', 'var(--ink)'].map((c, i) => (
+                  <div key={i} style={c ? { background: c } : { border: '1px solid var(--ink)' }} />
+                ))}
+              </div>
+              <h3>A week of posts</h3>
+              <p>LinkedIn, Reddit, X and Hacker News drafts in your voice, saved to your calendar.</p>
+              <span className="m-make__meta">TEXT · ANY AI APP</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="m-wrap m-sec">
+        <div className="m-split">
+          <div>
+            <span className="m-label m-label--blue">The difference</span>
+            <h2 className="display m-title">Everyone has the same AI. Yours knows your proof.</h2>
+            <p className="m-sub">A plain chatbot guesses what your customers feel and invents a number to sound sure. With Deno connected, your AI works from what real people posted about your problem, and from what you have actually done.</p>
+            <a href="/docs/tools" className="link-mono" style={{ marginTop: 24 }}>See all 19 tools your AI gets →</a>
+          </div>
+          <div className="m-compare">
+            <div className="m-compare__row m-compare__row--head"><div>YOUR AI ALONE</div><div>YOUR AI + DENO</div></div>
+            {COMPARE.map(([alone, withDeno]) => (
+              <div key={alone} className="m-compare__row"><div>{alone}</div><div>{withDeno}</div></div>
+            ))}
+          </div>
+        </div>
+        <div className="m-grid m-grid--4" style={{ marginTop: 64 }}>
+          <div className="m-stat" style={{ background: 'var(--green-soft)' }}><b>19</b><span>tools your AI can call, plus 5 ready prompts</span></div>
+          <div className="m-stat" style={{ background: 'var(--peach)' }}><b>20</b><span>slop patterns flagged at the exact words</span></div>
+          <div className="m-stat" style={{ background: 'var(--blue-soft)' }}><b>0</b><span>API keys needed to find footage, images and sound</span></div>
+          <div className="m-stat" style={{ background: 'var(--lime)' }}><b>0</b><span>posts, votes or DMs sent for you. You press send.</span></div>
+        </div>
+      </section>
+
+      <section id="proof" className="m-band m-band--tint">
+        <div className="m-wrap m-sec m-split">
+          <div className="m-verdict">
+            <div className="m-verdict__head"><span>EXAMPLE VERDICT</span><span style={{ color: 'var(--muted)' }}>89 POSTS READ</span></div>
+            <div className="m-verdict__main">
+              <span className="display" style={{ fontSize: 64 }}>PIVOT</span>
+              <span className="display" style={{ fontSize: 32, color: 'var(--green)' }}>65%</span>
+              <span style={{ fontSize: 13.5, color: 'var(--muted)' }}>confidence, computed from the evidence</span>
+            </div>
+            <div className="m-verdict__rows">
+              <div><span className="m-kept">KEPT</span><span>&ldquo;We tried three tools and still do this in a spreadsheet.&rdquo; <span style={{ color: 'var(--muted)' }}>r/SaaS</span></span></div>
+              <div><span className="m-kept">KEPT</span><span>21 claims checked against the post they cite</span></div>
+              <div><span className="m-dropped">DROPPED</span><span style={{ color: 'var(--muted)' }}>Claims the judge could not verify</span></div>
+            </div>
+          </div>
+          <div>
+            <span className="m-label m-label--amber">Where the proof comes from</span>
+            <h2 className="display m-title m-title--sm">First, find out if the idea is worth marketing.</h2>
+            <p className="m-sub">Deno reads what people posted about your problem on Reddit, Hacker News, X, LinkedIn, Product Hunt and GitHub. You get Build, Pivot or Kill in under five minutes, and every claim links to its source. That evidence is what your AI writes from.</p>
+            <a href="/auth?mode=signup" className="btn btn--ghost" style={{ marginTop: 24 }}>Validate an idea free</a>
+          </div>
+        </div>
+      </section>
+
+      <section className="m-band m-band--lime">
+        <div className="m-wrap m-sec m-split m-split--top">
+          <div>
+            <h2 className="display m-title" style={{ marginTop: 0 }}>We don&apos;t sell AI credits.</h2>
+            <p className="m-sub" style={{ color: '#1E2A22', maxWidth: 520 }}>Most AI video tools charge per render. Deno doesn&apos;t. The thinking runs on the Claude or ChatGPT plan you already have, and the rendering runs on your own computer. You pay one flat price for what only Deno has.</p>
+            <a href="/pricing" className="btn btn--ink" style={{ marginTop: 28 }}>See pricing</a>
+          </div>
+          <div className="m-ledger">
+            <div><span>The writing and editing</span><b>Your AI plan</b></div>
+            <div><span>Rendering the video</span><b>Your computer</b></div>
+            <div><span>Your video files</span><b>Stay on your disk</b></div>
+            <div className="m-ledger__us"><span>Evidence, voice, rules, media, review</span><b>Deno</b></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="setup" className="m-band">
+        <div className="m-wrap m-sec">
+          <span className="m-label m-label--green">Set up in 2 minutes</span>
+          <h2 className="display m-title">Paste one prompt. Your AI does the rest.</h2>
+          <SetupPrompt />
+          <p className="m-mono m-byhand">Or do it by hand</p>
+          <SetupTabs />
+          <p className="m-fine" style={{ marginTop: 16 }}>
+            Building your own agent? The server address is below. <a href="/docs" className="link-mono">Read the docs →</a>
+          </p>
+          <div style={{ marginTop: 12, maxWidth: 620 }}><CodeBlock code={MCP_URL} /></div>
+        </div>
+      </section>
+
+      <section id="pricing" className="m-band m-band--tint">
+        <div className="m-wrap m-sec">
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20 }}>
             <div>
-              <span className="tag tag--lime">Ban Risk Studio</span>
-              <h2 className="display riskband__title">Moderators spot a generated post in one line. Check yours first.</h2>
-              <p className="prose riskband__sub" style={{ color: 'var(--on-dark-soft)' }}>Paste any draft — ours or yours. The scrubber runs twenty structural slop patterns, the density check catches stacked AI vocabulary, and the rule check reads the community you&apos;re aiming at. You get one number and a fix list.</p>
-              <div className="riskband__actions">
-                <a href="/app" className="btn btn--lime">Score a draft free</a>
-                <a href="#faq" className="btn" style={{ color: 'var(--on-dark)', borderColor: 'rgba(250,248,243,.4)' }}>How it decides</a>
-              </div>
+              <span className="m-label m-label--blue">Pricing</span>
+              <h2 className="display m-title">Start free. Upgrade when you ship.</h2>
             </div>
-
-            <div className="risk-card">
-              <div className="risk-card__top">
-                <div className="risk-card__score">
-                  <span className="display" style={{ fontSize: 'clamp(46px,6vw,72px)' }}>90</span>
-                  <span className="mono-plain" style={{ textAlign: 'center', color: 'var(--ink)' }}>Ban Risk<br />Score</span>
+            <a href="/pricing" className="link-mono">Compare every plan →</a>
+          </div>
+          <div className="m-plans" style={{ marginTop: 44, gap: 24 }}>
+            {TEASER.map((plan) => (
+              <div key={plan.id} className={`m-plan${plan.look === 'top' ? ' m-plan--top' : ''}`}>
+                <div className="m-plan__name">
+                  <span>{plan.name.toUpperCase()}</span>
+                  {plan.look === 'top' && <span className="m-plan__badge">MOST POPULAR</span>}
                 </div>
-                <div className="risk-card__meta">
-                  <span className="mono-plain">Example · r/SaaS · self-promotion limited</span>
-                  <span style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.4 }}>Passes every gate. Two small fixes suggested.</span>
+                <div className="m-plan__price">
+                  <b>${plan.yearly}</b>
+                  <span>{plan.monthly === 0 ? 'forever' : 'a month, billed yearly'}</span>
                 </div>
+                <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-2)' }}>{plan.short}</p>
+                <a href={plan.id === 'free' ? planHref(plan) : '/pricing'} className={`btn${plan.look === 'top' ? ' btn--lime' : ''}`} style={{ marginTop: 'auto' }}>{plan.cta}</a>
               </div>
-              <div className="risk-card__deductions">
-                <div className="mono-plain" style={{ marginBottom: 10 }}>Itemised deductions</div>
-                <div className="risk-card__item" style={{ background: 'var(--peach)' }}><span className="risk-card__pt" style={{ color: 'var(--red-ink)' }}>−5</span><span>Rule-of-three rhythm ×4 · <span style={{ color: 'var(--muted)' }}>break two of the triads into single clauses</span></span></div>
-                                <div className="risk-card__item" style={{ background: 'var(--amber-soft)' }}><span className="risk-card__pt" style={{ color: 'var(--amber)' }}>−5</span><span>Outbound link in body · <span style={{ color: 'var(--muted)' }}>move to first comment</span></span></div>
-                <div className="risk-card__item" style={{ background: 'var(--green-soft)' }}><span className="risk-card__pt" style={{ color: 'var(--green)' }}>PASS</span><span>Voice distance 0.31 · <span style={{ color: 'var(--muted)' }}>within your fingerprint</span></span></div>
-              </div>
-              <div className="risk-card__foot">
-                <span className="mono-plain">🔒 Human-send only</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <span className="btn btn--ghost btn--sm" style={{ pointerEvents: 'none' }}>Copy post</span>
-                  <span className="btn btn--ink btn--sm" style={{ pointerEvents: 'none' }}>Open Reddit ↗</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="receipts" className="receipts">
-        <span className="tag tag--amber">Receipts, not logos</span>
-        <h2 className="display receipts__title">We have no customer logos yet. Here&apos;s what we do have.</h2>
-        <p className="prose receipts__sub">Putting fake enterprise badges on a pre-launch page is exactly the behaviour Deno scores you down for. So: the real numbers, and a space for the first honest testimonial.</p>
-
-        <div className="receipts__stats">
-          <div className="receipt-stat" style={{ background: 'var(--green-soft)' }}><span className="display">7</span><span>analyst agents, plus a critic whose only job is to argue against them</span></div>
-          <div className="receipt-stat" style={{ background: 'var(--peach)', color: '#3A2A22' }}><span className="display">20</span><span>structural slop patterns, each flagged at the exact words</span></div>
-          <div className="receipt-stat" style={{ background: 'var(--blue-soft)', color: '#1E2A38' }}><span className="display">12</span><span>communities mapped with their rules, karma gates and promo limits</span></div>
-          <div className="receipt-stat" style={{ background: 'var(--lime)' }}><span className="display">0</span><span>posts, votes or DMs sent automatically. A human always presses send.</span></div>
-        </div>
-
-        <div className="receipts__cards">
-          <div className="receipt-slot">
-            <span className="mono-plain">Testimonial slot 01</span>
-            <span className="display" style={{ fontSize: 22, lineHeight: 1.2, color: 'var(--muted)' }}>Reserved for the first founder who ships with Deno.</span>
-            <span style={{ fontSize: 13, color: 'var(--muted)', marginTop: 'auto' }}>The beta is open now.</span>
-          </div>
-          <div className="receipt-note panel">
-            <span className="mono-plain">Built in public</span>
-            <span style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--ink-2)' }}>Every verdict Deno produces is auditable: unit tests across the scoring engines, and a source ledger with retrieval timestamps on every claim.</span>
-            <a href="#faq" className="link-mono" style={{ marginTop: 'auto' }}>Read how it decides →</a>
+      <section id="faq" className="m-band">
+        <div className="m-wrap m-sec m-split m-split--top">
+          <h2 className="display m-title m-title--sm" style={{ marginTop: 0, flex: '1 1 320px' }}>Asked often, answered plainly</h2>
+          <div className="m-faq" style={{ flex: '2 1 560px' }}>
+            {FAQ.map((item) => (
+              <div key={item.q}><h3>{item.q}</h3><p>{item.a}</p></div>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="pricing" className="pricing">
-        <div className="pricing__head">
-          <span className="tag tag--blue">Pricing</span>
-          <h2 className="display pricing__title">Free while in beta.</h2>
-        </div>
-        <div className="pricing__grid">
-          <div className="price-card">
-            <span className="mono">Stage 1</span>
-            <span className="display" style={{ fontSize: 52 }}>$0</span>
-            <div className="price-card__list">
-              <span>5 idea validations a month</span>
-              <span>Build / Pivot / Kill, or &ldquo;not enough evidence&rdquo;</span>
-              <span>Every claim linked to its source post</span>
-              <span>Kept and dropped claims, side by side</span>
-              <span>12 communities with their rules</span>
-            </div>
-            <a href="/auth?mode=signup" className="btn" style={{ marginTop: 'auto' }}>Start validating</a>
-          </div>
-          <div className="price-card price-card--featured">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span className="mono">Stage 2</span>
-              <span className="tag tag--ink">Beta</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span className="display" style={{ fontSize: 52 }}>$0</span>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>during beta</span>
-            </div>
-            <div className="price-card__list">
-              <span>Everything in Stage 1</span>
-              <span>1 content plan a month, 7 to 30 days</span>
-              <span>Ban Risk Score on every draft, 200 audits a month</span>
-              <span>Slop, density, rhythm and community-rule checks</span>
-              <span>Story Bank &amp; voice matching</span>
-              <span>Paid plans come later; beta users hear first</span>
-            </div>
-            <a href="/auth?mode=signup" className="btn btn--ink" style={{ marginTop: 'auto' }}>Join the beta</a>
+      <section className="m-wrap m-cta">
+        <div className="m-cta__box">
+          <h2 className="display m-cta__title">Connect tonight. Ship the launch video this week.</h2>
+          <p>Free to start, no card, and your AI plan does the heavy lifting.</p>
+          <div className="m-hero__actions">
+            <a href="/auth?mode=signup" className="btn btn--lime btn--lg">Connect your AI. It&apos;s free</a>
+            <a href="/docs" className="btn btn--ghost btn--lg">Read the docs</a>
           </div>
         </div>
       </section>
 
-      <section id="faq" className="faq">
-        <div className="faq__grid">
-          <h2 className="display faq__title">Frequently asked, honestly answered</h2>
-          <Faq />
-        </div>
-      </section>
-
-      <section id="start" className="cta">
-        <div className="cta__inner grid-wash" style={{ background: 'var(--lime)', '--wash': 'rgba(16,22,19,.12)' } as CSSProperties}>
-          <h2 className="display cta__title">Find out tonight. Post on Monday.</h2>
-          <p className="prose cta__sub" style={{ color: '#1E2A22' }}>Paste your idea. Get the verdict, the sources, and the communities. Free, no card, and no posting on your behalf — ever.</p>
-          <div className="cta__actions">
-            <a href="/auth?mode=signup" className="btn btn--ink btn--lg">Validate an idea — free</a>
-            <a href="#receipts" className="btn btn--lg" style={{ background: 'transparent' }}>Read a sample verdict</a>
-          </div>
-        </div>
-      </section>
-
-      <footer id="trust" className="site-footer slab">
-        <div className="site-footer__inner">
-          <div className="site-footer__grid">
-            <div>
-              <div className="brand" style={{ marginBottom: 14 }}>
-                <span className="brand__word" style={{ color: 'var(--on-dark)' }}>deno</span>
-                <span className="brand__chip">GTM</span>
-              </div>
-              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--on-dark-dim)', maxWidth: 220 }}>The founder go-to-market workspace. Validate, then distribute — without getting filtered.</p>
-            </div>
-            <div className="site-footer__col">
-              <div className="display site-footer__heading">Platform</div>
-              <a href="#how">Validation DAG</a>
-              <a href="#how">Verdicts</a>
-              <a href="#how">Source ledger</a>
-              <a href="#how">Community radar</a>
-              <a href="/app">Content calendar</a>
-            </div>
-            <div className="site-footer__col">
-              <div className="display site-footer__heading">Safety</div>
-              <a href="#risk">Ban Risk Score</a>
-              <a href="#risk">Anti-slop taxonomy</a>
-              <a href="#risk">Density heuristics</a>
-              <a href="#risk">Stylometry method</a>
-              <a href="#trust">Human-send policy</a>
-            </div>
-            <div className="site-footer__col">
-              <div className="display site-footer__heading">Company</div>
-              <a href="#top">About</a>
-              <a href="#receipts">Changelog</a>
-              <a href="#pricing">Pricing</a>
-              <a href="#faq">FAQ</a>
-              <a href="mailto:hello@deno.gtm">Contact</a>
-            </div>
-          </div>
-          <div className="site-footer__bottom">
-            <span>© 2026 DENO GTM · BUILT FOR FOUNDERS WITH NO AUDIENCE</span>
-            <span>NEVER POSTS · NEVER VOTES · NEVER DMs</span>
-          </div>
-        </div>
-      </footer>
-
+      <SiteFooter />
       <ScrollReveal />
     </>
   );

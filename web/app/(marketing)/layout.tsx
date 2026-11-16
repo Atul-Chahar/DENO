@@ -3,11 +3,12 @@ import { headers } from 'next/headers';
 import { FontLinks } from '@/components/FontLinks';
 import '@/styles/base.css';
 import '@/styles/landing.css';
+import '@/styles/site.css';
 
 export const metadata: Metadata = {
-  title: "Deno — Know if it's worth building, then get your first 100 users",
+  title: 'Deno — Edit your marketing by talking to your AI',
   description:
-    'Deno checks your startup idea against real Reddit, Hacker News, X and Product Hunt posts, with every claim linked to its source. Then it drafts up to thirty days of posts in your voice, each one checked before you send.',
+    'Deno plugs into Claude, ChatGPT and any MCP app. Your AI writes and edits your posts, reels and launch videos from real evidence, in your voice, with licensed media. One flat price, no AI credits.',
 };
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {

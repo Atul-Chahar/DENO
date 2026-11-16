@@ -48,7 +48,7 @@ export function applyRemember<T extends CookieLifetime>(options: T, remember: bo
 }
 
 /** Only allow same-origin relative redirect targets (blocks open redirects). */
-export function safeNext(next: string | null | undefined, fallback = '/app'): string {
+export function safeNext(next: string | null | undefined, fallback = '/app/home'): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return fallback;
   return next;
 }

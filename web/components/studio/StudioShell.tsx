@@ -11,7 +11,7 @@ export function StudioShell({ active, children, right }: { active: 'library' | '
               <span className="dv-brand-word">deno</span>
               <span className="dv-brand-chip">GTM</span>
             </a>
-            <a href="/app" className="dv-back">← WORKSPACE</a>
+            <a href="/app/home" className="dv-back">← HOME</a>
           </div>
           <div className="dv-tabs">
             <a href="/app/studio" className={`dv-tab${active === 'library' ? ' on' : ''}`} style={{ textDecoration: 'none' }}>STUDIO</a>
