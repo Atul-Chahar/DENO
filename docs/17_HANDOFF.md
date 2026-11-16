@@ -1,6 +1,6 @@
 # 17 — Handoff: where we are and what's next
 
-Last updated **2026-11-13** (after PR #33). Read this first in a new chat, after `CLAUDE.md`.
+Last updated **2026-11-16** (website redesign, docs/21). Read this first in a new chat, after `CLAUDE.md`.
 Before acting on anything below, re-check it live (`gh pr list`, `git log origin/main`, `vercel env ls`):
 this file can be a few hours stale.
 
@@ -29,6 +29,17 @@ Production env (`deno-api`) has: `NVIDIA_NIM_API_KEY`, `WEB_SEARCH_PROVIDER`, `T
 `EXA_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FREESOUND_API_KEY`, `NVIDIA_NIM_EXTRA_API_KEYS`,
 `RUN_QUEUE_*` (defaults: 2 runs per key, 60 waiting max).
 
+### 2026-11-16: website redesign (branch `feat/site-mcp-studio-redesign`, docs/21)
+New landing page ("Edit your marketing by talking to your AI"), `/pricing` (Free / Launch $29 / Studio $49 /
+Agency $149, yearly preselected), public docs at `/docs` with `/llms.txt`, `/llms-full.txt`, `/md/<slug>` and
+`/setup-prompt.txt`, a one-paste setup prompt, and a dashboard home at `/app/home` (sign-in now lands there).
+Checked locally: tsc, eslint, `next build`, pages at 375 px and 1280 px. **Not checked:** the dashboard home with
+real account data (the local API had no secrets), and the Cursor / ChatGPT setup steps against the live server.
+**Payments are now Razorpay** (Atul's decision); nothing is wired, paid buttons lead to sign-up.
+docs/21 §6 lists plan features the site shows that the product does not enforce yet.
+The repo is now also checked out on Atul's Windows machine (LF line endings forced in the repo config; the kit's
+chmod test fails there because Windows has no Unix file modes).
+
 ## 3. Waiting on the user (ask before assuming)
 1. **Before a demo with many people on one Wi-Fi** (docs/19 §2), all dashboard-only, not verified by us:
    Supabase Auth → Rate Limits (per-IP sign-in/refresh limits up), custom SMTP (or everyone uses Google; the
@@ -42,7 +53,7 @@ Production env (`deno-api`) has: `NVIDIA_NIM_API_KEY`, `WEB_SEARCH_PROVIDER`, `T
 7. Housekeeping: delete merged branches on GitHub (`feat/studio*`, `feat/burst-ready`, `docs/*`, `infra/vercel`,
    `feat/mcp-connect`, `feat/exa-web-search`, `fix/exa-*`, `integrate/contributor-prs`); triage Dependabot PRs
    (#1, #3, #5, #6, #7, #9, #10, #15; #5/#6/#10 touch Docker and are obsolete; #9 bumps Stripe, which Dodo replaces).
-8. For billing later: Dodo Payments product IDs, API key, webhook secret.
+8. For billing: Razorpay key id, key secret, webhook secret and plan ids (Atul will send them).
 
 ## 4. Next steps (suggested order)
 1. **Openverse in the server's `search_media`** (MCP-only clients don't get it yet; the kit does). Small.
@@ -51,7 +62,7 @@ Production env (`deno-api`) has: `NVIDIA_NIM_API_KEY`, `WEB_SEARCH_PROVIDER`, `T
    verdict. Also the real fix for NIM throughput: the founder's AI pays for the thinking. Needs an `executor`
    column (additive migration) and a collection-only job on the existing queue (it must also use the run line).
 3. **Content via MCP**: create plan, `save_draft` through `deno_gates`, calendar on the dashboard.
-4. **Billing with Dodo Payments** (replace Stripe code in `apps/api/src/deno_api/v1/billing.py`) + Connect plan quotas.
+4. **Billing with Razorpay** (was Dodo; replace Stripe code in `apps/api/src/deno_api/v1/billing.py`) + Connect plan quotas.
 5. Reddit fallback (Arctic Shift times out; see §5).
 
 ## 5. Known issues and gotchas
