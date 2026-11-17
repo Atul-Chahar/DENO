@@ -34,8 +34,26 @@ allowed those two players); X and LinkedIn links open the original post.
 ## 3. How to publish a video (today)
 
 Add an entry to `web/lib/gallery/videos.ts` (the type documents every field) and open a PR. Submissions arrive
-as GitHub issues or emails from `/videos/submit`; a person checks each one. Only list a video with its maker's
-permission; remove it when they ask.
+as GitHub issues or emails from `/videos/submit`; a person checks each one.
+
+**Community entries** (decided by Atul, 2026-11-17): the gallery also lists public posts of AI-made videos, the
+way claudevideo.org and skillry.dev do. Rules:
+- `madeWithDeno: false` (shown as "Community"); credit the maker by their display name and profile; `url` is
+  their original post. Every community video page and the gallery heading say how to ask for removal (`/takedown`).
+  Remove an entry as soon as its maker asks.
+- `title` and `summary` are our own words, never the maker's post text.
+- `prompt` (shown in full with a copy button) only when the maker invited reuse: an open licence, or a post that
+  says "use this prompt". Otherwise set `promptUrl` to where they posted it; the page shows "Read the maker's
+  prompt ↗". The PROMPT tag on a card means either field is set.
+- `model` and `app` are what the maker's post says. `app` is optional; leave it out when the post names no tool.
+- Skip anything unsafe for a marketing site, anything using media the maker plainly does not own, anything
+  behind a login.
+
+**First batch (2026-11-17): 28 entries**, all from the claudevideo.org index (which links each video to its X
+post), taken from the index at Atul's instruction rather than re-opened one by one. Two posts (Deedy, JetBrains)
+were also opened on X and matched the index. 6 have a prompt link; 1 (AjustaCV) shows the prompt in full because
+the post is a tutorial telling readers to use it. Mix: 23 launch videos and product promos, 5 explainers;
+18 × 16:9, 7 × 9:16, 2 × 1:1, 1 × 4:3. None are on YouTube, so no entry plays on the page yet.
 
 ## 4. Not built
 
@@ -43,9 +61,11 @@ permission; remove it when they ask.
   additive migration (a public slug, a status and the prompt on `studio_items`), a public read endpoint and an
   approval step. Worth doing once there are enough submissions that PRs become a chore.
 - **Search, filters and sorting** on `/videos`. Not needed below a few dozen entries.
-- **Listing other people's public videos from X** the way the reference sites do. It is the fastest way to fill
-  the gallery, but it lists people's work without asking first. Atul's decision; the data model supports it
-  (`madeWithDeno: false`, shown as "Community").
+- **Thumbnails for X entries.** The CSP only allows YouTube thumbnails, so every X card is a colour block. Showing
+  real stills would mean allowing `pbs.twimg.com` (hotlinking X's media) or storing our own stills under
+  `/assets/` with the maker's permission. Not decided.
+- **YouTube or Vimeo entries.** None in the first batch; the reference indexes list X posts only.
+- **A regular refresh.** The batch is a one-time copy; new videos need another PR.
 - **A custom domain.** Search engines index whatever `NEXT_PUBLIC_SITE_URL` says; today that is the
   `vercel.app` address.
 - `/llms.txt` does not mention the gallery yet.

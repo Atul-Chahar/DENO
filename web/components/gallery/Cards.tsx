@@ -33,8 +33,8 @@ export function VideoCard({ video }: { video: GalleryVideo }) {
     <a href={videoHref(video.slug)} className="g-video">
       <div className="g-video__art" style={poster ? undefined : { background: FORMAT_TONE[video.ratio] ?? 'var(--paper-2)' }}>
         {poster ? <img src={poster} alt="" loading="lazy" /> : <span className="m-mono">{video.ratio}</span>}
-        <span className="g-video__time">{`0:${String(Math.round(video.seconds)).padStart(2, '0')}`}</span>
-        {video.prompt && <span className="g-video__tag">PROMPT</span>}
+        <span className="g-video__time">{`${Math.floor(Math.round(video.seconds) / 60)}:${String(Math.round(video.seconds) % 60).padStart(2, '0')}`}</span>
+        {(video.prompt || video.promptUrl) && <span className="g-video__tag">PROMPT</span>}
       </div>
       <h3>{video.title}</h3>
       <p>{video.summary}</p>
