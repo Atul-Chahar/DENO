@@ -62,8 +62,8 @@ async function lumaStats(png) {
 }
 
 // Runs in the page: every visible text run with its box, font size and family.
-// `caption` is true for captions and counting numbers (data-studio-counter): they change by design, so they are
-// not timed as reads.
+// `caption` is true for captions, counting numbers (data-studio-counter) and text still typing in
+// (data-studio-typing): they change by design, so they are not timed as reads.
 function textBoxes() {
   const W = window.innerWidth;
   const H = window.innerHeight;
@@ -90,7 +90,7 @@ function textBoxes() {
     let block = el;
     while (block.parentElement && getComputedStyle(block).display.startsWith('inline')) block = block.parentElement;
     if (!blocks.has(block)) blocks.set(block, blocks.size);
-    out.push({ text: text.slice(0, 120), x: b.left, y: b.top, w: b.width, h: b.height, size: parseFloat(cs.fontSize), family, fontOk: document.fonts.check(`16px "${family}"`), clipped, caption: Boolean(el.closest('[data-studio-caption], [data-studio-counter]')), block: blocks.get(block), id: el.dataset.clip || el.id || '' });
+    out.push({ text: text.slice(0, 120), x: b.left, y: b.top, w: b.width, h: b.height, size: parseFloat(cs.fontSize), family, fontOk: document.fonts.check(`16px "${family}"`), clipped, caption: Boolean(el.closest('[data-studio-caption], [data-studio-counter], [data-studio-typing]')), block: blocks.get(block), id: el.dataset.clip || el.id || '' });
   }
   return { W, H, boxes: out };
 }

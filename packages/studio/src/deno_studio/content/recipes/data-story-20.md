@@ -9,3 +9,5 @@ style: dark-keynote
 # 20 s data story
 Only real data (validation signals, the founder's metrics). Never rescale an axis to dramatize. Draw axes, reveal
 the line on a spring, pause on the turning point with a 3–5 word annotation, end on what it means.
+
+Runnable: `studio init <name> --recipe data-story-20` creates this film from blocks; edit `film.json` scenes.

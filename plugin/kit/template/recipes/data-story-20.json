@@ -1,0 +1,14 @@
+{
+  "recipe": "data-story-20",
+  "ratio": "1:1",
+  "style": "dark-keynote",
+  "scenes": [
+    { "id": "setup", "block": "hook", "start": 0, "end": 3, "theme": "dark", "label": "The question the chart answers, in a few words",
+      "props": { "kicker": "Our review queue", "lines": ["Then we", "changed", "*one thing*."] } },
+    { "id": "chart", "block": "chart", "start": 3, "end": 15, "theme": "dark", "label": "One chart, real data only: the axis starts at zero, the turn is annotated",
+      "props": { "title": "Hours to first review", "values": [30, 28, 31, 27, 9, 6, 5], "labels": ["W1", "W2", "W3", "W4", "W5", "W6", "W7"], "unit": "h", "mark": { "at": 4, "text": "Bot *switched on*" }, "source": "Your data, and where it comes from" } },
+    { "id": "meaning", "block": "stat", "start": 15, "end": 20, "theme": "dark", "label": "What it means: one real number",
+      "props": { "value": 5, "suffix": "×", "label": "faster reviews, in *three weeks*", "source": "Same data as the chart" } }
+  ],
+  "cues": [{ "t": 0.05, "kind": "thump" }, { "t": 3, "kind": "whoosh" }, { "t": 7.6, "kind": "tick" }, { "t": 15, "kind": "pop" }]
+}

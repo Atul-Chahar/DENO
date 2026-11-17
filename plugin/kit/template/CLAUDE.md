@@ -21,8 +21,10 @@ Read these before touching index.html. Full playbooks: `get_playbook(<topic>)` t
 - Cuts on downbeats (`studio beats`), hits on hits; hold the last read 0.8–1.2 s.
 
 ## Recipe films (index.html imports lib/blocks.js)
-- The film is data: `film.json` → `scenes: [{ id, block, start, end, props }]`. Blocks: `hook`, `screen`, `stat`,
-  `points`, `quote`, `endcard` (props are documented in `lib/blocks.js`). `*word*` in a text gets the accent.
+- The film is data: `film.json` → `scenes: [{ id, block, start, end, props }]`. Blocks: `hook`, `screen`, `compare`
+  (before/after wipe), `terminal` (commands type in), `chart` (a line chart that draws in; the axis starts at zero),
+  `stat`, `points`, `quote`, `endcard` (props are documented in `lib/blocks.js`). `*word*` in a text gets the
+  accent. `"theme": "dark"` on a scene gives it the ink background.
 - Change words, pictures and timing in `film.json`. `studio fill <scene id>` when a scene holds the founder's own
   content; a full render refuses while any scene still has the recipe's sample copy.
 - A shot no block can do: write `{ mount(box, props), paint(state, lt, dur, props) }` in index.html and pass it to

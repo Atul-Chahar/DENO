@@ -1,0 +1,20 @@
+{
+  "recipe": "changelog-30",
+  "ratio": "16:9",
+  "style": "living-ui",
+  "scenes": [
+    { "id": "version", "block": "hook", "start": 0, "end": 3, "label": "Version stamp: the release name and date",
+      "props": { "kicker": "What's new", "lines": ["Version *2.4*", "November 2026"] } },
+    { "id": "change-1", "block": "compare", "start": 3, "end": 9, "label": "Change 1: before and after on the real UI (name in 5 words or fewer)",
+      "props": { "before": "", "after": "", "caption": "Search is *instant* now.", "at": 0.35 } },
+    { "id": "change-2", "block": "compare", "start": 9, "end": 15, "label": "Change 2: before and after on the real UI",
+      "props": { "before": "", "after": "", "caption": "A *cleaner* inbox.", "at": 0.35 } },
+    { "id": "change-3", "block": "compare", "start": 15, "end": 21, "label": "Change 3: before and after on the real UI",
+      "props": { "before": "", "after": "", "caption": "Dark mode, *finally*.", "at": 0.35 } },
+    { "id": "more", "block": "points", "start": 21, "end": 26, "label": "Smaller changes from the release notes, one read each",
+      "props": { "title": "Also in 2.4", "items": ["Faster exports", "Keyboard shortcuts", "12 bugs fixed"] } },
+    { "id": "update", "block": "endcard", "start": 26, "end": 30, "label": "Update now, and where to read the full notes",
+      "props": { "name": "yourproduct 2.4", "tagline": "Update *now*.", "url": "yourproduct.com/changelog" } }
+  ],
+  "cues": [{ "t": 0.05, "kind": "thump" }, { "t": 3, "kind": "whoosh" }, { "t": 5.1, "kind": "swoosh-out" }, { "t": 9, "kind": "whoosh" }, { "t": 11.1, "kind": "swoosh-out" }, { "t": 15, "kind": "whoosh" }, { "t": 17.1, "kind": "swoosh-out" }, { "t": 21, "kind": "tick" }, { "t": 26, "kind": "chime" }]
+}

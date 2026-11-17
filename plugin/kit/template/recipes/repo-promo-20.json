@@ -1,0 +1,18 @@
+{
+  "recipe": "repo-promo-20",
+  "ratio": "16:9",
+  "style": "dark-keynote",
+  "scenes": [
+    { "id": "result", "block": "hook", "start": 0, "end": 3, "theme": "dark", "label": "Open on the result, in the README's own words",
+      "props": { "kicker": "you/yourproject", "lines": ["Code review", "in *one line*."] } },
+    { "id": "install", "block": "terminal", "start": 3, "end": 9.5, "theme": "dark", "label": "Install to first result, one take (real commands and real output)",
+      "props": { "title": "~/my-app", "lines": [{ "cmd": "npm install yourproject" }, { "out": "added 1 package in 2s" }, { "cmd": "npx yourproject init" }, { "out": "✓ Found 3 repos" }, { "out": "✓ First review posted" }] } },
+    { "id": "api", "block": "terminal", "start": 9.5, "end": 14.5, "theme": "dark", "label": "One code snippet that shows the API (copied from the README)",
+      "props": { "title": "review.ts", "caption": "The whole API is *one call*.", "lines": [{ "code": "import { review } from 'yourproject';" }, { "code": "" }, { "code": "const r = await review(pullRequest);" }, { "code": "console.log(r.summary);" }] } },
+    { "id": "why", "block": "points", "start": 14.5, "end": 17.5, "theme": "dark", "label": "What the README promises (stars only if current and real)",
+      "props": { "title": "From the README", "items": ["Zero config", "GitHub and GitLab", "MIT licensed"] } },
+    { "id": "repo", "block": "endcard", "start": 17.5, "end": 20, "theme": "dark", "label": "The repo URL",
+      "props": { "name": "yourproject", "url": "github.com/you/yourproject" } }
+  ],
+  "cues": [{ "t": 0.05, "kind": "thump" }, { "t": 3, "kind": "whoosh" }, { "t": 9.5, "kind": "click" }, { "t": 14.5, "kind": "tick" }, { "t": 17.5, "kind": "chime" }]
+}

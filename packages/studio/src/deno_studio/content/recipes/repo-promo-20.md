@@ -9,3 +9,5 @@ style: dark-keynote
 # 20 s GitHub repo promo
 Open on the result, then the install command typing in, then the first result, then one code snippet that shows
 the API, then the repo URL. Use the README's own words. Star counts only if current and real.
+
+Runnable: `studio init <name> --recipe repo-promo-20` creates this film from blocks; edit `film.json` scenes.
