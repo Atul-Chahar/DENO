@@ -48,17 +48,25 @@ const FREEZE = `(() => {
   window.__studioPerf = perf;
 })();`;
 
+/** Start the headless Chromium every look and render uses. */
+export async function launch({ gpu = true } = {}) {
+  await ensure('core');
+  const { chromium } = requireDep('playwright-core');
+  const executablePath = await chromiumPath();
+  const args = ['--force-color-profile=srgb', '--disable-lcd-text', '--font-render-hinting=none', '--hide-scrollbars', '--mute-audio'];
+  if (gpu && process.platform === 'linux') args.push('--use-angle=gl-egl', '--enable-gpu-rasterization');
+  if (gpu && process.platform === 'darwin') args.push('--use-angle=metal');
+  return chromium.launch({ executablePath, args });
+}
+
 export class Film {
-  static async open(dir, fmt, { scale = 1, gpu = true } = {}) {
-    await ensure('core');
-    const { chromium } = requireDep('playwright-core');
-    const executablePath = await chromiumPath();
-    const args = ['--force-color-profile=srgb', '--disable-lcd-text', '--font-render-hinting=none', '--hide-scrollbars', '--mute-audio'];
-    if (gpu && process.platform === 'linux') args.push('--use-angle=gl-egl', '--enable-gpu-rasterization');
-    if (gpu && process.platform === 'darwin') args.push('--use-angle=metal');
-    const browser = await chromium.launch({ executablePath, args });
+  /** `browser`: reuse one that is already running (it is left open on close), so one command can look at several formats. */
+  static async open(dir, fmt, { scale = 1, gpu = true, browser = null } = {}) {
+    const own = !browser;
+    const b = browser || (await launch({ gpu }));
     const site = await serve(dir);
-    const f = new Film(browser, site, fmt, scale);
+    const f = new Film(b, site, fmt, scale);
+    f.ownBrowser = own;
     return f;
   }
 
@@ -68,6 +76,7 @@ export class Film {
     this.fmt = fmt;
     this.scale = scale;
     this.errors = [];
+    this.ownBrowser = true;
   }
 
   async page() {
@@ -99,7 +108,7 @@ export class Film {
     }));
   }
 
-  async grab(page, t, type = 'png') {
+  async grab(page, t, type = 'png', quality = 92) {
     // Chromium keeps a moving element's raster from when it was first painted, so the same `t` can come out a
     // few sub-pixels different depending on which frames came before (seen on Windows). Dropping the layout
     // tree before each seek makes every frame paint as if it were the first. The page is shown again before
@@ -112,11 +121,21 @@ export class Film {
       root.style.display = was;
       return window.seek(x);
     }, t);
-    return page.screenshot({ type, quality: type === 'jpeg' ? 92 : undefined, clip: { x: 0, y: 0, width: this.fmt.w, height: this.fmt.h }, animations: 'disabled', caret: 'hide' });
+    return page.screenshot({ type, quality: type === 'jpeg' ? quality : undefined, clip: { x: 0, y: 0, width: this.fmt.w, height: this.fmt.h }, animations: 'disabled', caret: 'hide' });
+  }
+
+  /** Seek and report how long the film's own seek(t) took, in ms (wall clock, not the frozen one). */
+  async timedSeek(page, t) {
+    return page.evaluate(async (x) => {
+      const now = window.__studioPerf || (() => 0);
+      const a = now();
+      await window.seek(x);
+      return now() - a;
+    }, t);
   }
 
   async close() {
-    await this.browser.close().catch(() => undefined);
+    if (this.ownBrowser) await this.browser.close().catch(() => undefined);
     await this.site.close();
   }
 }

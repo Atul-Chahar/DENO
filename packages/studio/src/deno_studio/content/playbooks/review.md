@@ -6,25 +6,27 @@ core: true
 ---
 # The review loop (the habit of looking)
 
-1. **Deterministic checks:** `studio verify` (seek purity, console errors, blank or blown frames, text in unsafe
-   areas, reading time). Fix everything it reports first.
-2. **Contact sheet:** `studio sheet` (one frame per beat or per second) and `studio sheet --phone` (360 px wide:
-   is it readable on a phone?).
+1. **One check:** `studio check` runs `verify` (seek purity, console errors, blank or blown frames, text in
+   unsafe areas, reading time, seeks slower than 50 ms), draws one contact sheet of the current render with every
+   frame at phone width (360 px: is it readable on a phone?) and prints the colour numbers. One browser, one short
+   report, one image. Fix everything it blocks on first.
+2. **More frames when needed:** `studio sheet` (one frame per beat), `studio sheet --live --chapter <id>`.
 3. **Strips:** `studio strip --at 4.2` (12 frames around a fast action, contact or transition).
 4. **Crops:** `studio crop --at 7 --box x,y,w,h` for faces, hands and small text.
    **Numbers for the look:** `studio sheet --stats` prints exposure, blacks and whites, contrast, crushed and
    blown pixels, saturation and colour cast per frame. `--reference ref.jpg` adds the distance to a reference
    look (under 0.05 is close). Measure; don't judge colour from a thumbnail.
 5. Fix the three worst problems you saw and re-render only the affected seconds
-   (`studio render --from 6 --to 9`). **One pass.** Then the founder looks: a person's notes beat another round
+   (`studio render` redoes only the chunks whose scene or chapter changed; `--from 6 --to 9` forces seconds).
+   **One pass.** Then the founder looks: a person's notes beat another round
    of your own scoring, and cost far less time.
 6. **Before a final only, once:** a separate reviewer (the `reviewer` agent, or a fresh look) scores 1–10 against
    the treatment line: **hook** (first 2 s), **phone readability**, **motion quality**, **variety**,
    **composition**, **brand accuracy**, **sound sync**, and names the two weakest moments. Fix anything under 6.
    Do not repeat the scoring.
 7. Watch and listen to the whole encoded file before you call it done. Stills can't show stutter.
-8. **The done gate:** nothing is finished until `studio verify` is clean on the current code and you have read
-   `studio sheet` of the mixed file. `studio upload` refuses otherwise (playbook `build-loop`).
+8. **The done gate:** nothing is finished until `studio check` is clean on the current code and you have read
+   its sheet of the mixed file. `studio upload` refuses otherwise (playbook `build-loop`).
 
 ## The founder's notes
 `studio review` serves a review page from this machine: the film plays from the founder's disk, frame by frame,

@@ -3,9 +3,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Film } from './browser.mjs';
+import { Film, launch } from './browser.mjs';
 import { pendingItems, sourceHash } from './timeline.mjs';
-import { formats, info, loadFilm, num, outDir, run, tc, warn, writeJSON } from './util.mjs';
+import { formats, info, loadFilm, num, run, tc, warn, writeJSON } from './util.mjs';
 
 const SCAN = [
   [/\bsetTimeout\s*\(|\bsetInterval\s*\(/, 'timers: frames must be a pure function of t'],
@@ -95,139 +95,177 @@ function textBoxes() {
   return { W, H, boxes: out };
 }
 
+/** Text is sampled this often (per second) for safe area, size, overlap and reading time. 4/s is enough for a
+ * rule measured in tenths of a second of reading, and 2.5× cheaper than the 10/s it used to be. */
+export const TEXT_SAMPLES_PER_S = 4;
+/** A frame budget: a seek(t) slower than this makes every look and every render slow. */
+export const SLOW_SEEK_MS = 50;
+
+/** Every check for one format on an open film. `add(severity, rule, message, t)` collects findings.
+ * Returns the frames it grabbed (t → PNG) so `studio check` can reuse them, and the seek times. */
+export async function verifyFormat(studio, film, fmt, opts, add) {
+  const page = await studio.page();
+  const meta = await studio.meta(page);
+  const isStill = film.kind === 'still';
+  const duration = isStill ? meta.pages || film.pages || 1 : meta.duration || film.duration;
+  if (!duration) add('block', 'duration', 'window.DURATION (or window.PAGES for a still) is missing');
+  const fps = film.fps || 30;
+  const chapter = opts.chapter ? [...meta.chapters, ...(film.chapters || [])].find((c) => c.id === opts.chapter) : null;
+  if (opts.chapter && !chapter) throw new Error(`no chapter "${opts.chapter}" in window.CHAPTERS or film.json`);
+  const inRange = (t) => !chapter || (t >= chapter.start && t < chapter.end);
+  const times = isStill
+    ? Array.from({ length: duration }, (_, p) => p)
+    : [...new Set([0, ...Array.from({ length: 12 }, (_, i) => ((i + 0.5) * duration) / 12), ...meta.chapters.map((c) => c.start ?? 0), duration - 1 / fps].map((t) => Math.max(0, Math.round(t * fps) / fps)))].filter(inRange).sort((a, b) => a - b);
+
+  // 1. Purity: the same t gives the same picture in any order, on a fresh page.
+  const first = new Map();
+  for (const t of times) first.set(t, await studio.grab(page, t));
+  const page2 = await studio.page();
+  const mismatched = [];
+  for (const t of [...times].reverse()) {
+    const again = await studio.grab(page2, t);
+    if (hash(again) !== hash(first.get(t)) && (await psnr(first.get(t), again)) < 60) mismatched.push(t);
+  }
+  await page2.close();
+  // A raster glitch doesn't repeat; carried state does. Re-check each suspect alone on a third fresh page.
+  for (const t of [...mismatched]) {
+    const page3 = await studio.page();
+    const alone = await studio.grab(page3, t);
+    await page3.close();
+    if (hash(alone) === hash(first.get(t)) || (await psnr(first.get(t), alone)) >= 60) mismatched.splice(mismatched.indexOf(t), 1);
+  }
+  if (mismatched.length) add('block', 'purity', `frames differ when rendered out of order at ${mismatched.map((t) => tc(t, fps)).join(', ')}: something carries state between frames`, mismatched[0]);
+  const after = await studio.meta(page);
+  if (after.clockReads > 0) add('warn', 'clock', `the page read Date.now/performance.now/Math.random ${after.clockReads} time(s); they are frozen while rendering, so motion that depends on them won't move`);
+
+  // 2. Blank or blown frames.
+  for (const t of times) {
+    const s = await lumaStats(first.get(t)).catch(() => null);
+    if (!s) continue;
+    if (s.max - s.min < 6) add('warn', 'blank', `${isStill ? `page ${t + 1}` : tc(t, fps)} is a flat frame (one colour)`, t);
+    else if (s.avg > 248) add('warn', 'blown', `${isStill ? `page ${t + 1}` : tc(t, fps)} is almost white`, t);
+  }
+
+  // 3. Text: safe area, size, overlap, clipping, fonts; and how long each line stays readable.
+  //    Each seek is timed: a slow seek(t) makes every look and every render slow.
+  const vertical = fmt.h > fmt.w;
+  const minSize = fmt.h * (vertical ? 0.022 : 0.026);
+  const seen = new Map();
+  const fontWarned = new Set();
+  const step = isStill ? 1 : 1 / TEXT_SAMPLES_PER_S;
+  const sampleTs = isStill ? times : Array.from({ length: Math.floor(duration / step) + 1 }, (_, i) => Math.min(duration, i * step)).filter(inRange);
+  const flagged = new Set();
+  const seeks = [];
+  for (const t of sampleTs) {
+    seeks.push({ t, ms: await studio.timedSeek(page, t) });
+    const { W, H, boxes } = await page.evaluate(textBoxes);
+    for (const b of boxes) {
+      const where = isStill ? `page ${t + 1}` : tc(t, fps);
+      const key = (r) => `${r}:${b.text}`;
+      const once = (rule, sev, msg) => {
+        if (flagged.has(key(rule))) return;
+        flagged.add(key(rule));
+        add(sev, rule, `${where} “${b.text.slice(0, 50)}”: ${msg}`, t);
+      };
+      const top = vertical ? 0.1 : 0.05;
+      const bottom = vertical ? 0.85 : 0.95;
+      if (b.x < W * 0.05 || b.x + b.w > W * 0.95 || b.y < H * top || b.y + b.h > H * bottom) once('safe_area', 'warn', 'outside the safe area');
+      if (b.size < minSize) once('small_text', 'warn', `${Math.round(b.size)} px is hard to read on a phone (aim ≥ ${Math.round(minSize)} px)`);
+      if (b.clipped) once('clipped', 'block', 'text is cut off by its box');
+      if (!b.fontOk && !fontWarned.has(b.family)) {
+        fontWarned.add(b.family);
+        add('warn', 'font', `font “${b.family}” isn't loaded; the render falls back to another font. Put it in assets/fonts and @font-face it.`, t);
+      }
+      if (!isStill && !b.caption) {
+        const s = seen.get(b.text) || { spans: [], last: -1 };
+        if (s.last >= 0 && t - s.last <= step * 1.5) s.spans[s.spans.length - 1][1] = t;
+        else s.spans.push([t, t]);
+        s.last = t;
+        seen.set(b.text, s);
+      }
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const c = boxes[j];
+        if ((a.caption && c.caption) || a.block === c.block) continue;
+        const ix = Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x));
+        const iy = Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
+        if (ix * iy > 0.25 * Math.min(a.w * a.h, c.w * c.h) && a.text !== c.text) {
+          const k = `overlap:${a.text}|${c.text}`;
+          if (!flagged.has(k)) {
+            flagged.add(k);
+            add('warn', 'overlap', `${isStill ? `page ${t + 1}` : tc(t, fps)} “${a.text.slice(0, 30)}” overlaps “${c.text.slice(0, 30)}”`, t);
+          }
+        }
+      }
+    }
+  }
+  for (const [text, s] of seen) {
+    const words = text.split(/\s+/).length;
+    const need = Math.max(1, words * 0.3);
+    for (const [a, b] of s.spans) {
+      const held = b - a + step;
+      if (held + 1e-6 < need && b < duration - step) add(held < need * 0.6 ? 'block' : 'warn', 'reading_time', `${tc(a, fps)} “${text.slice(0, 50)}” is readable for ${held.toFixed(2)} s; ${words} words need ${need.toFixed(1)} s`, a);
+    }
+  }
+  // The first seek pays for decoding images and fonts once; the rest is what every frame costs.
+  const slow = seeks.slice(1).filter((s) => s.ms > SLOW_SEEK_MS);
+  if (slow.length) {
+    const worst = slow.reduce((m, s) => (s.ms > m.ms ? s : m));
+    add('warn', 'slow_seek', `seek(t) took over ${SLOW_SEEK_MS} ms at ${slow.length} of ${seeks.length - 1} sampled times (slowest ${Math.round(worst.ms)} ms at ${tc(worst.t, fps)}). Every look and render pays this per frame: cache layout and images in mount, only set styles in seek.`, worst.t);
+  }
+
+  // 4. Loop seam.
+  if (film.loop && !isStill) {
+    const a = hash(await studio.grab(page, 0));
+    const b = hash(await studio.grab(page, duration));
+    if (a !== b) add('warn', 'seam', 'the last frame is not the first frame: the loop will jump');
+  }
+  const missing = await page.evaluate(() => [...(window.__studioMatteMissing || [])]);
+  if (missing.length) add('warn', 'matte', `behind-subject text over ${missing.join(', ')} has no person matte, so it falls back: run \`studio matte <name>\``);
+  for (const e of studio.errors) add('block', 'page_error', e);
+  await page.close();
+  const ms = seeks.slice(1).map((s) => s.ms).sort((a, b) => a - b);
+  return { frames: first, duration, meta, seek: ms.length ? { median: ms[Math.floor(ms.length / 2)], max: ms[ms.length - 1], n: ms.length } : null };
+}
+
+/** Write out/verify.json (what `upload` and `timeline` read) and return the blocking findings. */
+export function saveVerify(dir, opts, fmts, findings) {
+  writeJSON(path.join(dir, 'out', 'verify.json'), { at: new Date().toISOString(), source: sourceHash(dir), chapter: opts.chapter || null, formats: fmts.map((f) => f.ratio), findings });
+  return findings.filter((f) => f.severity === 'block');
+}
+
+/** Pending placeholders and the source scan: the checks that need no browser. */
+export function staticFindings(dir, film) {
+  const findings = scanSources(dir);
+  for (const p of pendingItems(film)) {
+    const what = p.type === 'scene' ? `still shows the recipe's sample copy: put the founder's own words and pictures in film.json, then \`studio fill ${p.id}\`` : `is still a placeholder: build it, then \`studio fill ${p.id}\``;
+    findings.push({ severity: 'block', rule: 'pending', message: `${p.type} "${p.label || p.id}" (${p.start}–${p.end} s) ${what}`, t: p.start });
+  }
+  return findings;
+}
+
 export async function verify(dir, opts) {
   const film = loadFilm(dir);
   const fmts = formats(film, opts.formats);
-  const findings = scanSources(dir);
+  const findings = staticFindings(dir, film);
   const add = (severity, rule, message, t = null, extra = {}) => findings.push({ severity, rule, message, t, ...extra });
-  for (const p of pendingItems(film)) {
-    const what = p.type === 'scene' ? `still shows the recipe's sample copy: put the founder's own words and pictures in film.json, then \`studio fill ${p.id}\`` : `is still a placeholder: build it, then \`studio fill ${p.id}\``;
-    add('block', 'pending', `${p.type} "${p.label || p.id}" (${p.start}–${p.end} s) ${what}`, p.start);
-  }
-  for (const fmt of fmts) {
-    const studio = await Film.open(dir, fmt);
-    try {
-      const page = await studio.page();
-      const meta = await studio.meta(page);
-      const isStill = film.kind === 'still';
-      const duration = isStill ? meta.pages || film.pages || 1 : meta.duration || film.duration;
-      if (!duration) add('block', 'duration', 'window.DURATION (or window.PAGES for a still) is missing');
-      const fps = film.fps || 30;
-      const chapter = opts.chapter ? [...meta.chapters, ...(film.chapters || [])].find((c) => c.id === opts.chapter) : null;
-      if (opts.chapter && !chapter) throw new Error(`no chapter "${opts.chapter}" in window.CHAPTERS or film.json`);
-      const inRange = (t) => !chapter || (t >= chapter.start && t < chapter.end);
-      const times = isStill
-        ? Array.from({ length: duration }, (_, p) => p)
-        : [...new Set([0, ...Array.from({ length: 12 }, (_, i) => ((i + 0.5) * duration) / 12), ...meta.chapters.map((c) => c.start ?? 0), duration - 1 / fps].map((t) => Math.max(0, Math.round(t * fps) / fps)))].filter(inRange).sort((a, b) => a - b);
-
-      // 1. Purity: the same t gives the same picture in any order, on a fresh page.
-      const first = new Map();
-      for (const t of times) first.set(t, await studio.grab(page, t));
-      const page2 = await studio.page();
-      const mismatched = [];
-      for (const t of [...times].reverse()) {
-        const again = await studio.grab(page2, t);
-        if (hash(again) !== hash(first.get(t)) && (await psnr(first.get(t), again)) < 60) mismatched.push(t);
+  const browser = await launch();
+  try {
+    for (const fmt of fmts) {
+      const studio = await Film.open(dir, fmt, { browser });
+      try {
+        await verifyFormat(studio, film, fmt, opts, add);
+      } finally {
+        await studio.close();
       }
-      await page2.close();
-      // A raster glitch doesn't repeat; carried state does. Re-check each suspect alone on a third fresh page.
-      for (const t of [...mismatched]) {
-        const page3 = await studio.page();
-        const alone = await studio.grab(page3, t);
-        await page3.close();
-        if (hash(alone) === hash(first.get(t)) || (await psnr(first.get(t), alone)) >= 60) mismatched.splice(mismatched.indexOf(t), 1);
-      }
-      if (mismatched.length) add('block', 'purity', `frames differ when rendered out of order at ${mismatched.map((t) => tc(t, fps)).join(', ')}: something carries state between frames`, mismatched[0]);
-      const after = await studio.meta(page);
-      if (after.clockReads > 0) add('warn', 'clock', `the page read Date.now/performance.now/Math.random ${after.clockReads} time(s); they are frozen while rendering, so motion that depends on them won't move`);
-
-      // 2. Blank or blown frames.
-      for (const t of times) {
-        const s = await lumaStats(first.get(t)).catch(() => null);
-        if (!s) continue;
-        if (s.max - s.min < 6) add('warn', 'blank', `${isStill ? `page ${t + 1}` : tc(t, fps)} is a flat frame (one colour)`, t);
-        else if (s.avg > 248) add('warn', 'blown', `${isStill ? `page ${t + 1}` : tc(t, fps)} is almost white`, t);
-      }
-
-      // 3. Text: safe area, size, overlap, clipping, fonts; and how long each line stays readable.
-      const vertical = fmt.h > fmt.w;
-      const minSize = fmt.h * (vertical ? 0.022 : 0.026);
-      const seen = new Map();
-      const fontWarned = new Set();
-      const step = isStill ? 1 : 1 / 10;
-      const sampleTs = isStill ? times : Array.from({ length: Math.floor(duration / step) + 1 }, (_, i) => Math.min(duration, i * step)).filter(inRange);
-      const flagged = new Set();
-      for (const t of sampleTs) {
-        await page.evaluate((x) => window.seek(x), t);
-        const { W, H, boxes } = await page.evaluate(textBoxes);
-        for (const b of boxes) {
-          const where = isStill ? `page ${t + 1}` : tc(t, fps);
-          const key = (r) => `${r}:${b.text}`;
-          const once = (rule, sev, msg) => {
-            if (flagged.has(key(rule))) return;
-            flagged.add(key(rule));
-            add(sev, rule, `${where} “${b.text.slice(0, 50)}”: ${msg}`, t);
-          };
-          const top = vertical ? 0.1 : 0.05;
-          const bottom = vertical ? 0.85 : 0.95;
-          if (b.x < W * 0.05 || b.x + b.w > W * 0.95 || b.y < H * top || b.y + b.h > H * bottom) once('safe_area', 'warn', 'outside the safe area');
-          if (b.size < minSize) once('small_text', 'warn', `${Math.round(b.size)} px is hard to read on a phone (aim ≥ ${Math.round(minSize)} px)`);
-          if (b.clipped) once('clipped', 'block', 'text is cut off by its box');
-          if (!b.fontOk && !fontWarned.has(b.family)) {
-            fontWarned.add(b.family);
-            add('warn', 'font', `font “${b.family}” isn't loaded; the render falls back to another font. Put it in assets/fonts and @font-face it.`, t);
-          }
-          if (!isStill && !b.caption) {
-            const s = seen.get(b.text) || { spans: [], last: -1 };
-            if (s.last >= 0 && t - s.last <= step * 1.5) s.spans[s.spans.length - 1][1] = t;
-            else s.spans.push([t, t]);
-            s.last = t;
-            seen.set(b.text, s);
-          }
-        }
-        for (let i = 0; i < boxes.length; i++) {
-          for (let j = i + 1; j < boxes.length; j++) {
-            const a = boxes[i];
-            const c = boxes[j];
-            if ((a.caption && c.caption) || a.block === c.block) continue;
-            const ix = Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x));
-            const iy = Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
-            if (ix * iy > 0.25 * Math.min(a.w * a.h, c.w * c.h) && a.text !== c.text) {
-              const k = `overlap:${a.text}|${c.text}`;
-              if (!flagged.has(k)) {
-                flagged.add(k);
-                add('warn', 'overlap', `${isStill ? `page ${t + 1}` : tc(t, fps)} “${a.text.slice(0, 30)}” overlaps “${c.text.slice(0, 30)}”`, t);
-              }
-            }
-          }
-        }
-      }
-      for (const [text, s] of seen) {
-        const words = text.split(/\s+/).length;
-        const need = Math.max(1, words * 0.3);
-        for (const [a, b] of s.spans) {
-          const held = b - a + step;
-          if (held + 1e-6 < need && b < duration - step) add(held < need * 0.6 ? 'block' : 'warn', 'reading_time', `${tc(a, fps)} “${text.slice(0, 50)}” is readable for ${held.toFixed(1)} s; ${words} words need ${need.toFixed(1)} s`, a);
-        }
-      }
-
-      // 4. Loop seam.
-      if (film.loop && !isStill) {
-        const a = hash(await studio.grab(page, 0));
-        const b = hash(await studio.grab(page, duration));
-        if (a !== b) add('warn', 'seam', 'the last frame is not the first frame: the loop will jump');
-      }
-      const missing = await page.evaluate(() => [...(window.__studioMatteMissing || [])]);
-      if (missing.length) add('warn', 'matte', `behind-subject text over ${missing.join(', ')} has no person matte, so it falls back: run \`studio matte <name>\``);
-      for (const e of studio.errors) add('block', 'page_error', e);
-      await page.close();
-    } finally {
-      await studio.close();
     }
+  } finally {
+    await browser.close().catch(() => undefined);
   }
-  const blocking = findings.filter((f) => f.severity === 'block');
-  writeJSON(path.join(dir, 'out', 'verify.json'), { at: new Date().toISOString(), source: sourceHash(dir), chapter: opts.chapter || null, formats: fmts.map((f) => f.ratio), findings });
-  if (!findings.length) info('verify: clean. Now look: `studio sheet`.');
+  const blocking = saveVerify(dir, opts, fmts, findings);
+  if (!findings.length) info('verify: clean. Now look: `studio check` (or `studio sheet`).');
   for (const f of findings) (f.severity === 'block' ? warn : info)(`${f.severity === 'block' ? 'BLOCK' : 'warn '} ${f.rule.padEnd(12)} ${f.where ? `${f.where} ` : ''}${f.message}`);
   info(`verify: ${blocking.length} blocking, ${findings.length - blocking.length} warning(s) → out/verify.json`);
   if (blocking.length && !opts['no-fail']) process.exitCode = 1;

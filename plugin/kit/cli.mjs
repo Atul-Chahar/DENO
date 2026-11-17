@@ -3,6 +3,7 @@
 import { login, logout, setConfig, config, apiUrl } from './lib/api.mjs';
 import { beats } from './lib/beats.mjs';
 import { captions } from './lib/captions.mjs';
+import { check } from './lib/check.mjs';
 import { capture, crop, frames, sheet, still, strip } from './lib/look.mjs';
 import { loudness, silence, transcript } from './lib/listen.mjs';
 import { matte } from './lib/matte.mjs';
@@ -23,10 +24,13 @@ Setup      doctor [--install [--voice] [--captions] [--matte]] · login · logou
 Project    init <folder> [--recipe saas-launch-32|vertical-feature-15] [--idea id] [--ratio 9:16,16:9] [--duration 20] [--style name] [--still --pages 8]
            (--recipe: a film that already renders, made of blocks; you change words, screens and timing in film.json)
            preview · verify [--formats 9:16] [--chapter id] · timeline
+Check      check [--formats 9:16] [--chapter id] [--all] [--live]   (verify + one contact sheet at phone width + colour
+           numbers, one browser, one short report, one image: the look after every draft render)
 Shape      place <id> --start 2 --end 4.5 [--label "what it shows"] [--kind graphic] [--as-chapter] · fill <id>
 Look       sheet [--phone] [--live] [--at 1,4.5,9 | --range 10,14 --every 0.5] [--stats] [--reference ref.jpg] [--audio]
            strip --at 4.2 [--n 12] · crop --at 7 --box x,y,w,h
-Render     render [--draft] [--formats 9:16,16:9] [--from 6 --to 9] [--sub 3] · still [--pdf]
+Render     render [--draft] [--formats 9:16,16:9] [--from 6 --to 9] [--all] [--sub 3] · still [--pdf]
+           (only the 2-second chunks whose scene or chapter changed are rendered again; --draft: half size, 15 fps)
 Media      search <video|image|sfx|music|icon|youtube> <query> [--source deno|openverse] · fetch <id> [--as whoosh] · download "<link>"|"ytsearch3:<q>" [--license own]
            frames <video> [--name n] · matte <name> · capture <url> · openverse register <email> (optional)
 Listen     transcribe <media> [--format words|text|srt|json] · silence <media> · loudness <media>
@@ -70,6 +74,7 @@ const commands = {
   reply: () => reply(projectDir(), args),
   preview: () => preview(projectDir(), args),
   verify: () => verify(projectDir(), args),
+  check: () => check(projectDir(), args),
   timeline: () => timeline(projectDir()),
   place: () => place(projectDir(), args),
   fill: () => fill(projectDir(), args),

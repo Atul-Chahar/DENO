@@ -368,7 +368,7 @@ export const DOCS: DocPage[] = [
         ['Setup', 'doctor, login, logout, config set, ideas', 'Check the machine, sign in, list your Deno ideas.'],
         ['Project', 'init, preview, verify, timeline', 'Start a film folder, preview it, check it against the rules.'],
         ['Shape', 'place, fill', 'Block out the timeline with placeholders, then fill each one.'],
-        ['Look', 'sheet, strip, crop', 'Contact sheets and frame strips so the AI can see its own work.'],
+        ['Look', 'check, sheet, strip, crop', 'One check (rules, a contact sheet at phone size and colour numbers) after each draft, plus frame strips, so the AI can see its own work.'],
         ['Render', 'render, still', 'Render video (draft or final, one or many ratios) or still pages.'],
         ['Media', 'search, fetch, download, frames, matte, capture', 'Find and bring in licensed media; record a web page.'],
         ['Listen', 'transcribe, silence, loudness', 'Read what is in an audio or video file.'],

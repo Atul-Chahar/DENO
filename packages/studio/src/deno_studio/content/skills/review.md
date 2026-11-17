@@ -4,15 +4,15 @@ description: Review a studio render the way a motion designer would: determinist
 ---
 # Review a render
 1. `get_playbook("review")`.
-2. `studio verify` and fix everything it reports (pending placeholders included).
-3. `studio sheet` and `studio sheet --phone`; read both images. `studio strip --at <t>` around fast moments.
-   `studio sheet --stats` for exposure and colour (crushed or blown pixels, casts); with footage or a look to match,
-   `--reference <image>`.
-4. Fix the three worst things you saw; `studio render --from a --to b` re-renders just those seconds. One pass,
+2. `studio check`: verify (fix everything it blocks on, pending placeholders included), one contact sheet at
+   phone width from the current render, and the colour numbers (exposure, crushed or blown pixels, casts). Read
+   its one image. `studio strip --at <t>` around the fastest moment only; with footage or a look to match,
+   `studio sheet --stats --reference <image>`.
+3. Fix the three worst things you saw; `studio render --draft` redoes only the chunks you changed. One pass,
    then show the founder: their notes are the second opinion. Before a **final** only, you may ask the
    `reviewer` agent once for scores (hook, phone readability, motion, variety, composition, brand, sound) and fix
    anything under 6. Never loop on your own scores.
-5. Founder notes: `studio review` (start it in the background and leave it running): a review page on this machine. The film
+4. Founder notes: `studio review` (start it in the background and leave it running): a review page on this machine. The film
   plays from the founder's own disk, every frame, and is never uploaded. Give the founder the link; if you have
   a built-in browser or preview, open it there for them.
    `studio notes --wait` returns when they press "I'm done reviewing" and prints each open note with its time,
@@ -20,6 +20,6 @@ description: Review a studio render the way a motion designer would: determinist
    then `studio reply <id> fixed "<one line>"` or `studio reply <id> open "<why not>"`. Write replies for the
    founder: what changed on screen, not what you ran. Re-render the seconds you touched and `studio review --next`
    for the next round. (Notes left on the Deno dashboard instead: `get_review_notes`, `reply_note`.)
-6. The done gate: never say a final is finished until verify is clean on the current code and you've read the
-   sheet of the mixed file. `studio upload` refuses otherwise. Drafts are reviewed locally and need no upload; to
+5. The done gate: never say a final is finished until `studio check` is clean on the current code and you've
+   read its sheet of the mixed file. `studio upload` refuses otherwise. Drafts are reviewed locally and need no upload; to
    save one to the dashboard anyway, `studio upload --draft` (clean verify + a sheet of the draft render).

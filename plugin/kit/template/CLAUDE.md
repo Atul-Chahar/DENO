@@ -7,7 +7,7 @@ Read these before touching index.html. Full playbooks: `get_playbook(<topic>)` t
 - No `Math.random`, `Date.now`, `performance.now`, `setTimeout`, `setInterval`, `requestAnimationFrame`, CSS
   transitions or animations, `<video>`, `<audio>`, `<iframe>`. Use `lib/motion.js` (`spring`, `track`, `rand`, `boil`).
 - Fonts and images local in `assets/`. Footage: `studio frames` + `lib/footage.js`. Sound: `window.CUES` + `studio mix`.
-- `studio verify` must be clean before anyone looks at a render.
+- `studio check` (it runs verify) must be clean before anyone looks at a render.
 
 ## Look
 - Colours, fonts: `brand.css` (from the founder's Deno brand kit). One accent, owned by one thing per shot.
@@ -41,16 +41,17 @@ Warm, brief, plain; about the story, never the machinery (no commands, paths, id
 two sentences after each change.
 
 ## Draft first, final last
-1. First cut and every fix round: `studio verify` → fix all, `studio render --draft`, `studio sheet` and
-   `studio sheet --phone` → read them, fix the 3 worst things once. Don't score yourself in a loop; the founder's
+1. First cut and every fix round: `studio render --draft` (only changed scenes and chapters are rendered again),
+   then `studio check` (verify + one sheet at phone width + colour numbers) → fix what blocks, read its one image,
+   fix the 3 worst things once. Don't score yourself in a loop; the founder's
    notes are the second opinion.
 2. Review round: `studio review` (in the background; the film plays from this disk, never uploaded) → give the
    founder the link → `studio notes --wait` → fix one note at a time → `studio reply <id> fixed "what changed"`
-   → re-render those seconds → `studio review --next`. Until a round has no notes.
-3. After the founder approves: `studio render`, `studio mix`, `studio verify`, `studio sheet` (read it),
-   `studio upload --final`. Re-render only changed seconds (`studio render --from a --to b`).
+   → `studio render --draft` → `studio review --next`. Until a round has no notes.
+3. After the founder approves: `studio render`, `studio mix`, `studio check` (read its image),
+   `studio upload --final`.
 
-Never call a final finished until `studio verify` is clean on the current code and you have read the sheet of
+Never call a final finished until `studio check` is clean on the current code and you have read its sheet of
 the mixed file; `studio upload` refuses otherwise.
 
 Keep `film.json` current: chapters, clips (with reads and on-screen text), captions, cues, assets.

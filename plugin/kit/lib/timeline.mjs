@@ -54,7 +54,7 @@ export function fill(dir, opts) {
   if (typeof opts.label === 'string') item.label = opts.label;
   saveFilm(dir, film);
   const left = pendingItems(film).length;
-  info(`filled "${item.label || id}". ${left ? `${left} placeholder(s) left.` : 'No placeholders left: `studio verify`, then `studio sheet`.'}`);
+  info(`filled "${item.label || id}". ${left ? `${left} placeholder(s) left.` : 'No placeholders left: `studio render --draft`, then `studio check`.'}`);
 }
 
 /** A compact read-back of the film: the shape, what is still pending, and what the last checks said. */
@@ -108,6 +108,48 @@ export function sourceHash(dir) {
   return h.digest('hex');
 }
 
+/** A fingerprint per render chunk, so a render only redoes the chunks whose picture can have changed.
+ * Each chunk hashes what is shared by the whole film (page code, styles, lib/, assets, film.json without its scenes
+ * and chapters) plus only the recipe scenes and chapters (film.json entries and `chapters/<id>.*` files) that
+ * overlap its seconds. `chunks` is [{ a, b }] in seconds; `chapters` adds window.CHAPTERS from the page. */
+export function chunkKeys(dir, film, chunks, { settings = '', chapters = [], margin = 0 } = {}) {
+  const shared = crypto.createHash('sha1').update(settings);
+  const chapterFiles = new Map();
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (['out', 'review', 'node_modules', '.git'].includes(e.name)) continue;
+      const p = path.join(d, e.name);
+      const rel = path.relative(dir, p).split(path.sep).join('/');
+      if (e.isDirectory()) walk(p);
+      else if (rel === 'film.json' || /\.md$/.test(e.name) || e.name === 'CREDITS.json') continue;
+      else if (rel.startsWith('assets/')) {
+        const st = fs.statSync(p); // assets are big: size + time is enough to notice a replaced file
+        shared.update(`${rel}\0${st.size}\0${st.mtimeMs}\0`);
+      } else if (rel.startsWith('chapters/')) {
+        const id = e.name.replace(/\.[^.]+$/, '');
+        chapterFiles.set(id, crypto.createHash('sha1').update(chapterFiles.get(id) || '').update(rel).update(fs.readFileSync(p)).digest('hex'));
+      } else if (/\.(html|js|mjs|css|json)$/.test(e.name)) shared.update(rel).update('\0').update(fs.readFileSync(p)).update('\0');
+    }
+  };
+  walk(dir);
+  const rest = { ...film };
+  for (const k of ['deno', 'stage', 'scenes', 'chapters']) delete rest[k];
+  shared.update(JSON.stringify(rest));
+  const sharedHex = shared.digest('hex');
+  const parts = [
+    ...(film.scenes || []).map((s) => ({ start: s.start, end: s.end, key: `scene:${JSON.stringify(s)}` })),
+    ...[...(film.chapters || []), ...chapters].map((c) => ({ start: c.start ?? 0, end: c.end ?? Infinity, key: `chapter:${JSON.stringify(c)}:${chapterFiles.get(c.id) || ''}` })),
+  ];
+  // Chapter files with no time range on record could draw anywhere: they count for every chunk.
+  const timed = new Set([...(film.chapters || []), ...chapters].map((c) => c.id));
+  const loose = [...chapterFiles].filter(([id]) => !timed.has(id)).map(([id, h]) => `${id}:${h}`).join('|');
+  return chunks.map(({ a, b }) => {
+    const h = crypto.createHash('sha1').update(sharedHex).update(`${a}:${b}\0${loose}\0`);
+    for (const p of parts) if (p.start < b + margin && p.end > a - margin) h.update(p.key).update('\0');
+    return h.digest('hex');
+  });
+}
+
 export function verifyState(dir) {
   const file = path.join(dir, 'out', 'verify.json');
   if (!fs.existsSync(file)) return { ran: false };
@@ -124,7 +166,7 @@ export function readiness(dir, film, out, { draft = false } = {}) {
   const pending = pendingItems(film);
   if (pending.length) why.push(`${pending.length} placeholder(s) still pending (${pending.map((p) => p.id).join(', ')})`);
   const v = verifyState(dir);
-  if (!v.ran) why.push('`studio verify` has not run');
+  if (!v.ran) why.push('`studio check` (or `studio verify`) has not run');
   else if (!v.fresh) why.push('the code changed since the last `studio verify`');
   else if (v.blocking) why.push(`\`studio verify\` has ${v.blocking} blocking finding(s)`);
   const sheetFile = path.join(out, 'sheet.json');
@@ -136,12 +178,12 @@ export function readiness(dir, film, out, { draft = false } = {}) {
   } else if (draft) {
     const shown = sheet?.from === 'encoded' && sheet.encoded ? path.join(out, sheet.encoded) : null;
     if (!shown || !fs.existsSync(shown) || sheet.encodedMtimeMs !== fs.statSync(shown).mtimeMs) {
-      why.push('no `studio sheet` of the current draft (`studio render --draft`, then `studio sheet`)');
+      why.push('no sheet of the current draft (`studio render --draft`, then `studio check`)');
     }
   } else {
     const master = path.join(out, 'master.mp4');
     if (!sheet || sheet.from !== 'encoded' || !fs.existsSync(master) || sheet.encodedMtimeMs !== fs.statSync(master).mtimeMs || sheet.encoded !== 'master.mp4') {
-      why.push('no `studio sheet` of the final mixed file (render, mix, then sheet)');
+      why.push('no sheet of the final mixed file (`studio render`, `studio mix`, then `studio check`)');
     }
   }
   return why;

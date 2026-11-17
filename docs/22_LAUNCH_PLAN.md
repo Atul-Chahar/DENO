@@ -3,7 +3,7 @@
 Written 2026-11-16 from a read of the code and docs. Goal: first paying founders within 10 days, with no new
 spend (no subscriptions, hardware, paid APIs or servers). Payments are out of scope here except §6.
 
-**Day 1 is built (§8, branch `feat/studio-fast-loop`); the rest is not.** Times marked "estimate" were worked
+**Built so far: day 1 (§8), the local review page (§9), runnable recipes (§10), kit speed S2/S5/S6 (§11).** Times marked "estimate" were worked
 out from the code, not measured. §8 has the first measured numbers.
 
 ---
@@ -15,7 +15,7 @@ out from the code, not measured. §8 has the first measured numbers.
 | docs/17 §3 | Supabase Auth rate limits + SMTP + Google consent "In production"; re-measure a validation (< 5 min rule); separate production Supabase project; shut down GCP; LinkedIn policy; Dependabot PRs #1 #3 #5 #6 #7 #9 #10 #15 still open |
 | docs/17 §4 | Openverse in the server's `search_media`; BYO-AI validation (docs/16 phase 2); content calendar via MCP; Razorpay; Reddit fallback (Reddit returns 0 posts today) |
 | docs/18 §12 | MCP App review inside claude.ai; `LICENSE` file (needed for Anthropic's plugin directory); first real `studio login` against live Supabase |
-| docs/18 §16.3 | All 13 gap items, none built. #1 (motion-blur shutter lags the frame) is a real bug in `plugin/kit/lib/render.mjs:75` |
+| docs/18 §16.3 | 12 of 13 gap items not built. #1 (motion-blur shutter) is fixed (§11) |
 | docs/21 §6 | The pricing page promises things the product does not enforce: paid plan limits, "1 Studio project, 3 versions" on Free, the Deno mark on Free videos, all Agency features, Cursor/ChatGPT setup steps untested |
 | Stale text | docs/16 §5–6 and docs/18 §7, §9 still say Dodo Payments; docs/17 §2 calls #38 a branch (it is merged) |
 
@@ -254,3 +254,44 @@ render of all 32 s: 86 s. `vertical-feature-15` (15 s): full render 46 s.
 **Not done:** the other 12 recipes; captions and voice inside a recipe film; transitions between scenes (they
 cut); a real founder's film made this way end to end (so no measured "time to first cut" with an AI in the loop
 yet); `studio check` (S2), the warm browser (S3) and the render work (S5).
+
+---
+
+## 11. Kit speed: `studio check`, faster drafts, the shutter fix (2026-11-17, branch `claude/launch-plan-rest-e0999a`)
+
+| # | What changed | Where |
+|---|---|---|
+| S2 | **`studio check`**: verify + one contact sheet with every frame at phone width (360 px) + the colour numbers, in one Chromium, one short text report and one image (`out/<format>/contact.png`). The sheet comes from the current render when there is one (one ffmpeg decode pass for all frames), otherwise from the frames verify already grabbed. It writes `verify.json` and `sheet.json` exactly as `verify` and `sheet` do, so `upload --draft` and `upload --final` accept it. Skills `video` and `review`, playbooks `build-loop`, `review`, `multi-agent`, the `reviewer` agent and the template `CLAUDE.md` now say `studio check` instead of verify + sheet + sheet --phone + sheet --stats. | `lib/check.mjs` (new), `lib/verify.mjs` (split into `verifyFormat`), `lib/look.mjs` (`tile` can reuse an open browser) |
+| S5 | **Draft render**: 15 fps, JPEG frames, faster x264 preset. **Only changed chunks are rendered again**: each 2-second chunk has a fingerprint of the shared code (page, styles, `lib/`, assets, `film.json` without scenes/chapters) plus only the `film.json` scenes and chapters (and `chapters/<id>.*` files) that overlap it (`chunkKeys` in `lib/timeline.mjs`, saved in `chunks/chunks.json`). `--from/--to` still forces seconds; `--all` forces everything. `render.json` records which code a render shows, so `check` knows a current render from an old one. | `lib/render.mjs`, `lib/timeline.mjs` |
+| S5 | **Motion-blur shutter fixed** (docs/18 §16.3 #1): sub-frames are centred on the frame time over a 0.5 shutter (180°) and averaged in linear light (16-bit, 2.2 gamma). Before, they trailed the frame by (n−1)/n of a frame and were averaged in gamma space (white over black came out 128 instead of 186). | `lib/render.mjs` (`subFrameTimes`) |
+| S5 | **Slow-seek warning**: every text-scan seek is timed; `verify`/`check` warn when `seek(t)` takes over 50 ms (the first seek, which decodes images, is not counted), and `check` prints the median and slowest seek. | `lib/verify.mjs`, `lib/browser.mjs` (`timedSeek`) |
+| S6 | Text scan at **4 samples per second** (was 10). | `lib/verify.mjs` |
+| S3 | **Not built, by the rule in the brief**: after S2 and S5, Chromium starts in 0.53 s and the page loads in 0.29 s, out of ~11 s for `check`. Browser start-up is not the largest cost. | — |
+
+**Measured on this machine (Windows 11, 8 cores, 6 render workers), `saas-launch-32` with one real screenshot in its
+three screen scenes. A fix round = change one scene's caption (`screen-2`, 9–15 s), draft-render, check.**
+
+| Fix round | Before (main, 2 runs) | After (this branch, final code, 2 runs) |
+|---|---|---|
+| `render --draft` | 44.0 s / 42.1 s (all 16 chunks, 30 fps, PNG) | 5.1 s / 5.8 s (4 of 16 chunks, 15 fps, JPEG) |
+| `verify` | 15.4 s / 14.5 s | — |
+| `sheet --stats` | 17.1 s / 38.3 s | — |
+| `sheet --phone` | 8.4 s / 10.4 s | — |
+| `check` | — | 10.5 s / 11.5 s |
+| **Total** | **84.9 s / 105.3 s** (4 commands, 2 images + a stats table) | **15.6 s / 17.3 s** (2 commands, 1 image) |
+
+An earlier version of `check` (one ffmpeg call per frame) took 14.0–15.7 s (fix round 19.8–21.5 s); one decode pass
+saved ~4 s. Where `check`'s time goes now: verify's checks on the page 6.7 s (purity on 3 pages, 129 text-scan
+seeks), the sheet ~3 s, Node + Chromium start ~1 s.
+
+Other numbers from the same session:
+- Draft render of all 32 s from nothing: **12 s** (was 42–44 s).
+- `vertical-feature-15` (9:16): draft render of all 8 chunks 8 s; `check` read the sheet from `draft.mp4`.
+- Full-quality render (30 fps, 2 sub-frames, now linear-light): 94 s. §10 measured 86 s for the old shutter on
+  another run; not compared back to back, so the cost of the linear-light average is somewhere between 0 and ~9%.
+- A film whose `seek(t)` busy-loops: `check` warned `slow_seek` (median 54 ms, slowest 62 ms).
+- Kit tests: 26 pass (new: shutter timing, chunk fingerprints); the known Windows chmod test fails as before.
+
+**Not done:** the AI-in-the-loop "time to first cut" (still needs a real founder's film); GPU flags on Windows; text
+scan once per layout family rather than per format (only the 4/s part of S6). On the local review page a 15 fps
+draft shows each picture for two frame steps (frames are counted at the film's 30 fps; note times stay exact).

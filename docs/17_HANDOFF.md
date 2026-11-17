@@ -1,6 +1,6 @@
 # 17 — Handoff: where we are and what's next
 
-Last updated **2026-11-16** (website redesign, docs/21). Read this first in a new chat, after `CLAUDE.md`.
+Last updated **2026-11-17** (kit speed, docs/22 §11). Read this first in a new chat, after `CLAUDE.md`.
 Before acting on anything below, re-check it live (`gh pr list`, `git log origin/main`, `vercel env ls`):
 this file can be a few hours stale.
 
@@ -64,6 +64,14 @@ links, so cards draw colour blocks (CSP allows only YouTube thumbnails). Rules a
 blocks (`template/lib/blocks.js`) and described in `film.json` `scenes`. The AI edits data, not code. Sample
 copy blocks a full render until each scene is filled. Open PRs, in merge order: #39 (loop + review), #40
 (gallery), then the recipes PR. Next: more recipes, `studio check` (S2), npm publish + `AGENTS.md` (A1, A2).
+
+### 2026-11-17: kit speed (branch `claude/launch-plan-rest-e0999a`, docs/22 §11)
+`studio check` replaces verify + sheet + phone sheet + stats with one command, one browser and one image. Draft
+renders are 15 fps JPEG and redo only the 2-second chunks whose scene or chapter changed. The motion-blur shutter
+is centred and averaged in linear light (docs/18 §16.3 #1). `verify` warns on seeks over 50 ms and scans text at
+4/s. **Measured fix round on `saas-launch-32`: 85–105 s before → 16–17 s after.** The warm browser (S3) was not
+built: Chromium starts in 0.5 s. Next: more runnable recipes, then npm + `AGENTS.md` + `studio connect` (A1–A3),
+then the Free plan limit and pricing-page honesty.
 
 ## 3. Waiting on the user (ask before assuming)
 1. **Before a demo with many people on one Wi-Fi** (docs/19 §2), all dashboard-only, not verified by us:
