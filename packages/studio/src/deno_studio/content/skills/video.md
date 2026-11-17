@@ -33,6 +33,16 @@ One message with the five pre-production questions, each with your suggested ans
 shots with what each must make the viewer understand, all on-screen copy, facts used. Run every line of copy
 through `check_copy` (kind `on_screen`). Show the founder the treatment in plain words and wait for approval.
 
+## 3b. Start from a runnable recipe when there is one
+- `studio init <name> --recipe saas-launch-32` (or `vertical-feature-15`) creates a film that **already renders**:
+  every shot is a scene in `film.json` (`scenes`), drawn by a ready-made block (headline, product screen with a
+  moving camera and cursor, counting number, points, quote, end card). `studio render --draft` works at once.
+- Your job is then the content, not the code: for each scene put the founder's own words, numbers and screens
+  (`studio capture <url>`, then `"src"`) into its `props`, adjust `start` / `end`, and `studio fill <scene id>`.
+  A scene keeps the label "sample copy" and blocks a full render until you do.
+- Write code only for the one shot that makes this film theirs (block `custom`, see `lib/blocks.js`). Skip
+  section 4: the recipe already is the shape. No runnable recipe for the format: carry on with section 4.
+
 ## 4. Place before you fill
 - Turn the approved treatment into placeholders before building anything: one `studio place` per chapter
   (`--as-chapter`) and per shot, with start, end and a label that says what the viewer sees.

@@ -9,3 +9,5 @@ style: vertical-captions
 # 15 s vertical feature
 0–1.5 s: a 2–3 word hook in the ICP's language. 1.5–10 s: the feature in action on a real screen, zoomed. 10–13 s:
 the result. 13–15 s: name. Captions burned in; safe area respected.
+
+Runnable: `studio init <name> --recipe vertical-feature-15` creates this film from blocks; edit `film.json` scenes.

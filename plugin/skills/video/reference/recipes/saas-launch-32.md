@@ -6,3 +6,5 @@ _Cards collapse into the logo, a cursor tours real screens, pull out to a featur
 Hook (0–3 s) on the pain or result, not the logo. Tour 3 real screens (5–6 s each) with a cursor. Pull out to a
 grid of 4–6 features (one read each, 1 s). CTA with URL. Because this shape is the most copied, the hook and one
 unexpected transition must be specific to this founder.
+
+Runnable: `studio init <name> --recipe saas-launch-32` creates this film from blocks; edit `film.json` scenes.

@@ -55,6 +55,12 @@ them with `studio notes --wait` and answers with `studio reply`. Next: runnable 
 where the maker posted (never hosted by us), `/videos/submit`, plus the site's first `sitemap.xml` and
 `robots.txt`. The video list (`web/lib/gallery/videos.ts`) is empty: Atul adds entries by PR.
 
+### 2026-11-17: runnable recipes (branch `feat/studio-recipes`, docs/22 §10)
+`studio init <name> --recipe saas-launch-32|vertical-feature-15` creates a film that already renders, built from
+blocks (`template/lib/blocks.js`) and described in `film.json` `scenes`. The AI edits data, not code. Sample
+copy blocks a full render until each scene is filled. Open PRs, in merge order: #39 (loop + review), #40
+(gallery), then the recipes PR. Next: more recipes, `studio check` (S2), npm publish + `AGENTS.md` (A1, A2).
+
 ## 3. Waiting on the user (ask before assuming)
 1. **Before a demo with many people on one Wi-Fi** (docs/19 §2), all dashboard-only, not verified by us:
    Supabase Auth → Rate Limits (per-IP sign-in/refresh limits up), custom SMTP (or everyone uses Google; the

@@ -218,3 +218,39 @@ page. Kit tests: 23 pass (+ the known chmod failure).
 **Not done:** notes from the local page do not reach the Deno dashboard or taste memory (they stay in the film
 folder); the page was not tested in Safari or Firefox, or at phone width; R2 (sample item) and R3 (links) are
 still open, and the dashboard review page is unchanged.
+
+---
+
+## 10. S4, first part: blocks and two runnable recipes (2026-11-17, branch `feat/studio-recipes`)
+
+`studio init <name> --recipe <slug>` now creates a film that **already renders**. The film is data: `film.json`
+has `scenes: [{ id, block, start, end, props }]` and `plugin/kit/template/lib/blocks.js` draws each scene. The AI
+changes words, pictures and timing in `film.json`; it writes code only for a shot no block can do
+(`"block": "custom"`). This changes the docs/18 §9 decision "Claude writes its own HTML" to "blocks by default,
+own code for the hero shot".
+
+| Piece | Where |
+|---|---|
+| Blocks | `hook` (headline, `*word*` gets the accent), `screen` (a product screenshot with a moving camera, a cursor and a caption), `stat` (a number that counts up), `points`, `quote`, `endcard` (the name shrinks to fit) |
+| Recipe page | `plugin/kit/template/recipe.html` (becomes `index.html`); it imports `film.json` directly |
+| Runnable recipes | `plugin/kit/template/recipes/saas-launch-32.json` (16:9, 6 scenes), `vertical-feature-15.json` (9:16, 4 scenes). The other 12 formats still start from the blank template |
+| Sample copy can't ship | Each scene starts with `todo: true`. `verify` blocks and a full render refuses until `studio fill <scene id>`; `studio timeline` shows `[sample copy]` |
+| Rules | Skill `video` §3b, playbook `build-loop` §0, the template `CLAUDE.md`, the two recipe docs |
+| Gallery | `formats.json` carries `runnable`; the format page says so and the prompt names the recipe |
+
+**Measured here (Windows 11, 6 workers), `saas-launch-32` with one real screenshot in its three screen scenes:**
+`init` to a first draft with no code written: draft render 31–35 s, sheet 5–7 s, verify 14 s. Full-quality
+render of all 32 s: 86 s. `vertical-feature-15` (15 s): full render 46 s.
+
+**Three more fixes found on the way:**
+1. The day-1 purity fix hid the page while `seek(t)` ran, so film code that measures layout got zero sizes (the
+   camera in `screen` and the name fit in `endcard` did nothing). The page is now shown again before `seek`;
+   purity is still clean (5 runs in a row on the template).
+2. `verify` counted each value of a counting number as a line shown too briefly, and counted the pieces of one
+   wrapped sentence as overlapping text. Counters carry `data-studio-counter`; text in the same block is no
+   longer compared.
+3. `studio capture` wrote Windows backslashes into asset paths.
+
+**Not done:** the other 12 recipes; captions and voice inside a recipe film; transitions between scenes (they
+cut); a real founder's film made this way end to end (so no measured "time to first cut" with an AI in the loop
+yet); `studio check` (S2), the warm browser (S3) and the render work (S5).

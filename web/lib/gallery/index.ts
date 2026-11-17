@@ -20,6 +20,8 @@ export type Format = {
   /** Length in seconds; 0 or null for stills (a carousel). */
   seconds: number | null;
   style: string;
+  /** The kit ships this format as a film that already renders (`studio init --recipe <slug>`). */
+  runnable: boolean;
   body: string;
 };
 
@@ -55,6 +57,7 @@ export function formatPrompt(f: Format, styleSlug: string = f.style): string {
     '',
     `- Format: the "${f.slug}" recipe (search_recipes).${f.ratio ? ` ${f.ratio}${isStill(f) ? '.' : `, about ${f.seconds} seconds.`}` : ''}`,
     `- Style: "${style?.slug ?? styleSlug}" (get_style).`,
+    ...(f.runnable ? [`- Start from the runnable recipe (studio init <name> --recipe ${f.slug}) and put my content into its scenes.`] : []),
     '- Use only my real facts from get_founder_context: pains with sources, my stories, my brand kit. Do not invent numbers, quotes or features.',
     '',
     'Ask me the five pre-production questions in one message, each with your suggested answer. Then show me the treatment and wait for my "go" before you build.',

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chaptersOf } from './timeline.mjs';
 import { die, formats, info, loadFilm, num, outDir, readJSON, tc, writeJSON } from './util.mjs';
 
 const KIT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -26,7 +27,7 @@ export const saveReview = (dir, r) => writeJSON(notesFile(dir), r);
 /** The chapter and clip on screen at `t`, so a note maps to the code that draws that moment. */
 export function whereIn(film, t) {
   const at = (list) => (list || []).filter((c) => t >= c.start && t < c.end).sort((a, b) => b.start - a.start)[0];
-  const chapter = at(film.chapters);
+  const chapter = at(chaptersOf(film));
   const clip = at(film.clips);
   return { chapter: chapter?.id ?? null, clip: clip?.id ?? null };
 }
@@ -120,7 +121,7 @@ function state(dir, opts) {
     ratio: fmt.ratio,
     width: fmt.w,
     height: fmt.h,
-    chapters: (film.chapters || []).map((c) => ({ id: c.id, start: c.start, end: c.end, label: c.label || c.title || c.id })),
+    chapters: chaptersOf(film).map((c) => ({ id: c.id, start: c.start, end: c.end, label: c.label || c.title || c.id })),
     tags: TAGS,
     round: review.round,
     done: review.done_round === review.round,

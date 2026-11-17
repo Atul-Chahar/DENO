@@ -19,6 +19,7 @@ from deno_studio import list_docs
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "plugin" / "skills"
 GALLERY = ROOT / "web" / "lib" / "gallery" / "formats.json"
+RUNNABLE = ROOT / "plugin" / "kit" / "template" / "recipes"
 
 PREAMBLE = """> **Deno Studio plugin.** `studio` is this plugin's command (on your PATH while the plugin is enabled; if the
 > shell can't find it, use `node "${CLAUDE_PLUGIN_ROOT}/kit/cli.mjs"`). Deno's MCP tools (get_founder_context,
@@ -51,6 +52,8 @@ def gallery_formats() -> str:
             "ratio": d.meta.get("ratio", ""),
             "seconds": int(d.meta["length"]) if d.meta.get("length", "").isdigit() else None,
             "style": d.meta.get("style", ""),
+            # The kit ships this recipe as a film that already renders (`studio init --recipe <slug>`).
+            "runnable": (RUNNABLE / f"{d.slug}.json").exists(),
             "body": _prose(d.body),
         }
         for d in list_docs("recipes")

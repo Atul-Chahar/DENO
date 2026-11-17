@@ -9,11 +9,15 @@ import { die, info, loadFilm, num, saveFilm, tc, timingSummary } from './util.mj
 
 const KINDS = ['shot', 'graphic', 'title', 'footage', 'screen', 'voice', 'music', 'sfx', 'caption'];
 
-/** Every chapter and clip still marked pending. */
+/** Every chapter and clip still marked pending, and every recipe scene that still shows the recipe's sample copy. */
 export const pendingItems = (film) => [
   ...(film.chapters || []).filter((c) => c.pending).map((c) => ({ ...c, type: 'chapter' })),
   ...(film.clips || []).filter((c) => c.pending).map((c) => ({ ...c, type: 'clip' })),
+  ...(film.scenes || []).filter((c) => c.todo).map((c) => ({ ...c, type: 'scene' })),
 ];
+
+/** A film's chapters; a recipe film (film.json `scenes`) has one per scene. */
+export const chaptersOf = (film) => (film.chapters?.length ? film.chapters : (film.scenes || []).map((s) => ({ id: s.id, start: s.start, end: s.end, label: s.label || s.id })));
 
 export function place(dir, opts) {
   const film = loadFilm(dir);
@@ -43,9 +47,10 @@ export function fill(dir, opts) {
   const film = loadFilm(dir);
   const id = opts._[1];
   if (!id) die('usage: studio fill <id>   (after its content is built)');
-  const item = [...(film.clips || []), ...(film.chapters || [])].find((c) => c.id === id);
-  if (!item) die(`no clip or chapter "${id}" in film.json`);
+  const item = [...(film.clips || []), ...(film.chapters || []), ...(film.scenes || [])].find((c) => c.id === id);
+  if (!item) die(`no clip, chapter or scene "${id}" in film.json`);
   delete item.pending;
+  delete item.todo;
   if (typeof opts.label === 'string') item.label = opts.label;
   saveFilm(dir, film);
   const left = pendingItems(film).length;
@@ -59,11 +64,12 @@ export function timeline(dir) {
   const rows = [
     ...(film.chapters || []).map((c) => ({ ...c, type: 'chapter' })),
     ...(film.clips || []).map((c) => ({ ...c, type: c.kind || 'clip' })),
+    ...(film.scenes || []).map((c) => ({ ...c, type: c.block, pending: c.todo })),
   ].sort((a, b) => a.start - b.start || (a.type === 'chapter' ? -1 : 1));
   info(`${film.title} · ${film.kind} · ${(film.formats || []).map((f) => f.ratio).join(', ')} · ${film.duration} s · style ${film.style || '-'}`);
   for (const r of rows) {
     const indent = r.type === 'chapter' ? '' : '  ';
-    info(`${indent}${tc(r.start, fps)}–${tc(r.end, fps)}  ${r.type.padEnd(8)} ${r.id.padEnd(16)} ${r.pending ? '[pending] ' : ''}${r.label || r.title || ''}`);
+    info(`${indent}${tc(r.start, fps)}–${tc(r.end, fps)}  ${r.type.padEnd(8)} ${r.id.padEnd(16)} ${r.pending ? (r.todo ? '[sample copy] ' : '[pending] ') : ''}${r.label || r.title || ''}`);
   }
   const pending = pendingItems(film);
   const lic = (film.assets || []).filter((a) => !a.license || a.license === 'unknown');

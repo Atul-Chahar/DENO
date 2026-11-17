@@ -4,6 +4,11 @@ _Place every shot as a labelled placeholder first, fill one at a time, look once
 
 # The build loop: place, fill, look
 
+## 0. Start from a recipe that already renders
+- `studio init <name> --recipe <slug>` gives a working film made of blocks (`film.json` → `scenes`). Change the
+  words, pictures and timing in `film.json`; `studio fill <scene id>` marks a scene as the founder's own. Write
+  code only for the shot no block can do. Without a runnable recipe for the format, start at 1.
+
 ## 1. Place before you fill
 - Before building anything heavy, put the whole film's shape into `film.json` as placeholders:
   `studio place <id> --start a --end b --label "what the viewer sees" --kind title|graphic|screen|footage|voice|music|sfx`

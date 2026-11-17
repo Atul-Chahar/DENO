@@ -20,6 +20,14 @@ Read these before touching index.html. Full playbooks: `get_playbook(<topic>)` t
 - One read at a time; ~0.3 s per word on screen, at least 1 s; ≤ 8 words per screen.
 - Cuts on downbeats (`studio beats`), hits on hits; hold the last read 0.8–1.2 s.
 
+## Recipe films (index.html imports lib/blocks.js)
+- The film is data: `film.json` → `scenes: [{ id, block, start, end, props }]`. Blocks: `hook`, `screen`, `stat`,
+  `points`, `quote`, `endcard` (props are documented in `lib/blocks.js`). `*word*` in a text gets the accent.
+- Change words, pictures and timing in `film.json`. `studio fill <scene id>` when a scene holds the founder's own
+  content; a full render refuses while any scene still has the recipe's sample copy.
+- A shot no block can do: write `{ mount(box, props), paint(state, lt, dur, props) }` in index.html and pass it to
+  `mountScenes(stage(), data.scenes, { <scene id>: yourShot })` with `"block": "custom"` on that scene.
+
 ## Build: place, fill, look
 - Place the whole film first: `studio place <id> --start a --end b --label "what the viewer sees"` per shot and
   chapter. Placeholders draw as striped blocks in previews and drafts; a full render refuses while any are pending.
