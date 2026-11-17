@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-type Section = 'home' | 'pricing' | 'docs';
+type Section = 'home' | 'pricing' | 'docs' | 'videos';
 
 export function SiteHeader({ active = 'home' }: { active?: Section }) {
   const [signedIn, setSignedIn] = useState(false);
@@ -28,6 +28,7 @@ export function SiteHeader({ active = 'home' }: { active?: Section }) {
         <nav className="site-nav" aria-label="Main">
           <a href="/#how" className="site-nav__link">How it works</a>
           <a href="/#make" className="site-nav__link">What you can make</a>
+          <a href="/videos" className="site-nav__link" aria-current={active === 'videos' ? 'page' : undefined}>Videos</a>
           <a href="/pricing" className="site-nav__link" aria-current={active === 'pricing' ? 'page' : undefined}>Pricing</a>
           <a href="/docs" className="site-nav__link" aria-current={active === 'docs' ? 'page' : undefined}>Docs</a>
         </nav>

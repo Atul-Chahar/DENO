@@ -50,6 +50,11 @@ Cut Notes page, rebuilt): the video plays from disk and is never uploaded, notes
 them with `studio notes --wait` and answers with `studio reply`. Next: runnable recipes + blocks (S4), then
 `studio check` (S2), npm publish + `AGENTS.md` (A1, A2).
 
+### 2026-11-17: public video gallery (branch `feat/video-gallery`, docs/23)
+`/videos`: 14 format pages with copyable prompts (generated from the Studio recipes), video pages that link to
+where the maker posted (never hosted by us), `/videos/submit`, plus the site's first `sitemap.xml` and
+`robots.txt`. The video list (`web/lib/gallery/videos.ts`) is empty: Atul adds entries by PR.
+
 ## 3. Waiting on the user (ask before assuming)
 1. **Before a demo with many people on one Wi-Fi** (docs/19 §2), all dashboard-only, not verified by us:
    Supabase Auth → Rate Limits (per-IP sign-in/refresh limits up), custom SMTP (or everyone uses Google; the

@@ -1,0 +1,308 @@
+{
+  "recipes": [
+    {
+      "slug": "brand-film-18",
+      "title": "18 s shot-by-shot brand film",
+      "summary": "One hero object threads every shot; exact copy, a cue every 0.6–0.9 s; outgoing text leaves before incoming arrives.",
+      "tags": [
+        "brand",
+        "launch",
+        "precise"
+      ],
+      "ratio": "16:9",
+      "seconds": 18,
+      "style": "swiss-kinetic",
+      "body": "Write every shot with exact copy and a cue time. One hero object (the product's icon, a card, a shape) carries\nthrough all shots and changes role. No bounce, no particles. Ends on the hero object becoming the logo."
+    },
+    {
+      "slug": "carousel-8",
+      "title": "8-page LinkedIn carousel",
+      "summary": "Hook page in the ICP's words, six one-idea pages from validated pains, a CTA page. 1080×1350 PDF.",
+      "tags": [
+        "carousel",
+        "linkedin",
+        "stills"
+      ],
+      "ratio": "4:5",
+      "seconds": 0,
+      "style": "risograph",
+      "body": "Page 1: the pain as a question, in the ICP's words. Pages 2–7: one idea each, from the strongest evidenced pains\nor the founder's Story Bank (≤ 25 words a page). Page 8: what to do next + handle. Render with `studio still --pdf`."
+    },
+    {
+      "slug": "changelog-30",
+      "title": "30 s changelog",
+      "summary": "Three to five shipped changes, each a 5 s before/after on real UI, with a version stamp.",
+      "tags": [
+        "changelog",
+        "product-update",
+        "release"
+      ],
+      "ratio": "16:9",
+      "seconds": 30,
+      "style": "living-ui",
+      "body": "Version stamp opens. 3–5 changes, ~5 s each: name of the change (≤ 5 words), before → after on real UI. Close on\n\"update now\" + URL. Pull change names from the release notes the founder supplies."
+    },
+    {
+      "slug": "data-story-20",
+      "title": "20 s data story",
+      "summary": "One chart that changes the viewer's mind; build axes, reveal the line, annotate the turn. Real data only.",
+      "tags": [
+        "data",
+        "chart",
+        "proof",
+        "linkedin"
+      ],
+      "ratio": "1:1",
+      "seconds": 20,
+      "style": "dark-keynote",
+      "body": "Only real data (validation signals, the founder's metrics). Never rescale an axis to dramatize. Draw axes, reveal\nthe line on a spring, pause on the turning point with a 3–5 word annotation, end on what it means."
+    },
+    {
+      "slug": "essay-180",
+      "title": "3 min essay film",
+      "summary": "A narrated argument with one recurring protagonist and a motif; chapters built by subagents; facts with sources.",
+      "tags": [
+        "essay",
+        "long-form",
+        "thought-leadership"
+      ],
+      "ratio": "16:9",
+      "seconds": 180,
+      "style": "ink-wash",
+      "body": "Treatment first with chapters. One recurring protagonist or object. ≤ 8 words on screen, held ≥ 2.5 s. Uncertain\nfacts go to `NOTES.md`, not the film. Use the multi-agent playbook: one scene-builder per chapter."
+    },
+    {
+      "slug": "explainer-30",
+      "title": "30 s narrated explainer",
+      "summary": "Problem, what it is, three steps, proof, name. Voiceover with cue words; captions as sidecar.",
+      "tags": [
+        "explainer",
+        "voiceover",
+        "new-audience"
+      ],
+      "ratio": "16:9",
+      "seconds": 30,
+      "style": "flat-explainer",
+      "body": "| Time | Beat |\n|---|---|\n| 0–4 s | The pain, in the ICP's words (from `get_founder_context` evidence) |\n| 4–9 s | What the product is, one sentence |\n| 9–24 s | Three steps, ~5 s each, each with a visible result |\n| 24–28 s | Proof: a real number or quote |\n| 28–30 s | Name + URL |\n~75 words of voiceover. Mark `{cue}` words for each visual hit."
+    },
+    {
+      "slug": "kinetic-lyric-60",
+      "title": "60 s kinetic type / lyric",
+      "summary": "Word-synced type over a track; each section integrates text differently; per-word timing from captions.",
+      "tags": [
+        "music",
+        "type",
+        "lyric"
+      ],
+      "ratio": "9:16",
+      "seconds": 60,
+      "style": "swiss-kinetic",
+      "body": "Run `studio beats` and `studio captions --text lyrics.txt`. Each section treats the words differently (stack, path,\nmask, scale). The highlight never runs ahead of the voice. Big changes on bar lines."
+    },
+    {
+      "slug": "logo-sting-6",
+      "title": "6 s logo sting",
+      "summary": "The logo builds from a motif of the product in 4 s and holds 2 s; one sound.",
+      "tags": [
+        "logo",
+        "intro",
+        "outro"
+      ],
+      "ratio": "16:9",
+      "seconds": 6,
+      "style": "swiss-kinetic",
+      "body": "Build the logo from something the product does (a cursor stroke, a chart line, a card stack). Land on a downbeat\nat 4 s, hold 2 s. One sound event plus a tail."
+    },
+    {
+      "slug": "repo-promo-20",
+      "title": "20 s GitHub repo promo",
+      "summary": "Terminal and code, install to first result in one take; stars and real usage only if true.",
+      "tags": [
+        "open-source",
+        "github",
+        "dev-tools"
+      ],
+      "ratio": "16:9",
+      "seconds": 20,
+      "style": "dark-keynote",
+      "body": "Open on the result, then the install command typing in, then the first result, then one code snippet that shows\nthe API, then the repo URL. Use the README's own words. Star counts only if current and real."
+    },
+    {
+      "slug": "saas-launch-32",
+      "title": "32 s classic SaaS launch",
+      "summary": "Cards collapse into the logo, a cursor tours real screens, pull out to a feature grid, CTA. Widely copied, so make the hook yours.",
+      "tags": [
+        "launch",
+        "saas",
+        "walkthrough"
+      ],
+      "ratio": "16:9",
+      "seconds": 32,
+      "style": "living-ui",
+      "body": "Hook (0–3 s) on the pain or result, not the logo. Tour 3 real screens (5–6 s each) with a cursor. Pull out to a\ngrid of 4–6 features (one read each, 1 s). CTA with URL. Because this shape is the most copied, the hook and one\nunexpected transition must be specific to this founder."
+    },
+    {
+      "slug": "showreel-15",
+      "title": "15 s showreel",
+      "summary": "Permission-framed energy piece; morphing product states on a ~120 BPM grid, logo on the last downbeat.",
+      "tags": [
+        "launch",
+        "energy",
+        "dev-tools",
+        "showreel"
+      ],
+      "ratio": "16:9",
+      "seconds": 15,
+      "style": "dark-keynote",
+      "body": "Best for: brand energy, dev tools, a launch day post on X. Weak for explaining.\n\n| Time | Shot | Read |\n|---|---|---|\n| 0–1 s | Open on the product doing its most impressive thing, mid-motion | \"this is fast/smart\" |\n| 1–8 s | 4–6 morphing states of real UI, one per 2 beats; a command menu or cursor drives them | each state's result |\n| 8–12 s | One metric card or before/after (real number only) | the proof |\n| 12–15 s | Everything collapses into the logo on the downbeat; URL holds 1 s | the name |\n\nSound: a 120–124 BPM track, a hit on every state change, sub-bass under the logo."
+    },
+    {
+      "slug": "story-44",
+      "title": "44 s emotional story",
+      "summary": "A personal object, a montage, a payoff. B2C only; reads as parody for B2B.",
+      "tags": [
+        "story",
+        "consumer",
+        "emotional"
+      ],
+      "ratio": "9:16",
+      "seconds": 44,
+      "style": "paper-cutout",
+      "body": "One emotional word drives it. Open on a personal object, montage of moments (one read each), a turn, the payoff\nwith the product as the enabler, not the hero. No narration; music carries it. Avoid for B2B."
+    },
+    {
+      "slug": "ui-loop-30",
+      "title": "30 s one-shape UI loop",
+      "summary": "One shape morphs through 8–12 UI states on a 120 BPM × 8-bar grid; never cuts; last frame equals first.",
+      "tags": [
+        "loop",
+        "ui",
+        "landing-page",
+        "onboarding"
+      ],
+      "ratio": "16:9",
+      "seconds": 30,
+      "style": "living-ui",
+      "body": "List the states first (8–12): each is a UI moment (checkout, a toggle, a chart). One container shape morphs\nbetween them, content enters after the container moves. Seamless: frame 0 equals the last frame, position and\nvelocity. `studio verify` runs the seam check. Great as a silent landing-page hero."
+    },
+    {
+      "slug": "vertical-feature-15",
+      "title": "15 s vertical feature",
+      "summary": "9:16 feature teaser for Reels/Shorts: hook word, the feature in action, result, name.",
+      "tags": [
+        "vertical",
+        "feature",
+        "reels",
+        "shorts"
+      ],
+      "ratio": "9:16",
+      "seconds": 15,
+      "style": "vertical-captions",
+      "body": "0–1.5 s: a 2–3 word hook in the ICP's language. 1.5–10 s: the feature in action on a real screen, zoomed. 10–13 s:\nthe result. 13–15 s: name. Captions burned in; safe area respected."
+    }
+  ],
+  "styles": [
+    {
+      "slug": "dark-keynote",
+      "title": "Dark keynote",
+      "summary": "Stage-lit product reveals on a near-black ground; one giant number, one accent, slow confident moves.",
+      "tags": [
+        "launch",
+        "saas",
+        "dev-tools",
+        "metrics"
+      ],
+      "best_for": "launch films, metric reveals, dev tools",
+      "avoid_for": "warm consumer stories"
+    },
+    {
+      "slug": "flat-explainer",
+      "title": "Flat vector explainer",
+      "summary": "Simple shapes and characters explain how something works: problem, what, three steps, proof, name.",
+      "tags": [
+        "explainer",
+        "how-it-works",
+        "onboarding"
+      ],
+      "best_for": "explaining a new category to a new audience",
+      "avoid_for": "dev tools that want to look technical"
+    },
+    {
+      "slug": "ink-wash",
+      "title": "Ink and watercolour",
+      "summary": "Brush lines and washes that bloom and dry; calm, thoughtful, editorial.",
+      "tags": [
+        "editorial",
+        "essay",
+        "story"
+      ],
+      "best_for": "essays, founder letters, thoughtful explainers",
+      "avoid_for": "fast hype reels"
+    },
+    {
+      "slug": "living-ui",
+      "title": "Living UI",
+      "summary": "The real product, moving: cursor tours, zooms into the action, one action every 3–4 s.",
+      "tags": [
+        "demo",
+        "saas",
+        "walkthrough",
+        "feature"
+      ],
+      "best_for": "feature teasers, walkthroughs, changelogs",
+      "avoid_for": "abstract ideas without a product"
+    },
+    {
+      "slug": "paper-cutout",
+      "title": "Paper cut-out",
+      "summary": "Layered paper with real shadows and slight wobble; handmade and warm.",
+      "tags": [
+        "story",
+        "consumer",
+        "warm",
+        "handmade"
+      ],
+      "best_for": "founder stories, consumer products, brand films",
+      "avoid_for": "dense data, technical demos"
+    },
+    {
+      "slug": "risograph",
+      "title": "Risograph print",
+      "summary": "Two or three spot colours, halftone and slight misregistration; punchy, indie, print-shop.",
+      "tags": [
+        "indie",
+        "poster",
+        "consumer",
+        "bold"
+      ],
+      "best_for": "posters, carousels, playful launches",
+      "avoid_for": "enterprise, serious data"
+    },
+    {
+      "slug": "swiss-kinetic",
+      "title": "Swiss kinetic type",
+      "summary": "Grid-locked typography that moves on the beat; flat colour fields, hard cuts, no decoration.",
+      "tags": [
+        "type",
+        "manifesto",
+        "announcement"
+      ],
+      "best_for": "manifestos, announcements, hooks, music-led reels",
+      "avoid_for": "detailed product walkthroughs"
+    },
+    {
+      "slug": "vertical-captions",
+      "title": "Vertical captions",
+      "summary": "9:16 talking or voiceover reels where the words carry the film; 1–4 words per caption popping on the spoken word.",
+      "tags": [
+        "vertical",
+        "reels",
+        "shorts",
+        "tiktok",
+        "voiceover"
+      ],
+      "best_for": "founder talking-head, voiceover reels, tips",
+      "avoid_for": "silent films"
+    }
+  ]
+}
