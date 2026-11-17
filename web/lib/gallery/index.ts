@@ -84,9 +84,33 @@ export function embedUrl(url: string): string | null {
   return null;
 }
 
-/** A YouTube link's own thumbnail; null for other hosts (the card then draws the format's colour block). */
+/** The post id of an X (Twitter) status link, or null. */
+export function xPostId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^(www|mobile)\./, '');
+    if (u.protocol !== 'https:' || (host !== 'x.com' && host !== 'twitter.com')) return null;
+    return u.pathname.match(/^\/\w{1,15}\/status\/(\d{5,25})/)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * X's official embedded post for an X link (the video plays inside it, served by X). Do-not-track on, thread
+ * hidden. Loaded only after the visitor presses play, so X sets nothing before that.
+ */
+export function xEmbedUrl(url: string): string | null {
+  const id = xPostId(url);
+  return id ? `https://platform.twitter.com/embed/Tweet.html?id=${id}&dnt=true&hideThread=true&theme=light` : null;
+}
+
+/** Stills we may show: our own /assets/, or X's preview image (the CSP allows pbs.twimg.com). */
+const isAllowedPoster = (p: string) => p.startsWith('/assets/') || p.startsWith('https://pbs.twimg.com/');
+
+/** The video's still: its `poster`, or a YouTube link's own thumbnail; null otherwise (the card draws a colour block). */
 export function posterUrl(v: GalleryVideo): string | null {
-  if (v.poster) return v.poster;
+  if (v.poster && isAllowedPoster(v.poster)) return v.poster;
   const id = embedUrl(v.url)?.match(/youtube-nocookie\.com\/embed\/([\w-]+)/)?.[1];
   return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
 }

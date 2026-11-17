@@ -56,8 +56,9 @@ where the maker posted (never hosted by us), `/videos/submit`, plus the site's f
 `robots.txt`. Merged (#40). **Filled 2026-11-17 (branch `claude/gallery-videos-bf19d6`):** 28 community
 entries (Claude Opus 5.5 launch videos, app promos and explainers; 18 at 16:9, 2 square, 1 at 4:3, 7 at 9:16),
 taken from the claudevideo.org index at Atul's instruction, each linking to the maker's X post with credit and a
-`/takedown` note. New optional field `promptUrl` ("Read the maker's prompt" link); `app` is now optional. All X
-links, so cards draw colour blocks (CSP allows only YouTube thumbnails). Rules and sources: docs/23 §3.
+`/takedown` note. New optional field `promptUrl` ("Read the maker's prompt" link); `app` is now optional. Cards
+show X's preview image; videos play on our page from claudevideo.org's MP4 copies (Atul's call), falling back to
+X's official embed if a file stops loading. Rules, sources and that risk: docs/23 §3.
 
 ### 2026-11-17: runnable recipes (branch `feat/studio-recipes`, docs/22 §10)
 `studio init <name> --recipe saas-launch-32|vertical-feature-15` creates a film that already renders, built from

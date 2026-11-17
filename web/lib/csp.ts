@@ -16,11 +16,12 @@ export function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     // Studio posters, contact sheets and review copies are signed URLs on Supabase Storage (docs/18).
-    // i.ytimg.com: thumbnails of gallery videos that live on YouTube (docs/23).
-    `img-src 'self' data: blob: https://i.ytimg.com${supabase ? ` ${supabase}` : ''}`,
+    // i.ytimg.com / pbs.twimg.com: thumbnails of gallery videos that live on YouTube or X (docs/23).
+    `img-src 'self' data: blob: https://i.ytimg.com https://pbs.twimg.com${supabase ? ` ${supabase}` : ''}`,
     // The MP4s stay on the founder's disk; a review can play their own unlisted link (R2, a tunnel: any https).
     `media-src 'self' blob: https:${supabase ? ` ${supabase}` : ''}`,
-    'frame-src https://www.youtube-nocookie.com https://player.vimeo.com',
+    // platform.twitter.com: X's official embedded post, so gallery videos posted on X play on the page (docs/23).
+    'frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://platform.twitter.com',
     `connect-src ${connect}`,
     "object-src 'none'",
     "base-uri 'self'",
