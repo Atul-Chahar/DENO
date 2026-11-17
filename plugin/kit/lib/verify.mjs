@@ -21,7 +21,7 @@ function scanSources(dir) {
   const out = [];
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      if (['out', 'assets', 'node_modules', '.git'].includes(e.name)) continue;
+      if (['out', 'assets', 'review', 'node_modules', '.git'].includes(e.name)) continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
       else if (/\.(html|js|mjs|css)$/.test(e.name) && !p.includes(`${path.sep}lib${path.sep}motion.js`)) {
@@ -120,6 +120,13 @@ export async function verify(dir, opts) {
         if (hash(again) !== hash(first.get(t)) && (await psnr(first.get(t), again)) < 60) mismatched.push(t);
       }
       await page2.close();
+      // A raster glitch doesn't repeat; carried state does. Re-check each suspect alone on a third fresh page.
+      for (const t of [...mismatched]) {
+        const page3 = await studio.page();
+        const alone = await studio.grab(page3, t);
+        await page3.close();
+        if (hash(alone) === hash(first.get(t)) || (await psnr(first.get(t), alone)) >= 60) mismatched.splice(mismatched.indexOf(t), 1);
+      }
       if (mismatched.length) add('block', 'purity', `frames differ when rendered out of order at ${mismatched.map((t) => tc(t, fps)).join(', ')}: something carries state between frames`, mismatched[0]);
       const after = await studio.meta(page);
       if (after.clockReads > 0) add('warn', 'clock', `the page read Date.now/performance.now/Math.random ${after.clockReads} time(s); they are frozen while rendering, so motion that depends on them won't move`);

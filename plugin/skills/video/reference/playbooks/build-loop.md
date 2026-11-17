@@ -1,6 +1,6 @@
 # The build loop
 
-_Place every shot as a labelled placeholder first, fill one at a time, look after each, and never call it done without a clean verify and a contact sheet._
+_Place every shot as a labelled placeholder first, fill one at a time, look once per chapter, show the founder a draft early, and never call a final done without a clean verify and a contact sheet._
 
 # The build loop: place, fill, look
 
@@ -20,15 +20,23 @@ _Place every shot as a labelled placeholder first, fill one at a time, look afte
   Read it before and after a batch of work. Leave nothing pending.
 - Small, targeted edits. Never rewrite a scene you were asked to trim.
 
-## 3. Look after every change
-- You can't watch the video: look at frames and numbers. `studio sheet --live --at <times>` for the moments
-  you touched; `studio strip --at <t>` for motion; `studio sheet --stats` for exposure and colour.
+## 3. Look once per chapter
+- You can't watch the video: look at frames and numbers. When a chapter is filled, one
+  `studio sheet --live --chapter <id>` (or `--at <times>` for the moments you touched). `studio strip --at <t>`
+  only for the fastest move; `studio sheet --stats` when colour matters. Every look costs time: don't look after
+  each small edit.
 
-## 4. The done gate (never skip)
-- You may not say a film, a fix or a version is finished until all of these are true on the current code:
+## 4. Draft first
+- The first cut and every fix round are drafts: `studio render --draft` (half size, no motion blur, seconds
+  instead of minutes), one format, `studio sheet`, then `studio review`: the founder watches it on their own
+  machine and pins notes to frames (`studio notes --wait`, `studio reply`, `studio review --next`). Their notes
+  decide what changes next. Full quality, the sound mix and the other formats wait until they approve.
+
+## 5. The done gate (finals; never skip)
+- You may not say a final is finished until all of these are true on the current code:
   `studio verify` has no blocking findings, the film was rendered and mixed, and you read `studio sheet` of the
   mixed file (plus `studio sheet --phone`).
 - `studio upload` enforces it: it refuses when verify is missing, stale or blocking, when a placeholder is
-  pending, or when no sheet of the mixed file exists. A work-in-progress upload can pass `--unchecked`; say so
-  to the founder. A final can't.
+  pending, or when no sheet of the mixed file exists. `--draft` asks for less (a clean verify and a sheet of
+  the draft render). `--unchecked` skips the checks for a work in progress; say so to the founder. A final can't.
 - "It rendered" proves nothing. Only the sheet you read does.

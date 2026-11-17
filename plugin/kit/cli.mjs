@@ -9,9 +9,11 @@ import { matte } from './lib/matte.mjs';
 import { mix } from './lib/mix.mjs';
 import { doctor, fetchAsset, ideas, init, notes, preview, search, upload } from './lib/project.mjs';
 import { render } from './lib/render.mjs';
+import { hasReview, localNotes, reply, review } from './lib/review.mjs';
 import { download, generateSfx, openverseCommand } from './lib/sources.mjs';
 import { fill, place, timeline } from './lib/timeline.mjs';
-import { parseArgs, projectDir, info } from './lib/util.mjs';
+import { useBundledFfmpeg } from './lib/deps.mjs';
+import { parseArgs, projectDir, info, logTiming } from './lib/util.mjs';
 import { verify } from './lib/verify.mjs';
 import { voice } from './lib/voice.mjs';
 
@@ -29,9 +31,13 @@ Media      search <video|image|sfx|music|icon|youtube> <query> [--source deno|op
 Listen     transcribe <media> [--format words|text|srt|json] · silence <media> · loudness <media>
 Sound      beats <track> · voice <script.md> [--engine kokoro|elevenlabs|sarvam] · sfx "<sound>" [--as kind] [--at 2.4] (free synth; ElevenLabs if keyed)
            captions <audio> [--text script.md] [--preset beast-mode|billboard|sideline|butter-serif] · mix [--bed]
-Deliver    upload [--idea id] [--summary "what changed"] [--final] [--brief id] [--video-url https://…] [--with-video]
-           · notes [item_id] [--all]   (upload sends poster + contact sheet, ~250 KB; the MP4s stay on this disk.
-           It needs a clean, current verify and a sheet of the mixed file)
+Review     review [--next] [--file out/…mp4] [--port 4747]   (a review page on this machine: the film plays from
+           this disk, never uploaded; notes are pinned to frames. Start it in the background, share the link)
+           · notes --wait   (blocks until the founder presses "I'm done", then prints the open notes)
+           · notes [--all] · reply <note id> fixed|open "what changed on screen, or why not"
+Deliver    upload [--draft | --final] [--idea id] [--summary "what changed"] [--brief id] [--video-url https://…] [--with-video]
+           · notes <item_id> | notes --deno   (notes left on the Deno dashboard instead)   (upload sends poster + contact sheet, ~250 KB; the MP4s stay on this disk.
+           --draft: clean verify + a sheet of the draft render. Otherwise: clean verify + a sheet of the mixed file)
 
 Everything a command writes goes in the project folder (out/ for renders). Docs: get_playbook via the Deno MCP.`;
 
@@ -54,7 +60,13 @@ const commands = {
   },
   init: () => init(args),
   search: () => search(args),
-  notes: () => notes(projectDir(false), args),
+  notes: () => {
+    const dir = projectDir(false);
+    // Notes from the local review page first; the Deno dashboard's when asked for, or when there is no local review.
+    return dir && hasReview(dir) && !args._[1] && !args.deno ? localNotes(dir, args) : notes(dir, args);
+  },
+  review: () => review(projectDir(), args),
+  reply: () => reply(projectDir(), args),
   preview: () => preview(projectDir(), args),
   verify: () => verify(projectDir(), args),
   timeline: () => timeline(projectDir()),
@@ -88,7 +100,15 @@ if (!cmd || cmd === 'help' || args.help) {
   process.stderr.write(`studio: unknown command "${cmd}"\n\n${HELP}\n`);
   process.exitCode = 2;
 } else {
+  const started = Date.now();
+  // `die()` exits the process, so the timing is written on exit rather than after the await.
+  process.on('exit', (code) => {
+    // Not tool time: a server that runs until stopped, and waiting for a person.
+    const dir = ['init', 'preview', 'review'].includes(cmd) || args.wait ? null : projectDir(false);
+    if (dir) logTiming(dir, { at: new Date(started).toISOString(), cmd, args: process.argv.slice(3).join(' ').slice(0, 200), s: Math.round((Date.now() - started) / 100) / 10, ok: code === 0 });
+  });
   try {
+    if (cmd !== 'doctor') useBundledFfmpeg();
     await commands[cmd]();
   } catch (err) {
     process.stderr.write(`studio ${cmd}: ${err.message}\n`);

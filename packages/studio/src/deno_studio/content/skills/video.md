@@ -46,23 +46,36 @@ through `check_copy` (kind `on_screen`). Show the founder the treatment in plain
 - Footage is drawn from frames (`studio frames`). Talking footage: `studio transcribe` and cut on words.
 - Sound, voice and captions: the `sound`, `voice`, `captions` and `footage` skills. Playbook `sources`.
 
-## 6. Fill, one placeholder at a time
-- Hardest 2–4 s first. Build one placeholder, `studio fill <id>`, look at a `studio sheet --live --at <its times>`
-  (and a `studio strip` for fast motion), then the next. `studio timeline` shows what's left; leave nothing pending.
+## 6. Fill, one chapter at a time
+- Hardest 2–4 s first. Build a chapter's placeholders, `studio fill <id>` each, then look **once per chapter**:
+  `studio sheet --live --chapter <id>`. A `studio strip` only for the one fastest move in the film.
+  `studio timeline` shows what's left; leave nothing pending.
 - Keep `film.json` current: chapters, clips with reads, captions, cues, assets.
-- Films over ~30 s or with several chapters: the `director` and `scene-builder` agents (playbook `multi-agent`).
+- Work alone up to ~60 s. Longer films, or when the founder asks for it: the `director` and `scene-builder`
+  agents (playbook `multi-agent`).
 
-## 7. Review loop
-The `review` skill: `studio verify`, sheets (phone, stats), strips, the `reviewer` agent's 7 scores, fix,
-partial re-render. Every dimension at least 8.
+## 7. First cut: one check, then the founder
+- `studio verify` and fix what it reports. `studio render --draft`, `studio sheet` and `studio sheet --phone`;
+  read both, fix the three worst things you see, once. Do not score yourself in a loop: the second opinion comes
+  from the founder, not from you.
+- `studio review` (start it in the background and leave it running): a review page on this machine. The film
+  plays from the founder's own disk, every frame, and is never uploaded. Give the founder the link; if you have
+  a built-in browser or preview, open it there for them.
+  Tell them in one line what the film does and the two moments you'd still improve. The first cut is one format
+  at draft quality on purpose.
 
-## 8. The done gate, then deliver
-- You may not call the film, a fix or a version finished until `studio verify` is clean on the current code and
-  you have read `studio sheet` of the mixed file. `studio upload` refuses otherwise.
-- `studio render --formats <ratios>`, `studio mix`, `studio verify`, `studio sheet` and `studio sheet --phone`
-  (read both), then `studio upload --idea <idea_id> [--brief <brief_id>]`.
-- Tell the founder, briefly: what the film does, the review link, the two weakest moments you'd still improve,
-  and any claim you couldn't verify. Then handle their notes (`get_review_notes`, `reply_note`) until they approve.
+## 8. Review rounds, then the final
+- `studio notes --wait` returns when the founder presses "I'm done reviewing" and prints their open notes: time,
+  frame, chapter and clip, the spot they pointed at, tags. Fix one note at a time, keep everything else exactly
+  as it is, and answer each: `studio reply <id> fixed "what changed on screen"` (or `open "why not"`).
+- `studio render --draft --from a --to b` for just the seconds you touched, then `studio review --next`: the page
+  loads the new cut as the next round. Repeat until a round comes back with no notes.
+- Then the final: `studio render --formats <ratios>`, `studio mix`, `studio verify`, `studio sheet` and
+  `studio sheet --phone` (read both), optionally the `reviewer` agent once, and
+  `studio upload --final --idea <idea_id> [--brief <brief_id>]` to save it to their Deno library (a poster, a
+  contact sheet and the manifest; the video file stays on their disk).
+- The done gate: you may not call a final finished until `studio verify` is clean on the current code and you
+  have read `studio sheet` of the mixed file. `studio upload` refuses otherwise.
 
 Rules: never invent numbers, features or quotes. Never put an asset without a commercial licence in a final.
 Never claim a render worked without reading the contact sheet of the encoded file.

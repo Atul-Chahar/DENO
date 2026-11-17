@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type Rule, type Rulebook as RulebookData } from '@/lib/api';
 import { StudioShell } from './StudioShell';
 
-/** The Rulebook: every rule your Claude follows when it makes video and images. Strike the ones you disagree
+/** The Rulebook: every rule your AI follows when it makes video and images. Strike the ones you disagree
  * with; core rules (render contract, licences, honesty about facts) stay on. */
 export function Rulebook() {
   const [book, setBook] = useState<RulebookData | null>(null);
@@ -42,7 +42,7 @@ export function Rulebook() {
     setStruck(next);
     try {
       await api.saveRulebook([...next]);
-      setSaved(next.has(rule.id) ? 'Rule off. Your Claude won’t see it.' : 'Rule back on.');
+      setSaved(next.has(rule.id) ? 'Rule off. Your AI won’t see it.' : 'Rule back on.');
       window.setTimeout(() => setSaved(null), 2200);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -56,7 +56,7 @@ export function Rulebook() {
       <div className="dv-split">
         <div className="dv-pad dv-rr">
           <span className="dv-kicker lime">RULEBOOK</span>
-          <h1 className="dv-h1">The rules your Claude follows.</h1>
+          <h1 className="dv-h1">The rules your AI follows.</h1>
           <p className="dv-lede">
             Deno&apos;s playbooks and styles, line by line. Switch off what doesn&apos;t fit your taste. Locked rules keep renders working and keep you
             out of trouble: the render contract, licences, and never inventing facts.
@@ -66,7 +66,7 @@ export function Rulebook() {
         <div className="dv-pad dv-soft">
           <div className="dv-label">YOUR TASTE, FROM YOUR NOTES</div>
           {tags.length === 0 ? (
-            <p className="st-meta">Tag your review notes (pacing, text, sound…) and the patterns show up here. Your Claude reads them too.</p>
+            <p className="st-meta">Tag your review notes (pacing, text, sound…) and the patterns show up here. Your AI reads them too.</p>
           ) : (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {tags.map(([tag, n]) => (

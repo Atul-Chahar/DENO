@@ -74,9 +74,9 @@ export function StudioLibrary() {
         <main style={{ flex: '999 1 560px', minWidth: 0 }}>
           <div className="dv-pad dv-rb">
             <span className="dv-kicker lime">STUDIO</span>
-            <h1 className="dv-h1">Videos and images your Claude made.</h1>
+            <h1 className="dv-h1">Videos and images your AI made.</h1>
             <p className="dv-lede">
-              Your own Claude directs and renders on your machine with Deno&apos;s playbooks, styles, licensed media and your validated pains. Every
+              Your own AI directs and renders on your machine with Deno&apos;s playbooks, styles, licensed media and your validated pains. Every
               version lands here for frame-by-frame review.
             </p>
           </div>

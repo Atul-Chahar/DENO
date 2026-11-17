@@ -2,10 +2,13 @@
 
 _A director writes the contract and storyboard, scene builders own one chapter each, the director reviews sheets and sends work back._
 
-# Multi-agent production (films over ~30 s)
+# Multi-agent production (films over ~60 s)
+
+Under a minute, one author is faster: every agent starts cold and re-reads the rules.
+
 
 - The **director** writes `TREATMENT.md` and `GUIDE.md`: the shared API (`seek`, `motion.js`), the palette per
-  chapter, reserved bands (captions, logo), the performance budget (≤ 1.5 s per frame), and the rule "edit only
+  chapter, reserved bands (captions, logo), the performance budget (`seek(t)` in ≤ 50 ms per frame), and the rule "edit only
   your own chapter file; report bugs in shared files".
 - Build chapter 1 yourself as the reference. Then fan out one **scene-builder** per chapter
   (`chapters/ch2.js`…), in waves: 2, then 4, then the rest, so early results calibrate the others.

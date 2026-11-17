@@ -10,9 +10,10 @@ import path from 'node:path';
 import { parseSilence } from '../lib/listen.mjs';
 import { modelSize } from '../lib/matte.mjs';
 import { formatSelector, generateSfx, licenceFromSite, pairDownloads, synthKindFor } from '../lib/sources.mjs';
+import { addNote, formatNotes, hasReview, loadReview, pickVideo, replyNote, saveReview, whereIn } from '../lib/review.mjs';
 import { distance, frameStats, notes, pool } from '../lib/stats.mjs';
 import { pendingItems, readiness, sourceHash } from '../lib/timeline.mjs';
-import { formats, parseArgs, safeName, tc } from '../lib/util.mjs';
+import { formats, logTiming, parseArgs, safeName, tc, timingSummary } from '../lib/util.mjs';
 
 function clickTrack(bpm, seconds, start = 0.3, rate = 22050) {
   const pcm = new Float32Array(Math.round(seconds * rate));
@@ -157,6 +158,64 @@ test('timeline: placeholders, source fingerprint and the done gate', () => {
     fs.writeFileSync(path.join(dir, 'out', 'verify.json'), JSON.stringify({ source: sourceHash(dir), findings: [] }));
     fs.writeFileSync(path.join(out, 'sheet.json'), JSON.stringify({ from: 'encoded', encoded: 'master.mp4', encodedMtimeMs: fs.statSync(path.join(out, 'master.mp4')).mtimeMs }));
     assert.deepEqual(readiness(dir, done, out), []);
+    // A first cut: a sheet of the draft render is enough for --draft, never for a final.
+    fs.writeFileSync(path.join(out, 'draft.mp4'), 'd');
+    fs.writeFileSync(path.join(out, 'sheet.json'), JSON.stringify({ from: 'encoded', encoded: 'draft.mp4', encodedMtimeMs: fs.statSync(path.join(out, 'draft.mp4')).mtimeMs }));
+    assert.deepEqual(readiness(dir, done, out, { draft: true }), []);
+    assert.ok(readiness(dir, done, out).some((w) => w.includes('mixed file')));
+    fs.writeFileSync(path.join(out, 'sheet.json'), JSON.stringify({ from: 'live' }));
+    assert.ok(readiness(dir, done, out, { draft: true }).some((w) => w.includes('draft')));
+    // Timings: every command's seconds add up in one line for `studio timeline`.
+    assert.equal(timingSummary(dir), '');
+    logTiming(dir, { cmd: 'render', s: 100, ok: true });
+    logTiming(dir, { cmd: 'sheet', s: 4, ok: true });
+    logTiming(dir, { cmd: 'sheet', s: 6, ok: true });
+    assert.match(timingSummary(dir), /^tool time so far: 1\.8 min over 3 command\(s\) · most: render 1\.7 min \(1×\), sheet 10 s \(2×\)/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('review: notes pin to frames, map to chapters, and round-trip through replies', () => {
+  const film = { title: 'Launch', fps: 30, chapters: [{ id: 'hook', start: 0, end: 2 }, { id: 'proof', start: 2, end: 6 }], clips: [{ id: 'logo', start: 4, end: 6 }] };
+  assert.deepEqual(whereIn(film, 4.5), { chapter: 'proof', clip: 'logo' });
+  assert.deepEqual(whereIn(film, 9), { chapter: null, clip: null });
+  const r = { round: 1, done_round: 0, notes: [] };
+  const a = addNote(r, film, { t: 1.35, x: 0.5, y: 2, text: '  too low \n', tags: ['text', 'made-up'] });
+  assert.deepEqual([a.id, a.frame, a.chapter, a.x, a.y, a.text, a.tags, a.status], ['n1', 40, 'hook', 0.5, 1, 'too low', ['text'], 'open']);
+  assert.throws(() => addNote(r, film, { t: 1, text: '   ' }), /text/);
+  const b = addNote(r, film, { t: 4, t_end: 5.5, text: 'drags' });
+  assert.equal(b.t_end, 5.5);
+  assert.equal(b.x, null);
+  // A late note reopens a round the founder had closed.
+  r.done_round = 1;
+  addNote(r, film, { t: 0, text: 'one more' });
+  assert.equal(r.done_round, 0);
+  assert.match(formatNotes(r, film), /^Launch · review round 1 · the founder is still reviewing · 3 open note\(s\)/);
+  assert.match(formatNotes(r, film), /\[n1\] 00:01:10 \(1\.35 s, F40\) \[chapter hook\] at x=0\.50 y=1\.00: too low #text/);
+  assert.match(formatNotes(r, film), /\[n2\] 00:04:00–00:05:15 .*\[chapter proof, clip logo\]: drags/);
+  replyNote(r, 'n1', 'fixed', 'Moved it up.');
+  assert.throws(() => replyNote(r, 'n9', 'fixed', 'x'), /no note/);
+  assert.throws(() => replyNote(r, 'n2', 'done', 'x'), /fixed/);
+  assert.doesNotMatch(formatNotes(r, film), /\[n1\]/);
+  assert.match(formatNotes(r, film, { all: true }), /\[n1\] r1 fixed .*→ Moved it up\./);
+  // Notes are not film code: writing them must not make `studio verify` stale.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-test-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'film.json'), JSON.stringify(film));
+    const h = sourceHash(dir);
+    assert.equal(hasReview(dir), false);
+    saveReview(dir, r);
+    assert.equal(hasReview(dir), true);
+    assert.equal(loadReview(dir).notes.length, 3);
+    assert.equal(sourceHash(dir), h);
+    assert.equal(pickVideo(dir, film), null);
+    const out = path.join(dir, 'out', '16x9');
+    fs.mkdirSync(out, { recursive: true });
+    fs.writeFileSync(path.join(out, 'master.mp4'), 'm');
+    fs.utimesSync(path.join(out, 'master.mp4'), new Date(1e12), new Date(1e12));
+    fs.writeFileSync(path.join(out, 'draft.mp4'), 'd');
+    assert.equal(path.basename(pickVideo(dir, film)), 'draft.mp4');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

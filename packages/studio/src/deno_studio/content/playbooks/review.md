@@ -1,6 +1,6 @@
 ---
 title: The review loop
-summary: Deterministic checks, contact sheets, strips and crops, a separate reviewer scoring 7 dimensions, partial re-renders.
+summary: Deterministic checks, contact sheets, strips and crops, one fix pass, then the founder; a separate reviewer once before a final.
 tags: [core, review, quality]
 core: true
 ---
@@ -15,17 +15,22 @@ core: true
    **Numbers for the look:** `studio sheet --stats` prints exposure, blacks and whites, contrast, crushed and
    blown pixels, saturation and colour cast per frame. `--reference ref.jpg` adds the distance to a reference
    look (under 0.05 is close). Measure; don't judge colour from a thumbnail.
-5. **A separate reviewer** (the `reviewer` agent, or a fresh look) scores 1–10 against the treatment line:
-   **hook** (first 2 s), **phone readability**, **motion quality**, **variety**, **composition**, **brand
-   accuracy**, **sound sync**. Name the two weakest moments with timestamps.
-6. Fix the three worst problems, re-render only the affected seconds (`studio render --from 6 --to 9`), repeat
-   until every dimension is at least 8. Expect three rounds.
+5. Fix the three worst problems you saw and re-render only the affected seconds
+   (`studio render --from 6 --to 9`). **One pass.** Then the founder looks: a person's notes beat another round
+   of your own scoring, and cost far less time.
+6. **Before a final only, once:** a separate reviewer (the `reviewer` agent, or a fresh look) scores 1–10 against
+   the treatment line: **hook** (first 2 s), **phone readability**, **motion quality**, **variety**,
+   **composition**, **brand accuracy**, **sound sync**, and names the two weakest moments. Fix anything under 6.
+   Do not repeat the scoring.
 7. Watch and listen to the whole encoded file before you call it done. Stills can't show stutter.
 8. **The done gate:** nothing is finished until `studio verify` is clean on the current code and you have read
    `studio sheet` of the mixed file. `studio upload` refuses otherwise (playbook `build-loop`).
 
 ## The founder's notes
-`studio upload` saves the version to Deno and prints a review link. The founder pins notes to frames there. Call
-`get_review_notes`, fix one note at a time, keep everything else exactly as it is, and answer each with
-`reply_note` (fixed, or won't fix with a reason). Notes describe feelings ("I lost interest here"); the founder's
-feeling about a moment is usually right, the fix is your job.
+`studio review` serves a review page from this machine: the film plays from the founder's disk, frame by frame,
+and is never uploaded. They pause, type, and the note pins to that frame (or a range, or a spot they click).
+When they press "I'm done reviewing", `studio notes --wait` returns with the notes. Fix one note at a time, keep
+everything else exactly as it is, and answer each with `studio reply <id> fixed "…"` (or `open "why not"`); the
+answer shows under their note. Re-render the seconds you touched and `studio review --next` opens the next round.
+Notes describe feelings ("I lost interest here"); the founder's feeling about a moment is usually right, the fix
+is your job. A note that names a rule for the whole film ("no outlined type") goes into `TREATMENT.md` as a rule.

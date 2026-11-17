@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cut Notes · Deno Studio</title>
+<link rel="icon" href="data:,">
+<style>
+  /* A dark cutting room in Deno's colours: ink ground, paper type, lime for the playhead and anything live.
+     System fonts only, so the page works with no network. */
+  :root {
+    color-scheme: dark;
+    --ground: #0c100e;
+    --panel: #131917;
+    --raised: #1a221e;
+    --line: #2a342f;
+    --paper: #f3f1ea;
+    --ash: #94a09a;
+    --lime: #c6f24e;
+    --lime-ink: #10160a;
+    --amber: #f2b84b;
+    --done: #7fd0a0;
+    --red: #ff7d66;
+    --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--ground); color: var(--paper); font: 15px/1.5 var(--ui); }
+  button, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+
+  /* ---- top bar ---- */
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .brand { font: 700 11px/1 var(--mono); letter-spacing: .14em; color: var(--lime); border: 1px solid var(--line); padding: 6px 8px; }
+  h1 { margin: 0; font: 600 20px/1.1 var(--display); letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { font: 500 12px/1 var(--mono); color: var(--ash); white-space: nowrap; }
+  .grow { flex: 1; }
+  .pill { font: 600 11px/1 var(--mono); letter-spacing: .08em; padding: 6px 9px; border: 1px solid var(--line); color: var(--ash); white-space: nowrap; }
+  .pill.live { color: var(--lime); border-color: color-mix(in srgb, var(--lime) 45%, var(--line)); }
+  .pill.sent { color: var(--done); border-color: color-mix(in srgb, var(--done) 45%, var(--line)); }
+  select { background: var(--raised); border: 1px solid var(--line); padding: 5px 6px; font: 500 12px var(--mono); }
+
+  .btn { background: var(--raised); border: 1px solid var(--line); padding: 7px 11px; white-space: nowrap; font-size: 13px; }
+  .btn:hover:not(:disabled) { border-color: var(--ash); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.on { border-color: var(--lime); color: var(--lime); }
+  .btn.primary { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); font-weight: 650; }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
+  .btn.quiet { background: none; border-color: transparent; color: var(--ash); padding: 2px 7px; font-size: 12px; }
+  .btn.quiet:hover { color: var(--paper); border-color: var(--line); }
+  .key { font: 600 12px/1 var(--mono); padding: 8px 10px; }
+
+  /* ---- layout ---- */
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 372px; min-height: 0; }
+  .left { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; min-width: 0; min-height: 0; border-right: 1px solid var(--line); }
+  @media (max-width: 880px) {
+    .app { height: auto; min-height: 100%; }
+    main { grid-template-columns: minmax(0, 1fr); }
+    .left { border-right: 0; grid-template-rows: auto auto auto; }
+    .screen { height: 56vh; }
+    aside { border-top: 1px solid var(--line); }
+  }
+
+  /* ---- screen ---- */
+  .screen { position: relative; background: #000; display: grid; place-items: center; min-height: 0; overflow: hidden; }
+  .frame { position: absolute; inset: 0; }
+  video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; cursor: crosshair; }
+  .pin { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 2px solid var(--lime-ink); background: var(--amber); pointer-events: none; }
+  .pin.closed { background: var(--done); opacity: .75; }
+  .pin.pending { background: var(--lime); box-shadow: 0 0 0 4px rgba(198, 242, 78, .25); }
+  .empty-screen { text-align: center; padding: 28px; max-width: 46ch; }
+  .empty-screen strong { display: block; font: 600 24px/1.2 var(--display); margin-bottom: 8px; }
+  .empty-screen span { color: var(--ash); }
+  .badge { position: absolute; left: 12px; top: 12px; font: 600 10px/1 var(--mono); letter-spacing: .12em; background: rgba(12, 16, 14, .8); border: 1px solid var(--line); color: var(--amber); padding: 5px 7px; }
+
+  /* ---- transport ---- */
+  .transport { padding: 10px 14px 12px; border-top: 1px solid var(--line); background: var(--panel); display: grid; gap: 9px; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tc { font: 600 15px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .tc b { color: var(--lime); font-weight: 600; }
+  .tc span { color: var(--ash); }
+
+  .track { position: relative; height: 34px; cursor: pointer; touch-action: none; user-select: none; }
+  .bar { position: absolute; left: 0; right: 0; top: 12px; height: 6px; background: var(--raised); border: 1px solid var(--line); }
+  .fill { position: absolute; left: 0; top: 12px; height: 6px; background: color-mix(in srgb, var(--lime) 55%, transparent); }
+  .range { position: absolute; top: 9px; height: 12px; background: rgba(242, 184, 75, .3); border-inline: 2px solid var(--amber); }
+  .head { position: absolute; top: 4px; width: 2px; height: 22px; margin-left: -1px; background: var(--lime); }
+  .head::before { content: ""; position: absolute; left: -4px; top: -4px; border: 5px solid transparent; border-top-color: var(--lime); }
+  .mark { position: absolute; top: 0; width: 8px; height: 8px; margin-left: -4px; background: var(--amber); transform: rotate(45deg); }
+  .mark.closed { background: var(--done); opacity: .7; }
+  .chapters { position: relative; height: 18px; }
+  .chapter { position: absolute; top: 0; height: 18px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 10px/18px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ash); padding: 0 6px; border-left: 1px solid var(--line); background: none; border-block: 0; border-right: 0; text-align: left; }
+  .chapter:hover, .chapter.now { color: var(--paper); background: var(--raised); }
+
+  /* ---- composer ---- */
+  .composer { padding: 12px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+  .at { font: 600 11px/1 var(--mono); letter-spacing: .1em; color: var(--ash); }
+  .at b { color: var(--lime); font-weight: 600; }
+  textarea { width: 100%; background: var(--ground); border: 1px solid var(--line); padding: 9px 10px; line-height: 1.45; resize: vertical; }
+  #noteInput { min-height: 58px; }
+  textarea::placeholder { color: var(--ash); }
+  .tag { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 8px; background: none; border: 1px solid var(--line); color: var(--ash); }
+  .tag:hover { color: var(--paper); }
+  .tag.on { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+  .keys { font-size: 12px; color: var(--ash); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  kbd { font: 600 11px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; padding: 0 5px; color: var(--paper); background: var(--ground); }
+
+  /* ---- notes ---- */
+  aside { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: var(--panel); }
+  .notes-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .notes-head h2 { margin: 0; font: 700 11px/1 var(--mono); letter-spacing: .14em; }
+  .count { color: var(--ash); font: 500 12px var(--mono); }
+  ol { list-style: none; margin: 0; padding: 8px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+  .note { border: 1px solid transparent; padding: 9px 10px; display: grid; gap: 5px; }
+  .note:hover { background: var(--raised); border-color: var(--line); }
+  .note.active { border-color: var(--lime); }
+  .note.closed .text { color: var(--ash); }
+  .note-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip { font: 600 12px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--amber); background: none; border: 1px solid var(--line); padding: 5px 6px; }
+  .note.closed .chip { color: var(--done); }
+  .chip:hover { border-color: var(--amber); }
+  .where { font: 500 11px var(--mono); color: var(--ash); }
+  .state { margin-left: auto; font: 700 10px/1 var(--mono); letter-spacing: .1em; color: var(--amber); }
+  .note.closed .state { color: var(--done); }
+  .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .tags { font: 500 11px var(--mono); color: var(--ash); }
+  .reply { font-size: 13px; color: var(--paper); border-left: 2px solid var(--done); padding-left: 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .reply.why { border-color: var(--amber); }
+  .reply b { font: 700 10px var(--mono); letter-spacing: .1em; color: var(--done); display: block; }
+  .reply.why b { color: var(--amber); }
+  .actions { display: flex; gap: 2px; margin-left: -7px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--ash); }
+  .blank { color: var(--ash); padding: 18px 14px; font-size: 14px; }
+  .foot { border-top: 1px solid var(--line); padding: 12px 14px; display: grid; gap: 8px; }
+  .foot p { margin: 0; font-size: 13px; color: var(--ash); }
+  .foot .row { justify-content: space-between; }
+  .err { color: var(--red); font-size: 13px; }
+  @media (prefers-reduced-motion: no-preference) { .btn, .tag, .note { transition: border-color .12s, background-color .12s, color .12s; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="brand">DENO STUDIO</span>
+    <h1 id="title">Cut Notes</h1>
+    <span class="meta" id="meta"></span>
+    <span class="grow"></span>
+    <label class="meta" for="roundSel">Round <select id="roundSel" aria-label="Round"></select></label>
+    <span class="pill" id="pill">LOADING</span>
+  </header>
+
+  <main>
+    <section class="left" aria-label="Player">
+      <div class="screen" id="screen">
+        <div class="frame" id="frame" hidden>
+          <video id="video" playsinline preload="auto"></video>
+        </div>
+        <span class="badge" id="badge" hidden>DRAFT QUALITY</span>
+        <div class="empty-screen" id="empty">
+          <strong id="emptyTitle">No render yet</strong>
+          <span id="emptyText">Ask your AI for a draft. It appears here on its own, played from this computer.</span>
+        </div>
+      </div>
+
+      <div class="transport">
+        <div>
+          <div class="track" id="track" role="slider" aria-label="Position" tabindex="-1" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <div class="bar"></div>
+            <div class="fill" id="fill"></div>
+            <div class="range" id="range" hidden></div>
+            <div id="marks"></div>
+            <div class="head" id="head"></div>
+          </div>
+          <div class="chapters" id="chapters" hidden></div>
+        </div>
+        <div class="row">
+          <button class="btn key" id="back1" type="button" title="One frame back (←)">◀ 1F</button>
+          <button class="btn key" id="play" type="button" title="Play / pause (space)">PLAY</button>
+          <button class="btn key" id="fwd1" type="button" title="One frame forward (→)">1F ▶</button>
+          <span class="tc"><b id="now">00:00:00</b> <span>/ <span id="dur">00:00:00</span> · F<span id="frameNo">0</span></span></span>
+          <span class="grow"></span>
+          <button class="btn key" id="inBtn" type="button" title="Start of a range note ([)">[ IN</button>
+          <button class="btn key" id="outBtn" type="button" title="End of a range note (])">OUT ]</button>
+          <select id="speed" aria-label="Playback speed">
+            <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="at">NOTE AT <b id="noteAt">00:00:00</b><span id="spotAt"></span></div>
+        <textarea id="noteInput" rows="2" placeholder="Just start typing: the note pins to this frame. Say what feels off (“I lost interest here”, “logo too small”). Click the picture to point at a spot. Enter saves."></textarea>
+        <div class="row" id="tagRow"></div>
+        <div class="row">
+          <button class="btn primary" id="saveBtn" type="button" disabled>Pin note</button>
+          <button class="btn quiet" id="cancelBtn" type="button" hidden>Cancel</button>
+          <span class="err" id="err" hidden></span>
+          <span class="grow"></span>
+          <span class="keys">
+            <span><kbd>Space</kbd> play</span>
+            <span><kbd>←</kbd><kbd>→</kbd> frame</span>
+            <span><kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> second</span>
+            <span><kbd>[</kbd><kbd>]</kbd> range</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <aside aria-label="Notes">
+      <div class="notes-head">
+        <h2>NOTES</h2>
+        <span class="count" id="count"></span>
+        <span class="grow"></span>
+        <button class="btn quiet" id="openOnly" type="button">Open only</button>
+        <button class="btn quiet" id="copyBtn" type="button" title="Copy the open notes as text, to paste into any AI chat">Copy</button>
+      </div>
+      <ol id="list"></ol>
+      <div class="foot">
+        <button class="btn primary" id="doneBtn" type="button">I'm done reviewing</button>
+        <p id="doneText">Your AI is waiting for this. It reads your notes, fixes each one, and answers here.</p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const video = $('video'), input = $('noteInput'), list = $('list'), track = $('track');
+  let S = null;            // last state from the kit
+  let viewRound = null;    // round being looked at (null = the open one)
+  let draft = { t: null, t_end: null, x: null, y: null, tags: [] };
+  let range = { a: null, b: null };
+  let editing = null, confirming = null, openOnly = false, lastJson = '', videoV = null, raf = 0, scrubbing = false;
+
+  const fps = () => (S && S.fps) || 30;
+  const dur = () => video.duration || (S && S.duration) || 0;
+  const frameOf = (t) => Math.floor(t * fps() + 1e-4);
+  const p2 = (n) => String(n).padStart(2, '0');
+  const tc = (t) => {
+    const f = frameOf(Math.max(0, t)), n = Math.round(fps()), s = Math.floor(f / n);
+    return `${p2(Math.floor(s / 60))}:${p2(s % 60)}:${p2(f % n)}`;
+  };
+  // The picture is letterboxed inside the <video> element: its real box, relative to the element.
+  const picture = () => {
+    const b = video.getBoundingClientRect(), vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+    const k = Math.min(b.width / vw, b.height / vh), w = vw * k, h = vh * k;
+    return { left: (b.width - w) / 2, top: (b.height - h) / 2, w, h, el: b };
+  };
+  const closed = (n) => n.status !== 'open';
+  const round = () => viewRound ?? (S ? S.round : 1);
+  const current = () => S && round() === S.round;
+  const shown = () => (S ? S.notes.filter((n) => n.round === round() && (!openOnly || !closed(n))).sort((a, b) => a.t - b.t) : []);
+
+  async function api(method, path, body) {
+    const res = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `error ${res.status}`);
+    return data;
+  }
+  function problem(msg) { $('err').textContent = msg; $('err').hidden = !msg; }
+
+  // ---- state from the kit: polled, so the AI's replies and a new render appear on their own ----
+  async function refresh() {
+    try {
+      const res = await fetch('/api/state', { cache: 'no-store' });
+      const text = await res.text();
+      if (text === lastJson) return;
+      lastJson = text;
+      S = JSON.parse(text);
+      if (viewRound !== null && viewRound >= S.round) viewRound = null;
+      apply();
+    } catch {
+      $('pill').textContent = 'KIT NOT RUNNING'; $('pill').className = 'pill';
+    }
+  }
+  function apply() {
+    document.title = `${S.title} · Cut Notes`;
+    $('title').textContent = S.title;
+    $('meta').textContent = `${S.ratio} · ${S.fps} fps${S.video ? ` · ${S.video.name}` : ''}`;
+    const sel = $('roundSel');
+    sel.innerHTML = '';
+    for (let r = S.round; r >= 1; r--) { const o = document.createElement('option'); o.value = r; o.textContent = r === S.round ? `${r} (now)` : r; sel.appendChild(o); }
+    sel.value = String(round());
+    if (S.video && S.video.v !== videoV) {
+      const keep = videoV !== null ? video.currentTime : 0;
+      videoV = S.video.v;
+      video.src = `/video?v=${videoV}`;
+      video.addEventListener('loadedmetadata', () => { video.currentTime = Math.min(keep, video.duration || 0); }, { once: true });
+      $('frame').hidden = false; $('empty').hidden = true;
+    }
+    $('badge').hidden = !(S.video && S.video.draft);
+    const pill = $('pill');
+    if (!current()) { pill.textContent = `ROUND ${round()} · PAST`; pill.className = 'pill'; }
+    else if (S.done) { pill.textContent = 'SENT TO YOUR AI'; pill.className = 'pill sent'; }
+    else { pill.textContent = 'REVIEWING'; pill.className = 'pill live'; }
+    $('doneBtn').disabled = !current() || !S.video;
+    $('doneBtn').textContent = S.done && current() ? 'Sent. Reopen this round' : "I'm done reviewing";
+    const open = S.notes.filter((n) => n.round === S.round && !closed(n)).length;
+    $('doneText').textContent = !current() ? 'This is an earlier round. Pick the latest round to add notes.'
+      : S.done ? (open ? `Your AI has ${open} note${open === 1 ? '' : 's'} to work through. Answers appear here; the next round loads on its own.` : 'No open notes: your AI knows this cut is good.')
+      : 'Your AI is waiting for this. It reads your notes, fixes each one, and answers here.';
+    input.disabled = !current() || !S.video;
+    if (!$('tagRow').children.length) S.tags.forEach((g) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'tag'; b.textContent = g; b.dataset.tag = g;
+      b.addEventListener('click', () => { draft.tags = draft.tags.includes(g) ? draft.tags.filter((x) => x !== g) : [...draft.tags, g]; paintTags(); });
+      $('tagRow').appendChild(b);
+    });
+    paintChapters(); render(); tick();
+  }
+  $('roundSel').addEventListener('change', (e) => { const r = Number(e.target.value); viewRound = r === S.round ? null : r; apply(); });
+
+  // ---- transport ----
+  function tick() {
+    const t = video.currentTime || 0, d = dur();
+    $('now').textContent = tc(t); $('dur').textContent = tc(d); $('frameNo').textContent = frameOf(t);
+    if (draft.t === null) $('noteAt').textContent = range.a !== null ? `${tc(range.a)}${range.b !== null ? ` → ${tc(range.b)}` : ''}` : tc(t);
+    const pc = d ? (t / d) * 100 : 0;
+    $('fill').style.width = `${pc}%`; $('head').style.left = `${pc}%`;
+    track.setAttribute('aria-valuemax', d.toFixed(2)); track.setAttribute('aria-valuenow', t.toFixed(2));
+    const r = $('range');
+    r.hidden = range.a === null || !d;
+    if (!r.hidden) { r.style.left = `${(range.a / d) * 100}%`; r.style.width = `${(((range.b ?? range.a) - range.a) / d) * 100}%`; }
+    document.querySelectorAll('.chapter').forEach((el) => el.classList.toggle('now', t >= Number(el.dataset.a) && t < Number(el.dataset.b)));
+    document.querySelectorAll('.note').forEach((el) => el.classList.toggle('active', Math.abs(Number(el.dataset.t) - t) < 0.6 / fps()));
+    paintPins();
+  }
+  const loop = () => { tick(); raf = video.paused ? 0 : requestAnimationFrame(loop); };
+  video.addEventListener('play', () => { $('play').textContent = 'PAUSE'; if (!raf) loop(); });
+  video.addEventListener('pause', () => { $('play').textContent = 'PLAY'; tick(); });
+  video.addEventListener('seeked', tick);
+  video.addEventListener('loadedmetadata', () => { render(); tick(); });
+  video.addEventListener('error', () => { $('frame').hidden = true; $('empty').hidden = false; $('emptyTitle').textContent = "This browser can't play the file"; $('emptyText').textContent = 'Ask your AI to render again (H.264 MP4).'; });
+  const seek = (t) => { video.currentTime = Math.max(0, Math.min(t, Math.max(0, dur() - 0.5 / fps()))); };
+  const toggle = () => { if (!video.src) return; video.paused ? video.play().catch(() => {}) : video.pause(); };
+  // Land mid-frame so the decoder shows exactly that frame.
+  const step = (n) => { if (!video.src) return; video.pause(); seek((Math.max(0, frameOf(video.currentTime) + n) + 0.5) / fps()); };
+  $('play').addEventListener('click', toggle);
+  $('back1').addEventListener('click', () => step(-1));
+  $('fwd1').addEventListener('click', () => step(1));
+  $('speed').addEventListener('change', (e) => { video.playbackRate = Number(e.target.value); });
+  const setIn = () => { const t = video.currentTime; range = { a: t, b: range.b !== null && range.b > t ? range.b : null }; tick(); };
+  const setOut = () => { const t = video.currentTime; range = { a: range.a !== null && range.a < t ? range.a : 0, b: t }; tick(); };
+  $('inBtn').addEventListener('click', setIn);
+  $('outBtn').addEventListener('click', setOut);
+
+  const scrubTo = (e) => { const b = track.getBoundingClientRect(); seek(Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)) * dur()); tick(); };
+  track.addEventListener('pointerdown', (e) => { if (!video.src) return; scrubbing = true; track.setPointerCapture(e.pointerId); video.pause(); scrubTo(e); });
+  track.addEventListener('pointermove', (e) => scrubbing && scrubTo(e));
+  track.addEventListener('pointerup', () => { scrubbing = false; });
+
+  function paintChapters() {
+    const box = $('chapters'), d = dur() || S.duration;
+    box.innerHTML = ''; box.hidden = !S.chapters.length || !d;
+    S.chapters.forEach((c) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chapter'; b.textContent = c.label; b.title = c.label;
+      b.dataset.a = c.start; b.dataset.b = c.end;
+      b.style.left = `${(c.start / d) * 100}%`; b.style.width = `${((c.end - c.start) / d) * 100}%`;
+      b.addEventListener('click', () => { video.pause(); seek(c.start + 0.5 / fps()); });
+      box.appendChild(b);
+    });
+  }
+
+  // ---- composing: the note pins to the frame on screen the moment you start writing ----
+  function pinNow() {
+    if (draft.t !== null || input.disabled) return;
+    video.pause();
+    draft.t = range.a ?? video.currentTime ?? 0;
+    draft.t_end = range.a !== null && range.b !== null && range.b > range.a ? range.b : null;
+    $('noteAt').textContent = `${tc(draft.t)}${draft.t_end !== null ? ` → ${tc(draft.t_end)}` : ''}`;
+    $('cancelBtn').hidden = false;
+  }
+  function clearDraft() {
+    draft = { t: null, t_end: null, x: null, y: null, tags: [] }; range = { a: null, b: null };
+    input.value = ''; $('spotAt').textContent = ''; $('cancelBtn').hidden = true; $('saveBtn').disabled = true; problem(''); paintTags(); tick();
+  }
+  function paintTags() { document.querySelectorAll('#tagRow .tag').forEach((b) => b.classList.toggle('on', draft.tags.includes(b.dataset.tag))); }
+  input.addEventListener('focus', pinNow);
+  input.addEventListener('input', () => { pinNow(); $('saveBtn').disabled = !input.value.trim(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { clearDraft(); input.blur(); }
+  });
+  $('cancelBtn').addEventListener('click', clearDraft);
+  $('saveBtn').addEventListener('click', save);
+  async function save() {
+    const text = input.value.trim();
+    if (!text || draft.t === null) return;
+    try {
+      await api('POST', '/api/notes', { ...draft, text });
+      clearDraft(); input.blur(); await refresh();
+    } catch (e) { problem(`That note didn't save (${e.message}). Is the kit still running?`); }
+  }
+  // Click the picture: point at a spot.
+  video.addEventListener('click', (e) => {
+    if (input.disabled) return;
+    const b = picture();
+    const x = (e.clientX - b.el.left - b.left) / b.w, y = (e.clientY - b.el.top - b.top) / b.h;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return; // the black bars are not the picture
+    pinNow();
+    draft.x = Math.round(x * 1000) / 1000;
+    draft.y = Math.round(y * 1000) / 1000;
+    $('spotAt').textContent = ' · SPOT PINNED';
+    paintPins(); input.focus();
+  });
+  function paintPins() {
+    const frame = $('frame');
+    frame.querySelectorAll('.pin').forEach((el) => el.remove());
+    if (!S || frame.hidden) return;
+    const b = picture(), t = video.currentTime || 0;
+    const put = (x, y, cls) => {
+      const el = document.createElement('span'); el.className = `pin ${cls}`;
+      el.style.left = `${b.left + x * b.w}px`; el.style.top = `${b.top + y * b.h}px`;
+      frame.appendChild(el);
+    };
+    shown().filter((n) => n.x !== null && n.y !== null && t >= n.t - 0.25 && t <= (n.t_end ?? n.t) + 0.25).forEach((n) => put(n.x, n.y, closed(n) ? 'closed' : ''));
+    if (draft.x !== null) put(draft.x, draft.y, 'pending');
+  }
+  addEventListener('resize', paintPins);
+
+  // ---- notes list ----
+  const mk = (label, fn, cls = 'btn quiet') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = label; b.addEventListener('click', fn); return b; };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  async function change(fn) { try { await fn(); await refresh(); } catch (e) { problem(`That didn't save (${e.message}).`); } }
+  function render() {
+    if (!S) return;
+    const rows = shown(), all = S.notes.filter((n) => n.round === round());
+    $('count').textContent = all.length ? `${all.filter((n) => !closed(n)).length} open of ${all.length}` : '';
+    $('openOnly').classList.toggle('on', openOnly);
+    list.innerHTML = '';
+    if (!rows.length) list.appendChild(el('li', 'blank', !S.video ? 'Notes appear here once there is a render to watch.' : all.length ? 'No open notes in this round.' : 'No notes yet. Press play, and type when something feels off.'));
+    rows.forEach((n) => {
+      const li = el('li', `note${closed(n) ? ' closed' : ''}`); li.dataset.t = n.t;
+      const top = el('div', 'note-top');
+      top.append(mk(`${tc(n.t)}${n.t_end !== null ? `–${tc(n.t_end)}` : ''}`, () => { video.pause(); seek(n.t + 0.5 / fps()); }, 'chip'));
+      const where = [n.chapter, n.x !== null ? 'spot' : ''].filter(Boolean).join(' · ');
+      if (where) top.append(el('span', 'where', where));
+      top.append(el('span', 'state', n.status === 'fixed' ? 'FIXED' : n.status === 'resolved' ? 'RESOLVED' : 'OPEN'));
+      li.append(top);
+      if (editing === n.id) {
+        const box = el('textarea'); box.value = n.text; box.rows = 3; box.setAttribute('aria-label', 'Edit note');
+        box.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = box.value.trim(); editing = null; v && v !== n.text ? change(() => api('PATCH', `/api/notes/${n.id}`, { text: v })) : render(); }
+          if (e.key === 'Escape') { editing = null; render(); }
+        });
+        li.append(box); setTimeout(() => box.focus(), 0);
+      } else li.append(el('div', 'text', n.text));
+      if (n.tags.length) li.append(el('div', 'tags', `#${n.tags.join(' #')}`));
+      if (n.reply) { const r = el('div', `reply${n.status === 'fixed' ? '' : ' why'}`); r.append(el('b', '', n.status === 'fixed' ? 'YOUR AI FIXED IT' : 'YOUR AI SAYS'), document.createTextNode(n.reply)); li.append(r); }
+      const a = el('div', 'actions');
+      if (confirming === n.id) a.append('Delete this note?', mk('Delete', () => { confirming = null; change(() => api('DELETE', `/api/notes/${n.id}`)); }), mk('Keep', () => { confirming = null; render(); }));
+      else a.append(
+        mk(closed(n) ? 'Reopen' : 'Resolve', () => change(() => api('PATCH', `/api/notes/${n.id}`, { status: closed(n) ? 'open' : 'resolved' }))),
+        mk('Edit', () => { editing = n.id; render(); }),
+        mk('Delete', () => { confirming = n.id; render(); }),
+      );
+      li.append(a); list.appendChild(li);
+    });
+    const marks = $('marks'), d = dur();
+    marks.innerHTML = '';
+    if (d) rows.forEach((n) => { const i = el('i', `mark${closed(n) ? ' closed' : ''}`); i.style.left = `${(n.t / d) * 100}%`; marks.appendChild(i); });
+    tick();
+  }
+  $('openOnly').addEventListener('click', () => { openOnly = !openOnly; render(); });
+  $('doneBtn').addEventListener('click', () => change(() => api('POST', '/api/done', { done: !S.done })));
+  $('copyBtn').addEventListener('click', () => {
+    const rows = S.notes.filter((n) => n.round === round() && !closed(n)).sort((a, b) => a.t - b.t);
+    const text = [`Review notes for "${S.title}" (round ${round()}, ${S.fps} fps). Fix one at a time and keep everything else exactly as it is. Then tell me what you changed for each note.`, '',
+      ...rows.map((n, i) => `${i + 1}. ${tc(n.t)}${n.t_end !== null ? `–${tc(n.t_end)}` : ''} (${n.t.toFixed(2)} s)${n.chapter ? ` [${n.chapter}]` : ''}${n.x !== null ? ` at x=${n.x.toFixed(2)} y=${n.y.toFixed(2)}` : ''}: ${n.text.replace(/\n+/g, ' ')}${n.tags.length ? ` #${n.tags.join(' #')}` : ''}`)].join('\n');
+    const b = $('copyBtn');
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Copy failed'; }).finally(() => setTimeout(() => { b.textContent = 'Copy'; }, 1600));
+  });
+
+  // ---- keyboard: frame keys, and typing anywhere starts a note on the current frame ----
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'textarea' || tag === 'select') return;
+    if (e.metaKey || e.ctrlKey || e.altKey || !video.src) return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); toggle(); }
+    else if (e.key === 'ArrowLeft' || e.key === ',') { e.preventDefault(); e.shiftKey ? seek(video.currentTime - 1) : step(-1); }
+    else if (e.key === 'ArrowRight' || e.key === '.') { e.preventDefault(); e.shiftKey ? seek(video.currentTime + 1) : step(1); }
+    else if (e.key === '[') setIn();
+    else if (e.key === ']') setOut();
+    else if (e.key === 'Escape') { range = { a: null, b: null }; tick(); }
+    else if (e.key.length === 1 && !input.disabled) input.focus(); // the key lands in the note
+  });
+
+  refresh();
+  setInterval(refresh, 1500);
+})();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { die, info, loadFilm, num, saveFilm, tc } from './util.mjs';
+import { die, info, loadFilm, num, saveFilm, tc, timingSummary } from './util.mjs';
 
 const KINDS = ['shot', 'graphic', 'title', 'footage', 'screen', 'voice', 'music', 'sfx', 'caption'];
 
@@ -71,6 +71,8 @@ export function timeline(dir) {
   if (pending.length) info(`${pending.length} placeholder(s) pending: ${pending.map((p) => p.id).join(', ')}. Fill them all before a full render.`);
   if (lic.length) info(`${lic.length} asset(s) without a confirmed licence: ${lic.map((a) => a.id).join(', ')}. They can't go in a final.`);
   const v = verifyState(dir);
+  const spent = timingSummary(dir);
+  if (spent) info(spent);
   info(v.ran ? `last verify: ${v.blocking} blocking, ${v.warnings} warning(s)${v.fresh ? '' : ' (stale: the code changed since)'}` : 'not verified yet');
 }
 
@@ -80,7 +82,7 @@ export function sourceHash(dir) {
   const files = [];
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-      if (['out', 'assets', 'node_modules', '.git'].includes(e.name)) continue;
+      if (['out', 'assets', 'review', 'node_modules', '.git'].includes(e.name)) continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
       else if (/\.(html|js|mjs|css|json)$/.test(e.name) && e.name !== 'CREDITS.json') files.push(p);
@@ -109,8 +111,9 @@ export function verifyState(dir) {
   return { ran: !v.chapter, blocking, warnings: (v.findings || []).length - blocking, fresh: v.source === sourceHash(dir) };
 }
 
-/** Why this project isn't ready to hand over, or [] when verify is clean and current and the sheet shows the file. */
-export function readiness(dir, film, out) {
+/** Why this project isn't ready to hand over, or [] when verify is clean and current and the sheet shows the file.
+ * `draft`: a first cut or fix round, where a sheet of any current encoded file (the draft render) is enough. */
+export function readiness(dir, film, out, { draft = false } = {}) {
   const why = [];
   const pending = pendingItems(film);
   if (pending.length) why.push(`${pending.length} placeholder(s) still pending (${pending.map((p) => p.id).join(', ')})`);
@@ -124,6 +127,11 @@ export function readiness(dir, film, out) {
     const pages = fs.existsSync(out) ? fs.readdirSync(out).filter((f) => /^page-\d+\.png$/.test(f)) : [];
     const newest = Math.max(0, ...pages.map((f) => fs.statSync(path.join(out, f)).mtimeMs));
     if (!sheet || sheet.at < newest) why.push('no `studio sheet` of the current pages');
+  } else if (draft) {
+    const shown = sheet?.from === 'encoded' && sheet.encoded ? path.join(out, sheet.encoded) : null;
+    if (!shown || !fs.existsSync(shown) || sheet.encodedMtimeMs !== fs.statSync(shown).mtimeMs) {
+      why.push('no `studio sheet` of the current draft (`studio render --draft`, then `studio sheet`)');
+    }
   } else {
     const master = path.join(out, 'master.mp4');
     if (!sheet || sheet.from !== 'encoded' || !fs.existsSync(master) || sheet.encodedMtimeMs !== fs.statSync(master).mtimeMs || sheet.encoded !== 'master.mp4') {

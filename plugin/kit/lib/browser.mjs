@@ -100,7 +100,20 @@ export class Film {
   }
 
   async grab(page, t, type = 'png') {
-    await page.evaluate((x) => window.seek(x), t);
+    // Chromium keeps a moving element's raster from when it was first painted, so the same `t` can come out a
+    // few sub-pixels different depending on which frames came before (seen on Windows). Dropping the layout
+    // tree before each seek makes every frame paint as if it were the first.
+    await page.evaluate((x) => {
+      const root = document.body;
+      const was = root.style.display;
+      root.style.display = 'none';
+      void root.offsetHeight;
+      const done = () => {
+        root.style.display = was;
+      };
+      const r = window.seek(x);
+      return r && typeof r.then === 'function' ? r.then(done, (e) => (done(), Promise.reject(e))) : done();
+    }, t);
     return page.screenshot({ type, quality: type === 'jpeg' ? 92 : undefined, clip: { x: 0, y: 0, width: this.fmt.w, height: this.fmt.h }, animations: 'disabled', caret: 'hide' });
   }
 
