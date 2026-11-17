@@ -1,7 +1,8 @@
 """Build the Claude Code plugin's skills from the Studio's shared content (docs/18 §4.4).
 
 The words live once, in packages/studio/src/deno_studio/content/. This writes plugin/skills/<name>/SKILL.md and
-the offline reference copies, so the plugin and the MCP never drift. CI runs it with --check.
+the offline reference copies, so the plugin and the MCP never drift, and web/lib/gallery/formats.json, so the
+public video gallery (docs/23) shows the same formats and styles. CI runs it with --check.
 
     uv run python scripts/build_plugin.py          # write
     uv run python scripts/build_plugin.py --check  # fail if plugin/skills is stale
@@ -9,6 +10,7 @@ the offline reference copies, so the plugin and the MCP never drift. CI runs it 
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -16,6 +18,7 @@ from deno_studio import list_docs
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "plugin" / "skills"
+GALLERY = ROOT / "web" / "lib" / "gallery" / "formats.json"
 
 PREAMBLE = """> **Deno Studio plugin.** `studio` is this plugin's command (on your PATH while the plugin is enabled; if the
 > shell can't find it, use `node "${CLAUDE_PLUGIN_ROOT}/kit/cli.mjs"`). Deno's MCP tools (get_founder_context,
@@ -29,6 +32,43 @@ PREAMBLE = """> **Deno Studio plugin.** `studio` is this plugin's command (on yo
 """
 
 
+def _prose(body: str) -> str:
+    """A doc's body without its own `# Title` line (the page prints the title itself)."""
+    lines = body.strip().splitlines()
+    if lines and lines[0].startswith("# "):
+        lines = lines[1:]
+    return "\n".join(lines).strip()
+
+
+def gallery_formats() -> str:
+    """Recipes and styles as data for the website's video gallery."""
+    recipes = [
+        {
+            "slug": d.slug,
+            "title": d.title,
+            "summary": d.summary,
+            "tags": list(d.tags),
+            "ratio": d.meta.get("ratio", ""),
+            "seconds": int(d.meta["length"]) if d.meta.get("length", "").isdigit() else None,
+            "style": d.meta.get("style", ""),
+            "body": _prose(d.body),
+        }
+        for d in list_docs("recipes")
+    ]
+    styles = [
+        {
+            "slug": d.slug,
+            "title": d.title,
+            "summary": d.summary,
+            "tags": list(d.tags),
+            "best_for": d.meta.get("best_for", ""),
+            "avoid_for": d.meta.get("avoid_for", ""),
+        }
+        for d in list_docs("styles")
+    ]
+    return json.dumps({"recipes": recipes, "styles": styles}, indent=2, ensure_ascii=False) + "\n"
+
+
 def skill_files() -> dict[Path, str]:
     out: dict[Path, str] = {}
     for doc in list_docs("skills"):
@@ -39,6 +79,7 @@ def skill_files() -> dict[Path, str]:
             out[SKILLS / "video" / "reference" / kind / f"{doc.slug}.md"] = (
                 f"# {doc.title}\n\n_{doc.summary}_\n\n{doc.body}"
             )
+    out[GALLERY] = gallery_formats()
     return out
 
 
