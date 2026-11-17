@@ -40,6 +40,16 @@ docs/21 §6 lists plan features the site shows that the product does not enforce
 The repo is now also checked out on Atul's Windows machine (LF line endings forced in the repo config; the kit's
 chmod test fails there because Windows has no Unix file modes).
 
+### 2026-11-16: launch plan + day 1 (branch `feat/studio-fast-loop`, docs/22)
+docs/22 is the 10-day plan: why a 1-minute film takes hours, the speed plan (S1–S7), the review page (R1–R3),
+other AI tools (A1–A5). Day 1 is built, **not merged**: bounded build/review loop in the skills, playbooks and
+agents; `studio upload --draft`; `out/timings.json`; the kit installs its own ffmpeg; three Windows fixes
+(npm spawn, verify purity on the template, CRLF from `build_plugin.py`). Numbers and what was not tested:
+docs/22 §8. Also built (docs/22 §9): **`studio review`**, a review page served from the founder's machine (their
+Cut Notes page, rebuilt): the video plays from disk and is never uploaded, notes pin to frames, the AI reads
+them with `studio notes --wait` and answers with `studio reply`. Next: runnable recipes + blocks (S4), then
+`studio check` (S2), npm publish + `AGENTS.md` (A1, A2).
+
 ## 3. Waiting on the user (ask before assuming)
 1. **Before a demo with many people on one Wi-Fi** (docs/19 §2), all dashboard-only, not verified by us:
    Supabase Auth → Rate Limits (per-IP sign-in/refresh limits up), custom SMTP (or everyone uses Google; the

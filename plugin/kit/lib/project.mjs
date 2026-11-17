@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { serve } from './browser.mjs';
 import { apiUrl, call, putFile } from './api.mjs';
 import { fetchOpenverse, searchOpenverse, youtubeSearch } from './sources.mjs';
-import { DEPS, chromiumPath, ensure, missing } from './deps.mjs';
+import { DEPS, chromiumPath, ensure, missing, useBundledFfmpeg } from './deps.mjs';
 import { readiness } from './timeline.mjs';
 import { RATIOS, die, formats, info, loadFilm, num, outDir, readJSON, run, safeName, saveFilm, warn, which, writeJSON } from './util.mjs';
 
@@ -178,9 +178,10 @@ export async function upload(dir, opts) {
   const out = outDir(dir, fmt);
   // The done gate: nothing goes to the founder until verify is clean on the current code and someone has
   // looked at a contact sheet of the file being sent.
-  const why = readiness(dir, film, out);
+  if (opts.final && opts.draft) die('--draft and --final are opposites: a final needs the full render, the mix and a sheet of the mixed file');
+  const why = readiness(dir, film, out, { draft: Boolean(opts.draft) });
   if (why.length && (opts.final || !opts.unchecked)) {
-    die(`not ready to hand over:\n  - ${why.join('\n  - ')}\nFix these, then upload. (A work-in-progress upload can pass --unchecked; a --final one can't.)`);
+    die(`not ready to hand over:\n  - ${why.join('\n  - ')}\nFix these, then upload. (A first cut can go up with --draft: clean verify + a sheet of the draft render. --unchecked skips the checks; a --final can't.)`);
   }
   if (why.length) warn(`uploading unchecked (${why.join('; ')}). Tell the founder it is a work in progress.`);
   const files = {};
@@ -259,11 +260,12 @@ export async function doctor(opts) {
   const bad = (m) => info(`✗ ${m}`);
   const major = Number(process.versions.node.split('.')[0]);
   major >= 22 ? ok(`Node ${process.versions.node}`) : bad(`Node ${process.versions.node}: need 22 or newer (https://nodejs.org)`);
-  for (const tool of ['ffmpeg', 'ffprobe']) {
-    if (which(tool)) ok(tool);
-    else bad(`${tool} not found: ${process.platform === 'darwin' ? 'brew install ffmpeg' : process.platform === 'win32' ? 'winget install ffmpeg' : 'sudo apt install ffmpeg (or your package manager)'}`);
-  }
   if (opts.install) await ensure('core');
+  // No system ffmpeg: the kit installs its own copy next to its other dependencies (nothing system-wide).
+  if (opts.install && !(which('ffmpeg') && which('ffprobe'))) await ensure('ffmpeg').catch((err) => bad(`couldn't install ffmpeg: ${err.message}`));
+  const ff = useBundledFfmpeg();
+  if (ff) ok(`ffmpeg + ffprobe (${ff === 'bundled' ? `the kit's own copy in ${DEPS}` : 'system'})`);
+  else bad('ffmpeg not found: run `studio doctor --install` (the kit downloads its own copy), or install it yourself and reopen the terminal');
   const core = missing('core');
   if (core.length) bad(`render engine not installed: run \`studio doctor --install\` (installs into ${DEPS})`);
   else {
@@ -284,5 +286,5 @@ export async function doctor(opts) {
   } catch {
     bad('not signed in: run `studio login`');
   }
-  await run('ffmpeg', ['-hide_banner', '-encoders']).then((o) => (o.includes('libx264') ? ok('H.264 encoder (libx264)') : bad('ffmpeg has no libx264 encoder'))).catch(() => undefined);
+  if (ff) await run('ffmpeg', ['-hide_banner', '-encoders']).then((o) => (o.includes('libx264') ? ok('H.264 encoder (libx264)') : bad('ffmpeg has no libx264 encoder'))).catch(() => undefined);
 }

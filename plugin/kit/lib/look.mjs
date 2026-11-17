@@ -78,7 +78,11 @@ export async function sheet(dir, opts) {
   const tmp = path.join(out, 'sheet-frames');
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(tmp, { recursive: true });
-  const encoded = ['master.mp4', 'silent.mp4', 'draft.mp4'].map((f) => path.join(out, f)).find((f) => fs.existsSync(f));
+  // The newest encoded file is the one to look at: a fresh draft beats last week's master.
+  const encoded = ['master.mp4', 'silent.mp4', 'draft.mp4']
+    .map((f) => path.join(out, f))
+    .filter((f) => fs.existsSync(f))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
   const phone = Boolean(opts.phone);
   const files = [];
   const labels = [];

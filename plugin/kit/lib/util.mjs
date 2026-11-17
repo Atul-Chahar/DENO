@@ -37,7 +37,11 @@ export const warn = (m) => process.stderr.write(`! ${m}\n`);
 /** Run a process; resolves with stdout (string, or Buffer with {buffer:true}); rejects with stderr on failure. */
 export function run(cmd, args, { input, buffer = false, cwd, env, quiet = true, stderr = false } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd, env: env ? { ...process.env, ...env } : process.env, stdio: ['pipe', 'pipe', 'pipe'] });
+    // Windows: Node refuses to start .cmd/.bat files (npm.cmd) without a shell (spawn EINVAL).
+    const shell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(cmd);
+    const options = { cwd, env: env ? { ...process.env, ...env } : process.env, stdio: ['pipe', 'pipe', 'pipe'] };
+    const quote = (a) => (/[\s"&|<>^]/.test(a) ? `"${String(a).replace(/"/g, '\\"')}"` : a);
+    const child = shell ? spawn([`"${cmd}"`, ...args.map(quote)].join(' '), { ...options, shell: true }) : spawn(cmd, args, options);
     const out = [];
     const err = [];
     child.stdout.on('data', (d) => out.push(d));
@@ -165,4 +169,32 @@ export function writeWav(file, channels, rate) {
   head.writeUInt32LE(data.length, 40);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, Buffer.concat([head, data]));
+}
+
+/** Append how long a command took to out/timings.json, so slow steps show up as numbers instead of guesses. */
+export function logTiming(dir, entry) {
+  try {
+    const file = path.join(dir, 'out', 'timings.json');
+    const all = readJSON(file, []);
+    all.push(entry);
+    writeJSON(file, all.slice(-1000));
+  } catch {
+    /* timing is never a reason to fail a command */
+  }
+}
+
+/** One line for `studio timeline`: total tool time and the three commands that cost the most. */
+export function timingSummary(dir) {
+  const all = readJSON(path.join(dir, 'out', 'timings.json'), []);
+  if (!all.length) return '';
+  const by = new Map();
+  for (const e of all) {
+    const row = by.get(e.cmd) || { s: 0, n: 0 };
+    row.s += e.s;
+    row.n += 1;
+    by.set(e.cmd, row);
+  }
+  const fmt = (s) => (s >= 90 ? `${(s / 60).toFixed(1)} min` : `${Math.round(s)} s`);
+  const top = [...by].sort((a, b) => b[1].s - a[1].s).slice(0, 3).map(([c, r]) => `${c} ${fmt(r.s)} (${r.n}×)`);
+  return `tool time so far: ${fmt(all.reduce((t, e) => t + e.s, 0))} over ${all.length} command(s) · most: ${top.join(', ')}  (out/timings.json)`;
 }

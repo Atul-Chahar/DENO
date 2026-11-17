@@ -44,6 +44,20 @@ export async function ensure(group) {
   await run(npm, ['install', '--no-audit', '--no-fund', '--save-exact', ...specs], { cwd: DEPS, quiet: false });
 }
 
+/** When the system has no ffmpeg, put the kit's own copy (deps group `ffmpeg`) on PATH for this process. */
+export function useBundledFfmpeg() {
+  if (which('ffmpeg') && which('ffprobe')) return 'system';
+  if (missing('ffmpeg').length) return null;
+  try {
+    const dirs = [path.dirname(requireDep('ffmpeg-static')), path.dirname(requireDep('ffprobe-static').path)];
+    if (!dirs.every((d) => fs.existsSync(d))) return null;
+    process.env.PATH = [...dirs, process.env.PATH || ''].join(path.delimiter);
+    return which('ffmpeg') && which('ffprobe') ? 'bundled' : null;
+  } catch {
+    return null;
+  }
+}
+
 export function requireDep(name) {
   return createRequire(path.join(DEPS, 'package.json'))(name);
 }

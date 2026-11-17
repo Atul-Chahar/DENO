@@ -59,7 +59,7 @@ def main() -> int:
         p.unlink()
     for p, text in want.items():
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(text, encoding="utf-8")
+        p.write_text(text, encoding="utf-8", newline="\n")  # LF on Windows too
     print(f"wrote {len(want)} files under {SKILLS.relative_to(ROOT)}")
     return 0
 

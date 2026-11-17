@@ -253,7 +253,7 @@ export function StudioReview({ id }: { id: string }) {
       setDraft(EMPTY);
       setRange({ a: null, b: null });
       setActiveNote(note.id);
-      flash('Note pinned. Your Claude sees it with get_review_notes.');
+      flash('Note pinned. Your AI reads it with get_review_notes.');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -284,7 +284,7 @@ export function StudioReview({ id }: { id: string }) {
     try {
       await api.approveStudioItem(item.id);
       await load();
-      flash('Approved. Ask your Claude for the final formats.');
+      flash('Approved. Ask your AI for the final formats.');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -301,7 +301,7 @@ export function StudioReview({ id }: { id: string }) {
     }
   }
 
-  function copyForClaude() {
+  function copyForAi() {
     if (!item) return;
     const open = (item.notes ?? []).filter((n) => n.status === 'open');
     const lines = open.map((n) => {
@@ -388,7 +388,7 @@ export function StudioReview({ id }: { id: string }) {
               </option>
             ))}
           </select>
-          <button className="dv-btn ghost sm" onClick={copyForClaude}>Copy notes for Claude</button>
+          <button className="dv-btn ghost sm" onClick={copyForAi}>Copy notes for your AI</button>
           <button className="dv-btn lime sm" disabled={item.status === 'approved' || version.version !== item.current_version} onClick={approve}>
             {item.status === 'approved' ? 'Approved' : 'Approve this cut'}
           </button>
