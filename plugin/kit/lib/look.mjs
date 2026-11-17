@@ -289,7 +289,7 @@ export async function capture(dir, opts) {
       const f = path.join(dir, 'assets', 'shots', `${safeName(name)}.png`);
       fs.mkdirSync(path.dirname(f), { recursive: true });
       await page.screenshot({ path: f, fullPage: Boolean(opts.full) });
-      shots.push(path.relative(dir, f));
+      shots.push(path.relative(dir, f).split(path.sep).join('/'));
     };
     const steps = opts.steps ? JSON.parse(fs.readFileSync(path.resolve(dir, opts.steps), 'utf8')) : [{ shot: opts.name || 'page' }];
     for (const s of steps) {

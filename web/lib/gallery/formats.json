@@ -12,6 +12,7 @@
       "ratio": "16:9",
       "seconds": 18,
       "style": "swiss-kinetic",
+      "runnable": false,
       "body": "Write every shot with exact copy and a cue time. One hero object (the product's icon, a card, a shape) carries\nthrough all shots and changes role. No bounce, no particles. Ends on the hero object becoming the logo."
     },
     {
@@ -26,6 +27,7 @@
       "ratio": "4:5",
       "seconds": 0,
       "style": "risograph",
+      "runnable": false,
       "body": "Page 1: the pain as a question, in the ICP's words. Pages 2–7: one idea each, from the strongest evidenced pains\nor the founder's Story Bank (≤ 25 words a page). Page 8: what to do next + handle. Render with `studio still --pdf`."
     },
     {
@@ -40,6 +42,7 @@
       "ratio": "16:9",
       "seconds": 30,
       "style": "living-ui",
+      "runnable": false,
       "body": "Version stamp opens. 3–5 changes, ~5 s each: name of the change (≤ 5 words), before → after on real UI. Close on\n\"update now\" + URL. Pull change names from the release notes the founder supplies."
     },
     {
@@ -55,6 +58,7 @@
       "ratio": "1:1",
       "seconds": 20,
       "style": "dark-keynote",
+      "runnable": false,
       "body": "Only real data (validation signals, the founder's metrics). Never rescale an axis to dramatize. Draw axes, reveal\nthe line on a spring, pause on the turning point with a 3–5 word annotation, end on what it means."
     },
     {
@@ -69,6 +73,7 @@
       "ratio": "16:9",
       "seconds": 180,
       "style": "ink-wash",
+      "runnable": false,
       "body": "Treatment first with chapters. One recurring protagonist or object. ≤ 8 words on screen, held ≥ 2.5 s. Uncertain\nfacts go to `NOTES.md`, not the film. Use the multi-agent playbook: one scene-builder per chapter."
     },
     {
@@ -83,6 +88,7 @@
       "ratio": "16:9",
       "seconds": 30,
       "style": "flat-explainer",
+      "runnable": false,
       "body": "| Time | Beat |\n|---|---|\n| 0–4 s | The pain, in the ICP's words (from `get_founder_context` evidence) |\n| 4–9 s | What the product is, one sentence |\n| 9–24 s | Three steps, ~5 s each, each with a visible result |\n| 24–28 s | Proof: a real number or quote |\n| 28–30 s | Name + URL |\n~75 words of voiceover. Mark `{cue}` words for each visual hit."
     },
     {
@@ -97,6 +103,7 @@
       "ratio": "9:16",
       "seconds": 60,
       "style": "swiss-kinetic",
+      "runnable": false,
       "body": "Run `studio beats` and `studio captions --text lyrics.txt`. Each section treats the words differently (stack, path,\nmask, scale). The highlight never runs ahead of the voice. Big changes on bar lines."
     },
     {
@@ -111,6 +118,7 @@
       "ratio": "16:9",
       "seconds": 6,
       "style": "swiss-kinetic",
+      "runnable": false,
       "body": "Build the logo from something the product does (a cursor stroke, a chart line, a card stack). Land on a downbeat\nat 4 s, hold 2 s. One sound event plus a tail."
     },
     {
@@ -125,6 +133,7 @@
       "ratio": "16:9",
       "seconds": 20,
       "style": "dark-keynote",
+      "runnable": false,
       "body": "Open on the result, then the install command typing in, then the first result, then one code snippet that shows\nthe API, then the repo URL. Use the README's own words. Star counts only if current and real."
     },
     {
@@ -139,7 +148,8 @@
       "ratio": "16:9",
       "seconds": 32,
       "style": "living-ui",
-      "body": "Hook (0–3 s) on the pain or result, not the logo. Tour 3 real screens (5–6 s each) with a cursor. Pull out to a\ngrid of 4–6 features (one read each, 1 s). CTA with URL. Because this shape is the most copied, the hook and one\nunexpected transition must be specific to this founder."
+      "runnable": true,
+      "body": "Hook (0–3 s) on the pain or result, not the logo. Tour 3 real screens (5–6 s each) with a cursor. Pull out to a\ngrid of 4–6 features (one read each, 1 s). CTA with URL. Because this shape is the most copied, the hook and one\nunexpected transition must be specific to this founder.\n\nRunnable: `studio init <name> --recipe saas-launch-32` creates this film from blocks; edit `film.json` scenes."
     },
     {
       "slug": "showreel-15",
@@ -154,6 +164,7 @@
       "ratio": "16:9",
       "seconds": 15,
       "style": "dark-keynote",
+      "runnable": false,
       "body": "Best for: brand energy, dev tools, a launch day post on X. Weak for explaining.\n\n| Time | Shot | Read |\n|---|---|---|\n| 0–1 s | Open on the product doing its most impressive thing, mid-motion | \"this is fast/smart\" |\n| 1–8 s | 4–6 morphing states of real UI, one per 2 beats; a command menu or cursor drives them | each state's result |\n| 8–12 s | One metric card or before/after (real number only) | the proof |\n| 12–15 s | Everything collapses into the logo on the downbeat; URL holds 1 s | the name |\n\nSound: a 120–124 BPM track, a hit on every state change, sub-bass under the logo."
     },
     {
@@ -168,6 +179,7 @@
       "ratio": "9:16",
       "seconds": 44,
       "style": "paper-cutout",
+      "runnable": false,
       "body": "One emotional word drives it. Open on a personal object, montage of moments (one read each), a turn, the payoff\nwith the product as the enabler, not the hero. No narration; music carries it. Avoid for B2B."
     },
     {
@@ -183,6 +195,7 @@
       "ratio": "16:9",
       "seconds": 30,
       "style": "living-ui",
+      "runnable": false,
       "body": "List the states first (8–12): each is a UI moment (checkout, a toggle, a chart). One container shape morphs\nbetween them, content enters after the container moves. Seamless: frame 0 equals the last frame, position and\nvelocity. `studio verify` runs the seam check. Great as a silent landing-page hero."
     },
     {
@@ -198,7 +211,8 @@
       "ratio": "9:16",
       "seconds": 15,
       "style": "vertical-captions",
-      "body": "0–1.5 s: a 2–3 word hook in the ICP's language. 1.5–10 s: the feature in action on a real screen, zoomed. 10–13 s:\nthe result. 13–15 s: name. Captions burned in; safe area respected."
+      "runnable": true,
+      "body": "0–1.5 s: a 2–3 word hook in the ICP's language. 1.5–10 s: the feature in action on a real screen, zoomed. 10–13 s:\nthe result. 13–15 s: name. Captions burned in; safe area respected.\n\nRunnable: `studio init <name> --recipe vertical-feature-15` creates this film from blocks; edit `film.json` scenes."
     }
   ],
   "styles": [

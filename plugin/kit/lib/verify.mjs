@@ -62,10 +62,13 @@ async function lumaStats(png) {
 }
 
 // Runs in the page: every visible text run with its box, font size and family.
+// `caption` is true for captions and counting numbers (data-studio-counter): they change by design, so they are
+// not timed as reads.
 function textBoxes() {
   const W = window.innerWidth;
   const H = window.innerHeight;
   const out = [];
+  const blocks = new Map();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const text = n.textContent.replace(/\s+/g, ' ').trim();
@@ -83,7 +86,11 @@ function textBoxes() {
     if (b.width < 1 || b.height < 1 || b.right < 0 || b.bottom < 0 || b.left > W || b.top > H) continue;
     const clipped = el.scrollWidth > el.clientWidth + 2 && ['hidden', 'clip'].includes(cs.overflowX);
     const family = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim();
-    out.push({ text: text.slice(0, 120), x: b.left, y: b.top, w: b.width, h: b.height, size: parseFloat(cs.fontSize), family, fontOk: document.fonts.check(`16px "${family}"`), clipped, caption: Boolean(el.closest('[data-studio-caption]')), id: el.dataset.clip || el.id || '' });
+    // The nearest block ancestor: runs inside one block are one sentence (a highlighted word, a wrapped line).
+    let block = el;
+    while (block.parentElement && getComputedStyle(block).display.startsWith('inline')) block = block.parentElement;
+    if (!blocks.has(block)) blocks.set(block, blocks.size);
+    out.push({ text: text.slice(0, 120), x: b.left, y: b.top, w: b.width, h: b.height, size: parseFloat(cs.fontSize), family, fontOk: document.fonts.check(`16px "${family}"`), clipped, caption: Boolean(el.closest('[data-studio-caption], [data-studio-counter]')), block: blocks.get(block), id: el.dataset.clip || el.id || '' });
   }
   return { W, H, boxes: out };
 }
@@ -93,7 +100,10 @@ export async function verify(dir, opts) {
   const fmts = formats(film, opts.formats);
   const findings = scanSources(dir);
   const add = (severity, rule, message, t = null, extra = {}) => findings.push({ severity, rule, message, t, ...extra });
-  for (const p of pendingItems(film)) add('block', 'pending', `${p.type} "${p.label || p.id}" (${p.start}–${p.end} s) is still a placeholder: build it, then \`studio fill ${p.id}\``, p.start);
+  for (const p of pendingItems(film)) {
+    const what = p.type === 'scene' ? `still shows the recipe's sample copy: put the founder's own words and pictures in film.json, then \`studio fill ${p.id}\`` : `is still a placeholder: build it, then \`studio fill ${p.id}\``;
+    add('block', 'pending', `${p.type} "${p.label || p.id}" (${p.start}–${p.end} s) ${what}`, p.start);
+  }
   for (const fmt of fmts) {
     const studio = await Film.open(dir, fmt);
     try {
@@ -179,7 +189,7 @@ export async function verify(dir, opts) {
           for (let j = i + 1; j < boxes.length; j++) {
             const a = boxes[i];
             const c = boxes[j];
-            if (a.caption && c.caption) continue;
+            if ((a.caption && c.caption) || a.block === c.block) continue;
             const ix = Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x));
             const iy = Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
             if (ix * iy > 0.25 * Math.min(a.w * a.h, c.w * c.h) && a.text !== c.text) {

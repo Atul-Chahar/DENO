@@ -12,7 +12,8 @@ import { modelSize } from '../lib/matte.mjs';
 import { formatSelector, generateSfx, licenceFromSite, pairDownloads, synthKindFor } from '../lib/sources.mjs';
 import { addNote, formatNotes, hasReview, loadReview, pickVideo, replyNote, saveReview, whereIn } from '../lib/review.mjs';
 import { distance, frameStats, notes, pool } from '../lib/stats.mjs';
-import { pendingItems, readiness, sourceHash } from '../lib/timeline.mjs';
+import { runnableRecipes } from '../lib/project.mjs';
+import { chaptersOf, pendingItems, readiness, sourceHash } from '../lib/timeline.mjs';
 import { formats, logTiming, parseArgs, safeName, tc, timingSummary } from '../lib/util.mjs';
 
 function clickTrack(bpm, seconds, start = 0.3, rate = 22050) {
@@ -219,6 +220,31 @@ test('review: notes pin to frames, map to chapters, and round-trip through repli
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('recipes: every runnable recipe is a well-formed film, and its sample copy counts as pending', () => {
+  const blocks = ['hook', 'screen', 'stat', 'points', 'quote', 'endcard', 'custom'];
+  const slugs = runnableRecipes();
+  assert.ok(slugs.includes('saas-launch-32') && slugs.includes('vertical-feature-15'));
+  for (const slug of slugs) {
+    const r = JSON.parse(fs.readFileSync(new URL(`../template/recipes/${slug}.json`, import.meta.url), 'utf8'));
+    assert.equal(r.recipe, slug);
+    assert.match(r.ratio, /^\d+:\d+$/);
+    assert.ok(r.scenes.length >= 3, slug);
+    r.scenes.forEach((s, i) => {
+      assert.ok(blocks.includes(s.block), `${slug}/${s.id}: block ${s.block}`);
+      assert.ok(s.end > s.start, `${slug}/${s.id}: end after start`);
+      // Scenes follow each other with no gap and no overlap: a gap is a blank frame.
+      assert.equal(s.start, i === 0 ? 0 : r.scenes[i - 1].end, `${slug}/${s.id}: starts where the last scene ends`);
+    });
+    assert.equal(new Set(r.scenes.map((s) => s.id)).size, r.scenes.length, `${slug}: scene ids are unique`);
+    for (const cue of r.cues) assert.ok(cue.t >= 0 && cue.t < r.scenes.at(-1).end, `${slug}: cue inside the film`);
+  }
+  const film = { scenes: [{ id: 'hook', block: 'hook', start: 0, end: 2, todo: true }, { id: 'name', block: 'endcard', start: 2, end: 4, label: 'Name' }] };
+  assert.deepEqual(pendingItems(film).map((p) => [p.id, p.type]), [['hook', 'scene']]);
+  assert.deepEqual(chaptersOf(film), [{ id: 'hook', start: 0, end: 2, label: 'hook' }, { id: 'name', start: 2, end: 4, label: 'Name' }]);
+  assert.deepEqual(chaptersOf({ chapters: [{ id: 'a', start: 0, end: 1 }], scenes: film.scenes }), [{ id: 'a', start: 0, end: 1 }]);
+  assert.deepEqual(whereIn(film, 3), { chapter: 'name', clip: null });
 });
 
 test('sfx: free text maps to a synthesized kind', () => {

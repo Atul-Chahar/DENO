@@ -12,9 +12,13 @@ import { RATIOS, die, formats, info, loadFilm, num, outDir, readJSON, run, safeN
 const KIT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const TEMPLATE = path.join(KIT, 'template');
 
-function copyDir(src, dest) {
+/** Recipes that ship as a film that already renders (template/recipes/<slug>.json). */
+export const runnableRecipes = () => fs.readdirSync(path.join(TEMPLATE, 'recipes')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
+
+function copyDir(src, dest, skip = []) {
   fs.mkdirSync(dest, { recursive: true });
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    if (skip.includes(e.name)) continue;
     const s = path.join(src, e.name);
     const d = path.join(dest, e.name);
     if (e.isDirectory()) copyDir(s, d);
@@ -43,9 +47,15 @@ export async function init(opts) {
   if (!name) die('usage: studio init <folder> [--idea <idea_id>] [--ratio 9:16[,16:9]] [--duration 20] [--style living-ui] [--still --pages 8 --size 1080x1350]');
   const dir = path.resolve(name);
   if (fs.existsSync(path.join(dir, 'film.json'))) die(`${name} already has a film.json`);
-  copyDir(TEMPLATE, dir);
   const still = Boolean(opts.still);
-  let ratios = String(opts.ratio || (still ? '4:5' : '16:9')).split(',');
+  // A runnable recipe: a film that already renders, built from blocks, with sample copy to replace.
+  const recipe = opts.recipe && opts.recipe !== true ? readJSON(path.join(TEMPLATE, 'recipes', `${safeName(opts.recipe)}.json`), null) : null;
+  if (opts.recipe && opts.recipe !== true && !recipe) {
+    info(`(no runnable recipe "${opts.recipe}" in the kit yet: starting from the blank template. Runnable: ${runnableRecipes().join(', ')})`);
+  }
+  if (recipe && still) die('recipes are videos: drop --still, or drop --recipe');
+  copyDir(TEMPLATE, dir, ['recipes']);
+  let ratios = String(opts.ratio || recipe?.ratio || (still ? '4:5' : '16:9')).split(',');
   const custom = opts.size ? String(opts.size).split('x').map(Number) : null;
   for (const r of ratios) if (!RATIOS[r] && !custom) die(`unknown ratio ${r}; use ${Object.keys(RATIOS).join(', ')}`);
   if (custom) ratios = [ratios[0]];
@@ -53,18 +63,20 @@ export async function init(opts) {
     schema: 'deno.film/1',
     title: opts.title || path.basename(dir),
     kind: still ? 'still' : 'video',
-    style: opts.style || null,
-    recipe: opts.recipe || null,
+    style: opts.style || recipe?.style || null,
+    recipe: opts.recipe && opts.recipe !== true ? String(opts.recipe) : null,
     formats: ratios.map((r) => (custom ? { ratio: r, w: custom[0], h: custom[1] } : { ratio: r })),
     fps: num(opts.fps, 30),
-    duration: still ? 0 : num(opts.duration, 15),
+    duration: still ? 0 : recipe ? Math.max(...recipe.scenes.map((x) => x.end)) : num(opts.duration, 15),
     pages: still ? num(opts.pages, 1) : 0,
     stage: 'plan',
     poster: 1,
     chapters: [],
     clips: [],
     captions: [],
-    cues: [],
+    cues: recipe?.cues || [],
+    // Each scene starts as `todo`: it shows the recipe's sample copy, and a full render refuses until it is replaced.
+    ...(recipe ? { scenes: recipe.scenes.map((x) => ({ ...x, todo: true })) } : {}),
     assets: [],
     deno: { idea_id: opts.idea || null, item_id: null, brief_id: opts.brief || null },
   };
@@ -81,8 +93,14 @@ export async function init(opts) {
   if (kit) writeJSON(path.join(dir, 'brand.json'), kit);
   if (still) fs.renameSync(path.join(dir, 'still.html'), path.join(dir, 'index.html'));
   else fs.rmSync(path.join(dir, 'still.html'), { force: true });
+  if (recipe) fs.renameSync(path.join(dir, 'recipe.html'), path.join(dir, 'index.html'));
+  else fs.rmSync(path.join(dir, 'recipe.html'), { force: true });
   saveFilm(dir, film);
   writeJSON(path.join(dir, 'CREDITS.json'), []);
+  if (recipe) {
+    return info(`Created ${name}/ from the "${recipe.recipe}" recipe (${ratios.join(', ')}, ${film.duration} s, ${recipe.scenes.length} scenes). It renders as it is: \`studio render --draft\`.
+Next: write TREATMENT.md and get "go". Then edit film.json "scenes": put the founder's own words, numbers and screens (\`studio capture <url>\` → "src") in each scene's props, adjust start/end, and \`studio fill <scene id>\` when a scene is theirs. No code is needed unless a shot needs something no block does (lib/blocks.js, block "custom").`);
+  }
   info(`Created ${name}/ (${film.kind}, ${ratios.join(', ')}). Files: film.json, index.html, brand.css, lib/, CLAUDE.md, assets/.
 Next: write TREATMENT.md and get "go", then build in index.html. \`studio preview\` to watch, \`studio verify\` to check.`);
 }

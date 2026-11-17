@@ -1,0 +1,20 @@
+{
+  "recipe": "saas-launch-32",
+  "ratio": "16:9",
+  "style": "living-ui",
+  "scenes": [
+    { "id": "hook", "block": "hook", "start": 0, "end": 3, "label": "Hook: the pain or the result, in the customer's words",
+      "props": { "kicker": "Before", "lines": ["Your PRs wait", "*three days*", "for a review."] } },
+    { "id": "screen-1", "block": "screen", "start": 3, "end": 9, "label": "Real screen 1: the first thing a user does",
+      "props": { "src": "", "caption": "Open a pull request. *That's it.*", "zoom": [{ "at": 0, "x": 0.5, "y": 0.4, "scale": 1 }, { "at": 1.6, "x": 0.35, "y": 0.3, "scale": 1.5 }] } },
+    { "id": "screen-2", "block": "screen", "start": 9, "end": 15, "label": "Real screen 2: the product doing the work",
+      "props": { "src": "", "caption": "A reviewer is picked in *seconds*.", "zoom": [{ "at": 0, "x": 0.5, "y": 0.5, "scale": 1.2 }, { "at": 2, "x": 0.65, "y": 0.45, "scale": 1.7 }] } },
+    { "id": "screen-3", "block": "screen", "start": 15, "end": 20.5, "label": "Real screen 3: the result",
+      "props": { "src": "", "caption": "Merged the *same day*.", "zoom": [{ "at": 0, "x": 0.5, "y": 0.5, "scale": 1.6 }, { "at": 1.8, "x": 0.5, "y": 0.5, "scale": 1 }] } },
+    { "id": "features", "block": "points", "start": 20.5, "end": 27, "label": "Pull out: four features, one read each",
+      "props": { "title": "Everything a review needs", "items": ["Picks the right reviewer", "Nudges when it stalls", "Works in *GitHub*", "Set up in two minutes"] } },
+    { "id": "name", "block": "endcard", "start": 27, "end": 32, "label": "Name and where to go",
+      "props": { "name": "yourproduct", "tagline": "Reviews that don't wait.", "url": "yourproduct.com" } }
+  ],
+  "cues": [{ "t": 0.05, "kind": "thump" }, { "t": 3, "kind": "whoosh" }, { "t": 9, "kind": "tick" }, { "t": 15, "kind": "tick" }, { "t": 20.5, "kind": "whoosh" }, { "t": 27, "kind": "chime" }]
+}

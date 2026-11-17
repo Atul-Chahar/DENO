@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deno Studio film</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="brand.css">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--body); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+  // A recipe film: every shot is a scene in film.json ("scenes"), drawn by a block from lib/blocks.js.
+  // To change the film, edit film.json: the words, the pictures, the timing. No code needed.
+  // For a shot no block can do, write it here and pass it to mountScenes (see lib/blocks.js, block "custom").
+  import data from './film.json' with { type: 'json' };
+  import { stage, film } from './lib/stage.js';
+  import { mountScenes } from './lib/blocks.js';
+
+  const built = mountScenes(stage(), data.scenes || []);
+  film({ duration: built.duration, seek: built.seek, chapters: built.chapters, cues: data.cues || [], fps: data.fps || 30, assets: built.assets });
+</script>
+</body>
+</html>

@@ -40,6 +40,7 @@ export default async function FormatPage({ params }: { params: Params }) {
           <div><dt>Length</dt><dd>{isStill(f) ? 'Still pages' : `${f.seconds} seconds`}</dd></div>
           <div><dt>Usual style</dt><dd>{style?.title ?? f.style}</dd></div>
           <div><dt>Made in</dt><dd>Claude Code + Deno Studio</dd></div>
+          {f.runnable && <div><dt>Starts as</dt><dd>A working film your AI fills in</dd></div>}
         </dl>
       </section>
 
@@ -49,7 +50,7 @@ export default async function FormatPage({ params }: { params: Params }) {
             <span className="m-label m-label--peach">The shape</span>
             <h2 className="display m-title m-title--sm">What each second is for.</h2>
             <div className="g-prose">
-              {f.body.split(/\n{2,}/).map((para) => <p key={para.slice(0, 40)}>{para.replace(/\n/g, ' ')}</p>)}
+              {f.body.split(/\n{2,}/).filter((para) => !para.startsWith('Runnable:')).map((para) => <p key={para.slice(0, 40)}>{para.replace(/\n/g, ' ')}</p>)}
             </div>
             {style && (
               <div className="g-style">

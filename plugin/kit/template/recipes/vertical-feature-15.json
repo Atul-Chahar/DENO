@@ -1,0 +1,16 @@
+{
+  "recipe": "vertical-feature-15",
+  "ratio": "9:16",
+  "style": "vertical-captions",
+  "scenes": [
+    { "id": "hook", "block": "hook", "start": 0, "end": 1.8, "label": "Hook: two or three words in the customer's language",
+      "props": { "lines": ["Stuck in", "*review?*"] } },
+    { "id": "feature", "block": "screen", "start": 1.8, "end": 10, "label": "The feature in action on a real screen, zoomed",
+      "props": { "src": "", "caption": "One click picks *the right reviewer*.", "zoom": [{ "at": 0, "x": 0.5, "y": 0.3, "scale": 1.2 }, { "at": 2.5, "x": 0.5, "y": 0.45, "scale": 1.8 }, { "at": 6, "x": 0.5, "y": 0.6, "scale": 1.4 }] } },
+    { "id": "result", "block": "stat", "start": 10, "end": 13, "label": "The result: one real number",
+      "props": { "value": 4, "suffix": " hours", "label": "from open to *merged*", "source": "Your number, and its source" } },
+    { "id": "name", "block": "endcard", "start": 13, "end": 15, "label": "Name",
+      "props": { "name": "yourproduct", "url": "yourproduct.com" } }
+  ],
+  "cues": [{ "t": 0.05, "kind": "thump" }, { "t": 1.8, "kind": "whoosh" }, { "t": 10, "kind": "pop" }, { "t": 13, "kind": "chime" }]
+}
