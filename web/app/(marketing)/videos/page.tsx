@@ -25,8 +25,8 @@ export default function VideosPage() {
           Videos made by talking to an AI.
         </h1>
         <p className="m-hero__sub">
-          A founder describes the video. Their own AI writes it as code and renders it on their computer. Every entry here shows the
-          prompt that started it, so you can ask your AI for the same.
+          A founder describes the video. Their own AI writes it as code and renders it on their computer. Each entry names its format,
+          and links to the maker&apos;s prompt when they shared one, so you can ask your AI for the same.
         </p>
         <div className="m-hero__actions">
           <a href="#formats" className="btn btn--lime btn--raised">Pick a format</a>
@@ -37,8 +37,12 @@ export default function VideosPage() {
 
       <section className="m-band" id="made">
         <div className="m-wrap m-sec">
-          <span className="m-label m-label--peach">Made by founders</span>
+          <span className="m-label m-label--peach">Made with AI</span>
           <h2 className="display m-title m-title--sm">Watch one, then copy its prompt.</h2>
+          <p className="g-fine" style={{ marginTop: 10 }}>
+            Community videos are listed with credit and a link to the original post. If one is yours and you want it removed, ask at{' '}
+            <a href="/takedown">/takedown</a>.
+          </p>
           {newest.length > 0 ? (
             <div className="g-videos">
               {newest.map((v) => <VideoCard key={v.slug} video={v} />)}

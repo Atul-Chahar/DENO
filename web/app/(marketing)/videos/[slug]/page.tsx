@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const v = findVideo((await params).slug);
   if (!v) return { title: 'Video gallery — Deno' };
   return {
-    title: `${v.title}: made with ${v.model}, with its prompt — Deno`,
+    title: `${v.title}: made with ${v.model}${v.prompt || v.promptUrl ? ', with its prompt' : ''} — Deno`,
     description: v.summary,
     alternates: { canonical: videoHref(v.slug) },
   };
@@ -64,13 +64,24 @@ export default async function VideoPage({ params }: { params: Params }) {
             <p className="m-sub">{v.summary}</p>
             <dl className="g-facts">
               <div><dt>Made by</dt><dd>{v.maker.url ? <a href={v.maker.url} target="_blank" rel="noreferrer">{v.maker.name}</a> : v.maker.name}</dd></div>
-              <div><dt>AI</dt><dd>{v.model} in {v.app}</dd></div>
+              <div><dt>AI</dt><dd>{v.app ? `${v.model} in ${v.app}` : v.model}</dd></div>
               <div><dt>Format</dt><dd>{format ? <a href={formatHref(format.slug)}>{format.title}</a> : v.format}</dd></div>
               <div><dt>Style</dt><dd>{style?.title ?? v.style}</dd></div>
               <div><dt>Frame</dt><dd>{v.ratio} · {Math.round(v.seconds)} s</dd></div>
               {v.rounds ? <div><dt>Review rounds</dt><dd>{v.rounds}</dd></div> : null}
             </dl>
-            <a href={v.url} target="_blank" rel="noreferrer" className="btn btn--ghost btn--sm" style={{ marginTop: 20 }}>Original post on {host} ↗</a>
+            <div className="m-hero__actions" style={{ marginTop: 20 }}>
+              <a href={v.url} target="_blank" rel="noreferrer" className="btn btn--ghost btn--sm">Original post on {host} ↗</a>
+              {v.promptUrl && !v.prompt && (
+                <a href={v.promptUrl} target="_blank" rel="noreferrer" className="btn btn--ghost btn--sm">Read the maker&apos;s prompt ↗</a>
+              )}
+            </div>
+            {!v.madeWithDeno && (
+              <p className="g-fine" style={{ marginTop: 14 }}>
+                Listed with credit and a link to the original. The video and its prompt belong to {v.maker.name}.{' '}
+                <a href="/takedown">Ask for removal</a>.
+              </p>
+            )}
           </div>
         </div>
       </section>

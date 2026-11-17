@@ -53,7 +53,11 @@ them with `studio notes --wait` and answers with `studio reply`. Next: runnable 
 ### 2026-11-17: public video gallery (branch `feat/video-gallery`, docs/23)
 `/videos`: 14 format pages with copyable prompts (generated from the Studio recipes), video pages that link to
 where the maker posted (never hosted by us), `/videos/submit`, plus the site's first `sitemap.xml` and
-`robots.txt`. The video list (`web/lib/gallery/videos.ts`) is empty: Atul adds entries by PR.
+`robots.txt`. Merged (#40). **Filled 2026-11-17 (branch `claude/gallery-videos-bf19d6`):** 28 community
+entries (Claude Opus 5.5 launch videos, app promos and explainers; 18 at 16:9, 2 square, 1 at 4:3, 7 at 9:16),
+taken from the claudevideo.org index at Atul's instruction, each linking to the maker's X post with credit and a
+`/takedown` note. New optional field `promptUrl` ("Read the maker's prompt" link); `app` is now optional. All X
+links, so cards draw colour blocks (CSP allows only YouTube thumbnails). Rules and sources: docs/23 §3.
 
 ### 2026-11-17: runnable recipes (branch `feat/studio-recipes`, docs/22 §10)
 `studio init <name> --recipe saas-launch-32|vertical-feature-15` creates a film that already renders, built from
