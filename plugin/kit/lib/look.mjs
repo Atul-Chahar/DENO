@@ -7,18 +7,25 @@ import { ensure, requireDep, chromiumPath } from './deps.mjs';
 import { distance, measure, notes, pool, statsRow } from './stats.mjs';
 import { ffprobeDuration, formats, info, loadFilm, num, outDir, run, safeName, saveFilm, tc, warn, writeJSON } from './util.mjs';
 
-/** Lay images out in a labelled grid and screenshot it (Chromium does the layout; no font setup needed). */
-async function tile(files, out, { cols = 6, width = 320, label = [] } = {}) {
+/** Lay images out in a labelled grid and screenshot it (Chromium does the layout; no font setup needed).
+ * `browser`: draw in one that is already open (it stays open). `scaled`: the files are already `width` wide JPEGs. */
+export async function tile(files, out, { cols = 6, width = 320, label = [], browser: open = null, scaled = false } = {}) {
   cols = Math.max(1, Math.min(cols, files.length));
-  await ensure('core');
-  const { chromium } = requireDep('playwright-core');
-  const browser = await chromium.launch({ executablePath: await chromiumPath() });
+  let browser = open;
+  if (!browser) {
+    await ensure('core');
+    const { chromium } = requireDep('playwright-core');
+    browser = await chromium.launch({ executablePath: await chromiumPath() });
+  }
   try {
     const small = [];
-    for (const f of files) {
-      const s = `${f}.thumb.jpg`;
-      await run('ffmpeg', ['-v', 'error', '-y', '-i', f, '-vf', `scale=${width}:-2`, '-q:v', '3', s]);
-      small.push(s);
+    if (scaled) small.push(...files);
+    else {
+      for (const f of files) {
+        const s = `${f}.thumb.jpg`;
+        await run('ffmpeg', ['-v', 'error', '-y', '-i', f, '-vf', `scale=${width}:-2`, '-q:v', '3', s]);
+        small.push(s);
+      }
     }
     const cells = small
       .map((f, i) => `<figure><img src="data:image/jpeg;base64,${fs.readFileSync(f).toString('base64')}"><figcaption>${label[i] ?? ''}</figcaption></figure>`)
@@ -42,14 +49,15 @@ async function tile(files, out, { cols = 6, width = 320, label = [] } = {}) {
       };
     });
     await page.locator('main').screenshot({ path: out });
-    for (const f of small) fs.rmSync(f, { force: true });
+    await page.close();
+    if (!scaled) for (const f of small) fs.rmSync(f, { force: true });
     return grid;
   } finally {
-    await browser.close();
+    if (!open) await browser.close();
   }
 }
 
-function sampleTimes(film, duration, opts) {
+export function sampleTimes(film, duration, opts) {
   const list = opts.at ?? opts.times;
   if (list !== undefined && list !== true) return String(list).split(',').map(Number).filter((t) => Number.isFinite(t) && t >= 0 && t < duration);
   if (opts.range && opts.range !== true) {

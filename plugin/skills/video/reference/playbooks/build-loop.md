@@ -33,14 +33,15 @@ _Place every shot as a labelled placeholder first, fill one at a time, look once
 
 ## 4. Draft first
 - The first cut and every fix round are drafts: `studio render --draft` (half size, no motion blur, seconds
-  instead of minutes), one format, `studio sheet`, then `studio review`: the founder watches it on their own
+  instead of minutes; only the chunks whose scene or chapter changed are rendered again), one format,
+  `studio check`, then `studio review`: the founder watches it on their own
   machine and pins notes to frames (`studio notes --wait`, `studio reply`, `studio review --next`). Their notes
   decide what changes next. Full quality, the sound mix and the other formats wait until they approve.
 
 ## 5. The done gate (finals; never skip)
 - You may not say a final is finished until all of these are true on the current code:
-  `studio verify` has no blocking findings, the film was rendered and mixed, and you read `studio sheet` of the
-  mixed file (plus `studio sheet --phone`).
+  the film was rendered and mixed, `studio check` has no blocking findings, and you read its sheet of the mixed
+  file.
 - `studio upload` enforces it: it refuses when verify is missing, stale or blocking, when a placeholder is
   pending, or when no sheet of the mixed file exists. `--draft` asks for less (a clean verify and a sheet of
   the draft render). `--unchecked` skips the checks for a work in progress; say so to the founder. A final can't.

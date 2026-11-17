@@ -13,7 +13,9 @@ import { formatSelector, generateSfx, licenceFromSite, pairDownloads, synthKindF
 import { addNote, formatNotes, hasReview, loadReview, pickVideo, replyNote, saveReview, whereIn } from '../lib/review.mjs';
 import { distance, frameStats, notes, pool } from '../lib/stats.mjs';
 import { runnableRecipes } from '../lib/project.mjs';
-import { chaptersOf, pendingItems, readiness, sourceHash } from '../lib/timeline.mjs';
+import { chaptersOf, chunkKeys, pendingItems, readiness, sourceHash } from '../lib/timeline.mjs';
+import { SHUTTER, subFrameTimes } from '../lib/render.mjs';
+import { TEXT_SAMPLES_PER_S } from '../lib/verify.mjs';
 import { formats, logTiming, parseArgs, safeName, tc, timingSummary } from '../lib/util.mjs';
 
 function clickTrack(bpm, seconds, start = 0.3, rate = 22050) {
@@ -297,6 +299,48 @@ test('download: YouTube Creative Commons is read; several search results pair wi
     ].join('\n');
     const got = pairDownloads(out);
     assert.deepEqual(got.map((d) => [d.title, d.file, d.license]), [['Clip A', a, 'Creative Commons Attribution license (reuse allowed)'], ['Clip B', b, '']]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('render: motion-blur sub-frames are centred on the frame time with a half-frame shutter', () => {
+  assert.deepEqual(subFrameTimes(30, 30, 1), [1]);
+  for (const sub of [2, 3, 4]) {
+    const ts = subFrameTimes(30, 30, sub);
+    assert.equal(ts.length, sub);
+    const mean = ts.reduce((a, b) => a + b, 0) / sub;
+    assert.ok(Math.abs(mean - 1) < 1e-9, `sub ${sub}: centred on the frame`);
+    // The samples cover the shutter (half a frame) whatever their count: the blur no longer grows with samples.
+    const spread = (ts[sub - 1] - ts[0]) * 30;
+    assert.ok(Math.abs(spread - SHUTTER * (1 - 1 / sub)) < 1e-9, `sub ${sub}: spread ${spread}`);
+  }
+  assert.equal(TEXT_SAMPLES_PER_S, 4);
+});
+
+test('render: editing one scene changes only the fingerprints of the chunks it overlaps', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-chunks-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'index.html'), '<script>/* film */</script>');
+    fs.mkdirSync(path.join(dir, 'chapters'));
+    fs.writeFileSync(path.join(dir, 'chapters', 'outro.js'), 'export const a = 1;');
+    const film = {
+      duration: 10,
+      scenes: [{ id: 'a', start: 0, end: 3, props: { text: 'one' } }, { id: 'b', start: 3, end: 6, props: { text: 'two' } }],
+      chapters: [{ id: 'outro', start: 6, end: 10 }],
+    };
+    const spans = [0, 2, 4, 6, 8].map((a) => ({ a, b: a + 2 }));
+    const before = chunkKeys(dir, film, spans);
+    assert.deepEqual(chunkKeys(dir, film, spans), before, 'stable when nothing changed');
+    film.scenes[1].props.text = 'changed';
+    const afterScene = chunkKeys(dir, film, spans);
+    assert.deepEqual(afterScene.map((k, i) => k !== before[i]), [false, true, true, false, false]);
+    fs.writeFileSync(path.join(dir, 'chapters', 'outro.js'), 'export const a = 2;');
+    const afterChapter = chunkKeys(dir, film, spans);
+    assert.deepEqual(afterChapter.map((k, i) => k !== afterScene[i]), [false, false, false, true, true]);
+    fs.writeFileSync(path.join(dir, 'index.html'), '<script>/* shared code changed */</script>');
+    assert.ok(chunkKeys(dir, film, spans).every((k, i) => k !== afterChapter[i]), 'shared code re-renders every chunk');
+    assert.notDeepEqual(chunkKeys(dir, film, spans, { settings: 'fps=15' }), chunkKeys(dir, film, spans, { settings: 'fps=30' }));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

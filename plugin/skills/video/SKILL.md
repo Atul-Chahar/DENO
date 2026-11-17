@@ -76,8 +76,8 @@ through `check_copy` (kind `on_screen`). Show the founder the treatment in plain
   agents (playbook `multi-agent`).
 
 ## 7. First cut: one check, then the founder
-- `studio verify` and fix what it reports. `studio render --draft`, `studio sheet` and `studio sheet --phone`;
-  read both, fix the three worst things you see, once. Do not score yourself in a loop: the second opinion comes
+- `studio render --draft`, then `studio check`: verify, one contact sheet at phone width and the colour numbers
+  in one command. Fix what it blocks on, read its one image, fix the three worst things you see, once. Do not score yourself in a loop: the second opinion comes
   from the founder, not from you.
 - `studio review` (start it in the background and leave it running): a review page on this machine. The film
   plays from the founder's own disk, every frame, and is never uploaded. Give the founder the link; if you have
@@ -89,14 +89,15 @@ through `check_copy` (kind `on_screen`). Show the founder the treatment in plain
 - `studio notes --wait` returns when the founder presses "I'm done reviewing" and prints their open notes: time,
   frame, chapter and clip, the spot they pointed at, tags. Fix one note at a time, keep everything else exactly
   as it is, and answer each: `studio reply <id> fixed "what changed on screen"` (or `open "why not"`).
-- `studio render --draft --from a --to b` for just the seconds you touched, then `studio review --next`: the page
+- `studio render --draft` (it redoes only the 2-second chunks whose scene or chapter changed), `studio check`,
+  then `studio review --next`: the page
   loads the new cut as the next round. Repeat until a round comes back with no notes.
-- Then the final: `studio render --formats <ratios>`, `studio mix`, `studio verify`, `studio sheet` and
-  `studio sheet --phone` (read both), optionally the `reviewer` agent once, and
+- Then the final: `studio render --formats <ratios>`, `studio mix`, `studio check` (read its image), optionally
+  the `reviewer` agent once, and
   `studio upload --final --idea <idea_id> [--brief <brief_id>]` to save it to their Deno library (a poster, a
   contact sheet and the manifest; the video file stays on their disk).
-- The done gate: you may not call a final finished until `studio verify` is clean on the current code and you
-  have read `studio sheet` of the mixed file. `studio upload` refuses otherwise.
+- The done gate: you may not call a final finished until `studio check` is clean on the current code and you
+  have read its sheet of the mixed file. `studio upload` refuses otherwise.
 
 Rules: never invent numbers, features or quotes. Never put an asset without a commercial licence in a final.
 Never claim a render worked without reading the contact sheet of the encoded file.

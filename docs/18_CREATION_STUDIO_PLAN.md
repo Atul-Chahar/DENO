@@ -456,7 +456,7 @@ Effort: S ≤ ½ day, M 1–2 days, L 3–5 days. "Needed?" is about 15–60 s m
 
 | # | Change | Where | Effort | Needed? |
 |---|---|---|---|---|
-| 1 | **Fix motion-blur shutter.** `render.mjs` places sub-frames *before* the frame time (a trailing shutter of (n−1)/n of a frame: ½ at 2 samples, ¾ at 4), so the blurred image lags the frame (and the sound) and the shutter changes with the sample count; it averages JPEG sub-frames in gamma space with `tmix`. Centre the sub-frames on the frame time with a 0.5 shutter (180°, film look) and average PNGs; default `samples` 4 for fast moves. | `plugin/kit/lib/render.mjs` | S | **Yes**: every film with motion. |
+| 1 | **Built 2026-11-17 (docs/22 §11).** **Fix motion-blur shutter.** `render.mjs` places sub-frames *before* the frame time (a trailing shutter of (n−1)/n of a frame: ½ at 2 samples, ¾ at 4), so the blurred image lags the frame (and the sound) and the shutter changes with the sample count; it averages JPEG sub-frames in gamma space with `tmix`. Centre the sub-frames on the frame time with a 0.5 shutter (180°, film look) and average PNGs; default `samples` 4 for fast moves. | `plugin/kit/lib/render.mjs` | S | **Yes**: every film with motion. |
 | 2 | **Deeper treatment template.** Add: idea in one paragraph; tone, including the humour and what the film is *not*; each colour's job and the rare accent's one moment; type families with a role each; a motif that *transforms* across shots; per shot, how the words are integrated graphically (not subtitles on top); a **Revisions** section where each founder note becomes a rule. | `plugin/kit/template/TREATMENT.md`, playbook `preproduction` | S | **Yes**: biggest quality lever for least work. |
 | 3 | **Revision rounds as rules.** Playbook `review` + director: after each founder round, write the note into TREATMENT "Revisions" as a rule that applies to the whole film (e.g. "no realistic faces"), not just the one timestamp. | playbooks `review`, `multi-agent`; `plugin/agents/director.md` | S | Yes. |
 | 4 | **Typography craft rules.** Kerning when type is drawn in pieces (sung/unsung, wipes): draw the whole word and clip, never offset by measured slices; no outlined or haloed type; draw glyphs the font lacks; variable-font width/weight as expression; one role per family. | playbook `typography`, style `swiss-kinetic` | S | Yes. |
@@ -486,4 +486,4 @@ look that needs it. All content edits go in `packages/studio/src/deno_studio/con
   for 2.5 minutes. A founder's Claude making a 30 s film in one sitting won't match that whatever we ship. What
   we can do is make each hour count (items 1–8) and tell founders that a hero film needs several review rounds.
 
-Nothing is implemented yet: Atul picks from 16.3.
+Only #1 is implemented (2026-11-17, docs/22 §11); Atul picks the rest from 16.3.

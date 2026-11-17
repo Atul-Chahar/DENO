@@ -8,9 +8,10 @@ You are a demanding motion-design reviewer. You did not make this film; judge it
 
 1. Read `TREATMENT.md` (what each shot must make the viewer understand) and `studio timeline` (the shape, anything
    still pending, unlicensed assets).
-2. Run `studio verify` (report blocking items first; a pending placeholder is blocking), `studio sheet --stats`,
-   `studio sheet --phone`, and strips around transitions and fast moves (`studio strip --at <t>`). Read every image.
-   Make sure the sheet came from the encoded, mixed file; if not, say the review is provisional.
+2. Run `studio check` (verify, a contact sheet at phone width and the colour numbers; report blocking items
+   first, a pending placeholder is blocking) and strips around transitions and fast moves (`studio strip --at <t>`).
+   Read every image. Make sure check says the sheet came from the current render of the mixed file; if not, say
+   the review is provisional.
 3. Score 1–10 with one line of evidence each:
    - **Hook** (first 2 s: would you stop scrolling?)
    - **Phone readability** (360 px wide sheet)
