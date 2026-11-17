@@ -42,8 +42,8 @@
       "ratio": "16:9",
       "seconds": 30,
       "style": "living-ui",
-      "runnable": false,
-      "body": "Version stamp opens. 3–5 changes, ~5 s each: name of the change (≤ 5 words), before → after on real UI. Close on\n\"update now\" + URL. Pull change names from the release notes the founder supplies."
+      "runnable": true,
+      "body": "Version stamp opens. 3–5 changes, ~5 s each: name of the change (≤ 5 words), before → after on real UI. Close on\n\"update now\" + URL. Pull change names from the release notes the founder supplies.\n\nRunnable: `studio init <name> --recipe changelog-30` creates this film from blocks; edit `film.json` scenes."
     },
     {
       "slug": "data-story-20",
@@ -58,8 +58,8 @@
       "ratio": "1:1",
       "seconds": 20,
       "style": "dark-keynote",
-      "runnable": false,
-      "body": "Only real data (validation signals, the founder's metrics). Never rescale an axis to dramatize. Draw axes, reveal\nthe line on a spring, pause on the turning point with a 3–5 word annotation, end on what it means."
+      "runnable": true,
+      "body": "Only real data (validation signals, the founder's metrics). Never rescale an axis to dramatize. Draw axes, reveal\nthe line on a spring, pause on the turning point with a 3–5 word annotation, end on what it means.\n\nRunnable: `studio init <name> --recipe data-story-20` creates this film from blocks; edit `film.json` scenes."
     },
     {
       "slug": "essay-180",
@@ -88,8 +88,8 @@
       "ratio": "16:9",
       "seconds": 30,
       "style": "flat-explainer",
-      "runnable": false,
-      "body": "| Time | Beat |\n|---|---|\n| 0–4 s | The pain, in the ICP's words (from `get_founder_context` evidence) |\n| 4–9 s | What the product is, one sentence |\n| 9–24 s | Three steps, ~5 s each, each with a visible result |\n| 24–28 s | Proof: a real number or quote |\n| 28–30 s | Name + URL |\n~75 words of voiceover. Mark `{cue}` words for each visual hit."
+      "runnable": true,
+      "body": "| Time | Beat |\n|---|---|\n| 0–4 s | The pain, in the ICP's words (from `get_founder_context` evidence) |\n| 4–9 s | What the product is, one sentence |\n| 9–24 s | Three steps, ~5 s each, each with a visible result |\n| 24–28 s | Proof: a real number or quote |\n| 28–30 s | Name + URL |\n~75 words of voiceover. Mark `{cue}` words for each visual hit.\n\nRunnable: `studio init <name> --recipe explainer-30` creates this film from blocks; edit `film.json` scenes."
     },
     {
       "slug": "kinetic-lyric-60",
@@ -133,8 +133,8 @@
       "ratio": "16:9",
       "seconds": 20,
       "style": "dark-keynote",
-      "runnable": false,
-      "body": "Open on the result, then the install command typing in, then the first result, then one code snippet that shows\nthe API, then the repo URL. Use the README's own words. Star counts only if current and real."
+      "runnable": true,
+      "body": "Open on the result, then the install command typing in, then the first result, then one code snippet that shows\nthe API, then the repo URL. Use the README's own words. Star counts only if current and real.\n\nRunnable: `studio init <name> --recipe repo-promo-20` creates this film from blocks; edit `film.json` scenes."
     },
     {
       "slug": "saas-launch-32",

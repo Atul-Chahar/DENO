@@ -21,7 +21,7 @@ import { voice } from './lib/voice.mjs';
 const HELP = `studio — Deno Studio kit (render, check, caption, voice and mix on your machine)
 
 Setup      doctor [--install [--voice] [--captions] [--matte]] · login · logout · config set <key> <value> · ideas
-Project    init <folder> [--recipe saas-launch-32|vertical-feature-15] [--idea id] [--ratio 9:16,16:9] [--duration 20] [--style name] [--still --pages 8]
+Project    init <folder> [--recipe saas-launch-32|vertical-feature-15|explainer-30|changelog-30|repo-promo-20|data-story-20] [--idea id] [--ratio 9:16,16:9] [--duration 20] [--style name] [--still --pages 8]
            (--recipe: a film that already renders, made of blocks; you change words, screens and timing in film.json)
            preview · verify [--formats 9:16] [--chapter id] · timeline
 Check      check [--formats 9:16] [--chapter id] [--all] [--live]   (verify + one contact sheet at phone width + colour

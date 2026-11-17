@@ -5,3 +5,5 @@ _Three to five shipped changes, each a 5 s before/after on real UI, with a versi
 # 30 s changelog
 Version stamp opens. 3–5 changes, ~5 s each: name of the change (≤ 5 words), before → after on real UI. Close on
 "update now" + URL. Pull change names from the release notes the founder supplies.
+
+Runnable: `studio init <name> --recipe changelog-30` creates this film from blocks; edit `film.json` scenes.

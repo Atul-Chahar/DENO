@@ -45,9 +45,10 @@ shots with what each must make the viewer understand, all on-screen copy, facts 
 through `check_copy` (kind `on_screen`). Show the founder the treatment in plain words and wait for approval.
 
 ## 3b. Start from a runnable recipe when there is one
-- `studio init <name> --recipe saas-launch-32` (or `vertical-feature-15`) creates a film that **already renders**:
-  every shot is a scene in `film.json` (`scenes`), drawn by a ready-made block (headline, product screen with a
-  moving camera and cursor, counting number, points, quote, end card). `studio render --draft` works at once.
+- `studio init <name> --recipe <slug>` creates a film that **already renders**. Runnable today: `saas-launch-32`,
+  `vertical-feature-15`, `explainer-30`, `changelog-30`, `repo-promo-20`, `data-story-20`. Every shot is a scene in
+  `film.json` (`scenes`), drawn by a ready-made block (headline, product screen with a moving camera and cursor,
+  before/after wipe, typing terminal, line chart, counting number, points, quote, end card). `studio render --draft` works at once.
 - Your job is then the content, not the code: for each scene put the founder's own words, numbers and screens
   (`studio capture <url>`, then `"src"`) into its `props`, adjust `start` / `end`, and `studio fill <scene id>`.
   A scene keeps the label "sample copy" and blocks a full render until you do.

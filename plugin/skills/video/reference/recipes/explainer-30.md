@@ -11,3 +11,5 @@ _Problem, what it is, three steps, proof, name. Voiceover with cue words; captio
 | 24–28 s | Proof: a real number or quote |
 | 28–30 s | Name + URL |
 ~75 words of voiceover. Mark `{cue}` words for each visual hit.
+
+Runnable: `studio init <name> --recipe explainer-30` creates this film from blocks; edit `film.json` scenes.

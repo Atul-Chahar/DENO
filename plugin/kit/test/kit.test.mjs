@@ -225,9 +225,9 @@ test('review: notes pin to frames, map to chapters, and round-trip through repli
 });
 
 test('recipes: every runnable recipe is a well-formed film, and its sample copy counts as pending', () => {
-  const blocks = ['hook', 'screen', 'stat', 'points', 'quote', 'endcard', 'custom'];
+  const blocks = ['hook', 'screen', 'compare', 'terminal', 'chart', 'stat', 'points', 'quote', 'endcard', 'custom'];
   const slugs = runnableRecipes();
-  assert.ok(slugs.includes('saas-launch-32') && slugs.includes('vertical-feature-15'));
+  for (const s of ['saas-launch-32', 'vertical-feature-15', 'explainer-30', 'changelog-30', 'repo-promo-20', 'data-story-20']) assert.ok(slugs.includes(s), s);
   for (const slug of slugs) {
     const r = JSON.parse(fs.readFileSync(new URL(`../template/recipes/${slug}.json`, import.meta.url), 'utf8'));
     assert.equal(r.recipe, slug);

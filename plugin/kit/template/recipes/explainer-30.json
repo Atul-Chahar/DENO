@@ -1,0 +1,22 @@
+{
+  "recipe": "explainer-30",
+  "ratio": "16:9",
+  "style": "flat-explainer",
+  "scenes": [
+    { "id": "pain", "block": "hook", "start": 0, "end": 4, "label": "The pain, in the customer's own words (from the evidence)",
+      "props": { "kicker": "Sound familiar?", "lines": ["Mondays go", "*two hours*", "into updates."] } },
+    { "id": "what", "block": "hook", "start": 4, "end": 9, "label": "What the product is, in one sentence",
+      "props": { "kicker": "Meet yourproduct", "lines": ["It writes", "the update", "*for you.*"] } },
+    { "id": "step-1", "block": "screen", "start": 9, "end": 14, "label": "Step 1 on a real screen, with a visible result",
+      "props": { "src": "", "caption": "*1.* Connect the tools your team already uses.", "zoom": [{ "at": 0, "x": 0.5, "y": 0.4, "scale": 1 }, { "at": 1.4, "x": 0.4, "y": 0.35, "scale": 1.5 }] } },
+    { "id": "step-2", "block": "screen", "start": 14, "end": 19, "label": "Step 2 on a real screen, with a visible result",
+      "props": { "src": "", "caption": "*2.* It reads the week's work for you.", "zoom": [{ "at": 0, "x": 0.5, "y": 0.5, "scale": 1.2 }, { "at": 1.6, "x": 0.6, "y": 0.45, "scale": 1.7 }] } },
+    { "id": "step-3", "block": "screen", "start": 19, "end": 24, "label": "Step 3 on a real screen: the result",
+      "props": { "src": "", "caption": "*3.* The update is ready on Monday morning.", "zoom": [{ "at": 0, "x": 0.5, "y": 0.5, "scale": 1.6 }, { "at": 1.8, "x": 0.5, "y": 0.5, "scale": 1 }] } },
+    { "id": "proof", "block": "quote", "start": 24, "end": 28, "label": "Proof: a real customer's words (or use a stat block with a real number)",
+      "props": { "text": "We got our *Mondays* back.", "by": "Name, role, company (a real customer)" } },
+    { "id": "name", "block": "endcard", "start": 28, "end": 30, "label": "Name and where to go",
+      "props": { "name": "yourproduct", "url": "yourproduct.com" } }
+  ],
+  "cues": [{ "t": 0.05, "kind": "thump" }, { "t": 4, "kind": "whoosh" }, { "t": 9, "kind": "tick" }, { "t": 14, "kind": "tick" }, { "t": 19, "kind": "tick" }, { "t": 24, "kind": "whoosh" }, { "t": 28, "kind": "chime" }]
+}

@@ -3,7 +3,7 @@
 Written 2026-11-16 from a read of the code and docs. Goal: first paying founders within 10 days, with no new
 spend (no subscriptions, hardware, paid APIs or servers). Payments are out of scope here except §6.
 
-**Built so far: day 1 (§8), the local review page (§9), runnable recipes (§10), kit speed S2/S5/S6 (§11).** Times marked "estimate" were worked
+**Built so far: day 1 (§8), the local review page (§9), runnable recipes (§10, §12: six of 14), kit speed S2/S5/S6 (§11).** Times marked "estimate" were worked
 out from the code, not measured. §8 has the first measured numbers.
 
 ---
@@ -295,3 +295,43 @@ Other numbers from the same session:
 **Not done:** the AI-in-the-loop "time to first cut" (still needs a real founder's film); GPU flags on Windows; text
 scan once per layout family rather than per format (only the 4/s part of S6). On the local review page a 15 fps
 draft shows each picture for two frame steps (frames are counted at the film's 30 fps; note times stay exact).
+
+---
+
+## 12. S4, second part: four more runnable recipes (2026-11-17, branch `feat/more-recipes`)
+
+`studio init <name> --recipe <slug>` now has six runnable recipes. The four new ones:
+
+| Recipe | Ratio | Scenes (blocks) |
+|---|---|---|
+| `explainer-30` | 16:9 | pain (`hook`), what it is (`hook`), three steps (`screen` ×3), proof (`quote`), name (`endcard`) |
+| `changelog-30` | 16:9 | version stamp (`hook`), three changes (`compare` ×3), smaller changes (`points`), update now (`endcard`) |
+| `repo-promo-20` | 16:9, dark | result (`hook`), install to first result (`terminal`), the API (`terminal`), from the README (`points`), repo URL (`endcard`) |
+| `data-story-20` | 1:1, dark | the question (`hook`), one chart with the turn annotated (`chart`), what it means (`stat`) |
+
+**Three new blocks, each because a recipe could not be made without it** (`plugin/kit/template/lib/blocks.js`):
+- `compare`: before → after on real UI, the "after" screenshot wipes across the "before" one. The changelog's whole
+  point is before/after on the same screen; two cut screens did not show the change.
+- `terminal`: commands type in, output and code appear line by line. The repo promo needs "install to first
+  result". A line that is still typing carries `data-studio-typing`, so `verify` does not time each half-typed
+  state as a read.
+- `chart`: a line chart that draws in, with a marked turn and a note placed where the line is not. The axis always
+  starts at zero (the recipe says "never rescale an axis to dramatize"), and labels are HTML, so `verify` measures
+  their real size.
+- Scenes can also set `"theme": "dark"` (ink background, paper type) for the dark-keynote recipes.
+
+**Tested on this machine** (Windows 11, 6 workers; films in a temporary folder outside the repo):
+- Each recipe renders straight after `init` (sample copy, empty screens): draft render 8–13 s.
+- Filled the way an AI would (two real screenshots captured with `studio capture`, `todo` removed): draft render
+  9–14 s, then `studio check`: 0 blocking, 0 warnings for all four. One warning on the first try (the chart's
+  source line sat in the bottom 5%) was fixed.
+- Read every contact sheet. Fixed what they showed: the chart note sat on the falling line (now placed in a clear
+  spot), the chart title wrapped, and the terminal text was too small at phone width (0.045 → 0.058 of the short side).
+  Read a strip across the changelog wipe: the wipe takes about 6 frames.
+- `saas-launch-32` and `vertical-feature-15` re-checked after the block changes: still clean.
+- Kit tests: 26 pass (the recipe test now covers all six recipes and the new blocks); the known Windows chmod test
+  fails as before.
+
+**Not done:** the other 8 recipes (`brand-film-18`, `carousel-8`, `essay-180`, `kinetic-lyric-60`, `logo-sting-6`,
+`showreel-15`, `story-44`, `ui-loop-30`); voiceover and captions inside a recipe film (the explainer is written for
+~75 words of voiceover but the recipe has none yet); transitions between scenes still cut.
