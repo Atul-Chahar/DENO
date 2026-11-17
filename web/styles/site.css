@@ -355,8 +355,14 @@
 
 .g-player { border: var(--rule); background: var(--ink); box-shadow: 8px 8px 0 var(--lime); }
 .g-player--tall { flex: 0 1 360px; }
-.g-player iframe, .g-player__out { display: block; width: 100%; border: 0; }
+.g-player iframe, .g-player__out, .g-player__video { display: block; width: 100%; border: 0; }
+.g-player__video { background: var(--ink); max-height: 80vh; object-fit: contain; }
 .g-player__out { position: relative; display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .g-player__out img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .7; }
 .g-player__out .btn { position: relative; }
+/* X's embedded post is a white card at most 550 px wide; centre it on the player's paper. */
+.g-player:has(.g-player__x) { background: var(--paper); flex: 0 1 560px; }
+.g-player__x { display: flex; justify-content: center; padding: 6px; }
+.g-player__x iframe { display: block; width: 100%; max-width: 550px; border: 0; transition: height .2s ease; }
+@media (prefers-reduced-motion: reduce) { .g-player__x iframe { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .g-card, .g-video { transition: none; } }

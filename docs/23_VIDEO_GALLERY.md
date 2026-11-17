@@ -53,7 +53,19 @@ way claudevideo.org and skillry.dev do. Rules:
 post), taken from the index at Atul's instruction rather than re-opened one by one. Two posts (Deedy, JetBrains)
 were also opened on X and matched the index. 6 have a prompt link; 1 (AjustaCV) shows the prompt in full because
 the post is a tutorial telling readers to use it. Mix: 23 launch videos and product promos, 5 explainers;
-18 × 16:9, 7 × 9:16, 2 × 1:1, 1 × 4:3. None are on YouTube, so no entry plays on the page yet.
+18 × 16:9, 7 × 9:16, 2 × 1:1, 1 × 4:3 (length and frame checked against each MP4).
+
+**Thumbnails and playback (Atul, 2026-11-17: "play videos on our website, don't redirect").**
+- Thumbnail: `poster` is X's own preview image for the post's video (`pbs.twimg.com`, read from each post).
+- Playback: `stream` is the direct MP4 at `cdn.claudevideo.org/video/<post id>.mp4`, played with the browser's own
+  player (`components/gallery/StreamPlayer.tsx`). The page says "Playback copy from claudevideo.org". The
+  "Original post on X" button stays.
+- Risk, accepted by Atul: those files are claudevideo.org's copies on their CDN, at their cost; they can block
+  other sites or remove a file at any time. So if an MP4 fails to load, the page falls back to X's official
+  embedded post (`XPlayer.tsx`, `platform.twitter.com`), where the video still plays. The embed's height is set
+  by frame shape, because X only reports its size to its own script (`widgets.js`), which we do not load.
+- CSP: `img-src` adds `https://pbs.twimg.com`; `frame-src` adds `https://platform.twitter.com`; `media-src`
+  already allowed any https.
 
 ## 4. Not built
 
@@ -61,9 +73,8 @@ the post is a tutorial telling readers to use it. Mix: 23 launch videos and prod
   additive migration (a public slug, a status and the prompt on `studio_items`), a public read endpoint and an
   approval step. Worth doing once there are enough submissions that PRs become a chore.
 - **Search, filters and sorting** on `/videos`. Not needed below a few dozen entries.
-- **Thumbnails for X entries.** The CSP only allows YouTube thumbnails, so every X card is a colour block. Showing
-  real stills would mean allowing `pbs.twimg.com` (hotlinking X's media) or storing our own stills under
-  `/assets/` with the maker's permission. Not decided.
+- **Our own playback copies.** Videos play from claudevideo.org's CDN (above). Not hosting them is a rule (Deno
+  never hosts a video); if their CDN goes away, the X embed is the fallback.
 - **YouTube or Vimeo entries.** None in the first batch; the reference indexes list X posts only.
 - **A regular refresh.** The batch is a one-time copy; new videos need another PR.
 - **A custom domain.** Search engines index whatever `NEXT_PUBLIC_SITE_URL` says; today that is the

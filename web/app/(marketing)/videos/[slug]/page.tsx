@@ -2,9 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { CopyButton } from '@/components/CopyButton';
 import { VideoCard } from '@/components/gallery/Cards';
+import { StreamPlayer } from '@/components/gallery/StreamPlayer';
+import { XPlayer } from '@/components/gallery/XPlayer';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
-import { VIDEOS, embedUrl, findFormat, findStyle, findVideo, formatHref, formatPrompt, hostName, isoDuration, posterUrl, videoHref } from '@/lib/gallery';
+import { VIDEOS, embedUrl, findFormat, findStyle, findVideo, formatHref, formatPrompt, hostName, isoDuration, posterUrl, videoHref, xEmbedUrl } from '@/lib/gallery';
 import { SITE_URL } from '@/lib/site';
 
 type Params = Promise<{ slug: string }>;
@@ -25,6 +27,7 @@ export default async function VideoPage({ params }: { params: Params }) {
   const format = findFormat(v.format);
   const style = findStyle(v.style);
   const embed = embedUrl(v.url);
+  const xEmbed = embed ? null : xEmbedUrl(v.url);
   const poster = posterUrl(v);
   const host = hostName(v.url);
   const more = VIDEOS.filter((x) => x.slug !== v.slug && (x.format === v.format || x.style === v.style)).slice(0, 3);
@@ -36,7 +39,7 @@ export default async function VideoPage({ params }: { params: Params }) {
     name: v.title,
     description: v.summary,
     uploadDate: v.published,
-    ...(poster ? { thumbnailUrl: absolute(poster), duration: isoDuration(v.seconds), ...(embed ? { embedUrl: embed } : { contentUrl: v.url }) } : { url: v.url }),
+    ...(poster ? { thumbnailUrl: absolute(poster), duration: isoDuration(v.seconds), ...(embed || xEmbed ? { embedUrl: embed ?? xEmbed } : {}), ...(v.stream ? { contentUrl: v.stream } : embed || xEmbed ? {} : { contentUrl: v.url }) } : { url: v.url }),
     creator: { '@type': 'Person', name: v.maker.name, ...(v.maker.url ? { url: v.maker.url } : {}) },
   };
 
@@ -51,6 +54,10 @@ export default async function VideoPage({ params }: { params: Params }) {
           <div className={`g-player${v.ratio === '9:16' ? ' g-player--tall' : ''}`}>
             {embed ? (
               <iframe src={embed} title={v.title} style={{ aspectRatio: v.ratio.replace(':', ' / ') }} allow="fullscreen; picture-in-picture" allowFullScreen loading="lazy" />
+            ) : v.stream ? (
+              <StreamPlayer stream={v.stream} poster={poster} ratio={v.ratio} title={`${v.title}, by ${v.maker.name}`} xEmbed={xEmbed} />
+            ) : xEmbed ? (
+              <XPlayer src={xEmbed} title={`${v.title}, posted on X by ${v.maker.name}`} ratio={v.ratio} />
             ) : (
               <a href={v.url} target="_blank" rel="noreferrer" className="g-player__out" style={{ aspectRatio: v.ratio.replace(':', ' / ') }}>
                 {poster && <img src={poster} alt="" />}
@@ -78,7 +85,8 @@ export default async function VideoPage({ params }: { params: Params }) {
             </div>
             {!v.madeWithDeno && (
               <p className="g-fine" style={{ marginTop: 14 }}>
-                Listed with credit and a link to the original. The video and its prompt belong to {v.maker.name}.{' '}
+                Listed with credit and a link to the original. The video and its prompt belong to {v.maker.name}.
+                {v.stream ? <> Playback copy from {hostName(v.stream).replace(/^cdn\./, '')}.</> : null}{' '}
                 <a href="/takedown">Ask for removal</a>.
               </p>
             )}
