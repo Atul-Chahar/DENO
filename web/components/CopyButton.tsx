@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { play } from '@/lib/sound';
 
 /** Copies `text` to the clipboard and says so for two seconds. */
 export function CopyButton({
@@ -8,11 +9,16 @@ export function CopyButton({
   label = 'Copy',
   done = 'Copied',
   className = 'btn btn--sm btn--ghost',
+  chime = false,
+  onCopied,
 }: {
   text: string;
   label?: string;
   done?: string;
   className?: string;
+  /** Play the quiet "copied" sound (marketing pages; visitors can turn it off). */
+  chime?: boolean;
+  onCopied?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -32,6 +38,8 @@ export function CopyButton({
       area.remove();
     }
     setCopied(true);
+    if (chime) play('copy');
+    onCopied?.();
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setCopied(false), 2000);
   };

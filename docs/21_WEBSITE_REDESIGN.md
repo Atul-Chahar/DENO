@@ -81,3 +81,23 @@ Be careful: these are on the pricing page as plan features.
 3. A real "connected apps" list from the OAuth grants.
 4. Remove the old landing sections' CSS that nothing uses now (`web/styles/landing.css`: hero-strip, walls,
    deepdive, riskband, receipts, mega-menu).
+
+## 8. Landing v2 (2026-11-27)
+Goal: a first-time visitor knows what to do in five seconds. The hero now ends in an install box, not two
+buttons: one command per system (`install.sh` / `install.ps1` in `web/public/`), a "Posts only" switch, and a
+"No terminal" tab (Cursor and VS Code one-click deeplinks, Claude and ChatGPT connector guides, the MCP address,
+the setup prompt). The install box is also the target of the header button and the closing section.
+Sections, top to bottom: hero + install box → chat/review mock (plays on scroll) → works inside (each app
+links to its guide) → how it works → what you can make → the difference (count-up stats) → proof → no credits
+→ **setup (ink band, animated install terminal)** → every other way to connect (setup prompt + tabs) →
+pricing → FAQ (opens in place; new: what the command does, account first?, no terminal?, update/remove) → CTA
+with the command.
+Motion: `components/landing/PlayOnView.tsx` arms `[data-play]` blocks and plays them in view; without JS or
+with reduced motion everything simply shows. Sound: `web/lib/sound.ts` (Web Audio, no files), only on clicks
+(copy, tab, FAQ), off switch in the install box, remembered per device.
+Also: a generated share image (`app/(marketing)/opengraph-image.tsx`) with Open Graph / X tags on the home page;
+a footer status dot that reads `/status.json` (the API's `/readyz`, cached 60 s); a skip link and a `<main>`
+landmark; lime focus rings on dark panels; footer links to Install and the setup prompt.
+Ideas not built yet: put the launch film on the hero once it is approved; a short screen recording of the real
+installer.
+

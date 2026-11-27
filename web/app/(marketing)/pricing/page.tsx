@@ -3,6 +3,7 @@ import { PricingPlans } from '@/components/landing/PricingPlans';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { COMPARE_ROWS } from '@/lib/plans';
+import { CONTACT_EMAIL } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Pricing — Deno',
@@ -83,7 +84,7 @@ export default function PricingPage() {
             <h2 className="display" style={{ fontSize: 'clamp(28px, 3.2vw, 42px)', lineHeight: 1.1, marginTop: 18 }}>Want us to run your launch with you?</h2>
             <p style={{ margin: '14px 0 0', fontSize: 16.5, color: '#3A2A22', maxWidth: 600 }}>We validate the idea, build the 14-day plan and make the launch video together, using Deno. A few slots a month, by application.</p>
           </div>
-          <a href="mailto:hello@deno.gtm?subject=Launch%20Kit" className="btn btn--ink">Ask about a slot</a>
+          <a href={`mailto:${CONTACT_EMAIL}?subject=Launch%20Kit`} className="btn btn--ink">Ask about a slot</a>
         </div>
       </section>
 
