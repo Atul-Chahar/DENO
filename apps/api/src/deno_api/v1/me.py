@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from deno_api.auth import AuthUser, current_user
 from deno_api.deps import Scope
+from deno_api.studio_service import persona_learned, persona_of
 from deno_api.v1.billing import settings_of, stripe_client
 from deno_api.v1.schemas import Handle, MeOut, MeUpdate
 from deno_core.db import models as m
@@ -52,6 +53,8 @@ def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
         product_url=profile.product_url,
         timezone=profile.timezone,
         founder_role=profile.founder_role,
+        persona=persona_of(profile),
+        persona_learned=persona_learned(profile),
         handles=_stored_handles(profile.handles),
         voice_preset=profile.voice_preset,
         notification_prefs={k: bool(v) for k, v in (profile.notification_prefs or {}).items()},
@@ -74,6 +77,10 @@ async def update_me(body: MeUpdate, scope: Scope, user: Annotated[AuthUser, Depe
         changes["handles"] = [h.model_dump() for h in body.handles]
     if "notification_prefs" in changes and body.notification_prefs is not None:
         changes["notification_prefs"] = {**(profile.notification_prefs or {}), **body.notification_prefs}
+    if "persona" in changes:
+        prefs = {k: v for k, v in (profile.studio_prefs or {}).items() if k != "persona"}
+        persona = changes.pop("persona")
+        profile.studio_prefs = {**prefs, "persona": persona} if persona else prefs
     for key, value in changes.items():
         setattr(profile, key, value or None if isinstance(value, str) else value)
     await scope.session.flush()

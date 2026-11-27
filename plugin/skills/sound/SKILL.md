@@ -15,7 +15,7 @@ description: Add music, sound effects and a proper mix to a studio video: beat a
 
 # Sound for a studio video
 1. `get_playbook("sound")`.
-2. Choose the route and say it: the founder's track (ask for the file and confirm they hold the rights), a library
+2. Start from the persona's `sound` line (`get_founder_context` → `persona.sound`). Choose the route and say it: the founder's track (ask for the file and confirm they hold the rights), a library
    track (`search_media kind=music`, then `studio fetch`), the kit's synthesized bed, or silent with captions.
 3. With a track: `studio beats assets/track.mp3`. It writes bpm, beats, downbeats and sections into
    `film.json.beatGrid` and `beats.json`. Snap cuts to downbeats.

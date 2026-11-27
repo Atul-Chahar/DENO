@@ -475,6 +475,10 @@ export interface Me {
   product_url: string | null;
   timezone: string | null;
   founder_role: string | null;
+  /** Who they are for video defaults (docs/18 §17); null until they answer "Who are you?". */
+  persona: string | null;
+  /** What Deno learned from the videos they saved, approved and asked to fix (plain sentences). */
+  persona_learned?: string[];
   handles: Handle[];
   voice_preset: string | null;
   notification_prefs: Record<string, boolean>;
@@ -482,7 +486,7 @@ export interface Me {
 
 export const api = {
   me: () => request<Me>('/me'),
-  updateMe: (body: Partial<Omit<Me, 'id' | 'email' | 'plan' | 'role'>>) => send<Me>('PATCH', '/me', body),
+  updateMe: (body: Partial<Omit<Me, 'id' | 'email' | 'plan' | 'role' | 'persona_learned'>>) => send<Me>('PATCH', '/me', body),
   billing: () => request<Billing>('/billing'),
   checkout: () => send<{ url: string }>('POST', '/billing/checkout'),
   portal: () => send<{ url: string }>('POST', '/billing/portal'),

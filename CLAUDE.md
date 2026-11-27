@@ -58,7 +58,7 @@ gotchas). Then the doc for the task at hand (map below). Re-check live state bef
 | Web | https://deno-web-eight.vercel.app (Vercel `deno-web`, root `web/`); home `/app/home`, Studio `/app/studio`, public docs `/docs`, `/llms.txt` |
 | API | https://deno-api-swart.vercel.app (Vercel `deno-api`, repo root, region hnd1) — `/readyz`, `/api/v1/*` |
 | Graph runs | `enqueue` joins the run line → Vercel Queues topic `graph-runs` → subscriber `deno_worker/queue.py` (entry shim `server/queues.py`); 2 runs per NIM key execute, the rest wait with their place shown |
-| MCP server | https://deno-api-swart.vercel.app/mcp (19 tools + 5 prompts; OAuth via Supabase OAuth server; consent page `web/app/(auth)/oauth/consent`) |
+| MCP server | https://deno-api-swart.vercel.app/mcp (20 tools + 5 prompts; OAuth via Supabase OAuth server; consent page `web/app/(auth)/oauth/consent`) |
 | Studio plugin | `plugin/` in this public repo: `/plugin marketplace add Atul-Chahar/DENO`, `/plugin install deno-studio@deno`; local CLI `studio` (`plugin/kit/cli.mjs`) |
 | DB / Auth | Supabase project `bfinvyflanpjfzlisspq` (ap-northeast-1); transaction pooler :6543 for the API; migration head 0006; Storage bucket `studio` |
 | Redis | Upstash (SSE events, run leases, **run line `rq:*`**, rate limits, source + media cache) |
@@ -95,7 +95,7 @@ migrations/                Alembic (head: 0006)   scripts/  run_validation.py, p
 - `docs/22_LAUNCH_PLAN.md` — the 10-day launch plan: Studio speed, review page, other AI tools; §8 = what is built
 - `docs/21_WEBSITE_REDESIGN.md` — the public site: landing, pricing ladder, docs + llms.txt, setup prompt, dashboard
   home; §6 lists what the site promises that the product doesn't do yet
-- `docs/18_CREATION_STUDIO_PLAN.md` — Studio: MCP tools, plugin, kit, media sources, review (§13 director upgrade,
+- `docs/18_CREATION_STUDIO_PLAN.md` — Studio: MCP tools, plugin, kit, media sources, review, personas §17 (§13 director upgrade,
   §14 zero keys + no MP4 storage, §15 Openverse)
 - `docs/19_DEMO_DAY.md` — many users at once: fair run line, NIM key pool, Supabase Auth settings for one shared Wi-Fi
 - `docs/16_BYO_AI_MCP.md` — bring-your-own-AI MCP plan (phase 1 shipped; phase 2 next)

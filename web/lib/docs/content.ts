@@ -73,7 +73,7 @@ export const DOCS: DocPage[] = [
       { t: 'cards', items: [
         { title: 'Quickstart', text: 'Connect your AI in about two minutes.', href: '/docs/quickstart' },
         { title: 'Your first video', text: 'From prompt to a reviewed reel.', href: '/docs/first-video' },
-        { title: 'Tool reference', text: 'All 19 tools your AI gets.', href: '/docs/tools' },
+        { title: 'Tool reference', text: 'All 20 tools your AI gets.', href: '/docs/tools' },
       ] },
     ],
   },
@@ -240,7 +240,7 @@ export const DOCS: DocPage[] = [
     blocks: [
       { t: 'ul', items: [
         `**Address:** \`${MCP_URL}\``,
-        '**19 tools**, **5 prompts** and one resource, `deno://playbooks/{topic}`.',
+        '**20 tools**, **5 prompts** and one resource, `deno://playbooks/{topic}`.',
         '**Stateless.** Every call stands alone, so there is no session to keep alive.',
         '**Your data only.** Every call runs as the signed-in founder. A founder can never read another founder\'s data.',
       ] },
@@ -273,7 +273,7 @@ export const DOCS: DocPage[] = [
   {
     slug: 'tools',
     title: 'Tools',
-    lead: 'The 19 tools your AI gets. You never call them yourself; your AI picks the right one.',
+    lead: 'The 20 tools your AI gets. You never call them yourself; your AI picks the right one.',
     group: 'MCP reference',
     blocks: [
       { t: 'p', text: '"Changes data" means the tool saves something to your Deno account or uses part of a monthly limit. The others only read.' },

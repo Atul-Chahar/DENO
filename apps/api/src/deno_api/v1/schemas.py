@@ -20,6 +20,7 @@ from pydantic import (
 from deno_core.db import models as m
 from deno_core.db.enums import ProjectStatus, RunStatus, Source, Stance, TakedownStatus, VerdictKind
 from deno_core.text import CleanText, clean_text
+from deno_studio.personas import PersonaId
 
 
 class _Out(BaseModel):
@@ -256,6 +257,8 @@ class MeOut(BaseModel):
     product_url: str | None = None
     timezone: str | None = None
     founder_role: str | None = None
+    persona: str | None = Field(default=None, description="Who the founder is (docs/18 §17); null until asked")
+    persona_learned: list[str] = Field(default_factory=list, description="What Deno learned from their videos")
     handles: list[Handle] = Field(default_factory=list)
     voice_preset: str | None = None
     notification_prefs: dict[str, bool] = Field(default_factory=dict)
@@ -296,6 +299,8 @@ class MeUpdate(BaseModel):
         default=None, description="IANA name, e.g. Asia/Kolkata"
     )
     founder_role: Literal["solo_founder", "co_founder", "indie_hacker", "founding_marketer"] | None = None
+    # Stored in profiles.studio_prefs (no column); null clears it so the question is asked again.
+    persona: PersonaId | None = None
     handles: list[Handle] | None = Field(default=None, max_length=10)
     voice_preset: Literal["terse_engineer", "build_in_public", "dry_humour", "data_first", "storyteller"] | None = None
     notification_prefs: (

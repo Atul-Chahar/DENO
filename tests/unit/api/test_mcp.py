@@ -13,6 +13,7 @@ import pytest
 from deno_api import mcp_server
 from deno_api.app import create_app
 from deno_core.settings import Settings
+from deno_studio import personas
 from tests.helpers.tokens import ISSUER, make_verifier, user_token
 
 API = "https://api.example.com"
@@ -35,6 +36,7 @@ EXPECTED_TOOLS = {
     "get_playbook",
     "list_styles",
     "search_recipes",
+    "set_persona",
     "set_brand_kit",
     "search_media",
     "create_upload",
@@ -158,3 +160,27 @@ async def _test_an_anticipated_tool_error_reaches_the_model(client: httpx.AsyncC
     result = res.json()["result"]
     assert result["isError"] is True
     assert "Describe the idea in at least a sentence or two." in result["content"][0]["text"]
+
+
+async def test_set_persona_offers_exactly_the_personas() -> None:
+    async with serve() as client:
+        await _test_set_persona_offers_exactly_the_personas(client)
+
+
+async def _test_set_persona_offers_exactly_the_personas(client: httpx.AsyncClient) -> None:
+    _user, auth = user_token()
+    assert (await client.post("/mcp", json=INIT, headers={**HEADERS, **auth})).status_code == 200
+    listed = await client.post(
+        "/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, headers={**HEADERS, **auth}
+    )
+    tool = next(t for t in listed.json()["result"]["tools"] if t["name"] == "set_persona")
+    assert set(tool["inputSchema"]["properties"]["persona"]["enum"]) == set(personas.PERSONA_IDS)
+    assert not (tool.get("annotations") or {}).get("readOnlyHint")
+    call = {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "tools/call",
+        "params": {"name": "set_persona", "arguments": {"persona": "astronaut"}},
+    }
+    res = await client.post("/mcp", json=call, headers={**HEADERS, **auth})
+    assert res.json()["result"]["isError"] is True  # refused before it reaches the database
