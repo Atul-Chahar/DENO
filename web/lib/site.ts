@@ -72,7 +72,10 @@ Add a remote MCP server with the address above (Streamable HTTP, OAuth). If the 
 Step 2. Check that it worked
 Call the Deno tool "list_ideas". If it returns my ideas, or an empty list, the connection works. If the tool is missing, tell me to start a new chat. If sign-in fails, tell me to disconnect Deno in the connector settings and connect again.
 
-Step 3. Tell me what I can do now
+Step 3. Ask who I am (once)
+Ask me "Who are you?" with these choices: founder, content creator, indie hacker / developer, agency / marketer, educator / coach. Save my answer with the Deno tool "set_persona". It sets the format of every video you make for me. If I skip it, move on.
+
+Step 4. Tell me what I can do now
 In three short lines, offer me these and ask which I want first:
 1. Validate a startup idea against real public posts (tool: validate_idea, takes 3 to 4 minutes).
 2. Write a week of posts in my voice and save them to Deno (tools: get_founder_context, create_content_plan, save_draft).

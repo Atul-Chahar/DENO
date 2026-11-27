@@ -93,7 +93,7 @@ migrations/                Alembic (head: 0006)   scripts/  run_validation.py, p
 - `docs/17_HANDOFF.md` — **current state + next steps (read first)**
 - `docs/23_VIDEO_GALLERY.md` — the public gallery at `/videos` (formats with prompts, videos by link only, how to publish one)
 - `docs/22_LAUNCH_PLAN.md` — the 10-day launch plan: Studio speed, review page, other AI tools; §8 = what is built
-- `docs/21_WEBSITE_REDESIGN.md` — the public site: landing, pricing ladder, docs + llms.txt, setup prompt, dashboard
+- `docs/21_WEBSITE_REDESIGN.md` — the public site: landing, pricing ladder, docs + llms.txt, setup prompt, persona pages `/for` (§9), dashboard
   home; §6 lists what the site promises that the product doesn't do yet
 - `docs/18_CREATION_STUDIO_PLAN.md` — Studio: MCP tools, plugin, kit, media sources, review, personas §17 (§13 director upgrade,
   §14 zero keys + no MP4 storage, §15 Openverse)

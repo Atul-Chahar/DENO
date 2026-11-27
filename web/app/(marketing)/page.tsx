@@ -4,6 +4,7 @@ import { CodeBlock } from '@/components/setup/CodeBlock';
 import { Faq } from '@/components/landing/Faq';
 import { InstallBox } from '@/components/landing/InstallBox';
 import { InstallTerminal } from '@/components/landing/InstallTerminal';
+import { PersonaCards } from '@/components/landing/PersonaCards';
 import { PlayOnView } from '@/components/landing/PlayOnView';
 import { ScrollReveal } from '@/components/landing/ScrollReveal';
 import { SetupPrompt } from '@/components/setup/SetupPrompt';
@@ -30,6 +31,7 @@ const COMPARE: [string, string][] = [
   ['Writes in the house AI voice', 'Matches your writing samples and your stories'],
   ['Grabs any image it finds', 'Uses licensed media and writes the credits file'],
   ['Forgets your notes next chat', 'Remembers every fix you asked for as your taste'],
+  ['Uses the same template for everyone', 'Starts in your format and learns from what you approve'],
 ];
 
 const FAQ: { q: string; a: ReactNode }[] = [
@@ -44,6 +46,20 @@ const FAQ: { q: string; a: ReactNode }[] = [
         <a href="/install.sh" className="link-mono" target="_blank" rel="noopener">Read the script →</a>
       </>
     ),
+  },
+  {
+    q: 'Who is Deno for?',
+    a: (
+      <>
+        Founders, content creators, indie hackers and developers, agencies and marketers, and educators and coaches.
+        You tell Deno which one you are once, and your AI makes every video in the format that fits you.{' '}
+        <a href="/for" className="link-mono">See each format →</a>
+      </>
+    ),
+  },
+  {
+    q: 'Can I change who I am later?',
+    a: 'Yes, on your Account page, or just tell your AI. Deno also adjusts by itself: the frame, length, pacing and captions you keep choosing become your defaults.',
   },
   { q: 'Do I need a Deno account first?', a: 'No. When your browser opens to sign in, you can make a free account right there. No card.' },
   {
@@ -92,7 +108,8 @@ export default function LandingPage() {
         <h1 className="display m-hero__title">Edit your marketing by talking to your AI.</h1>
         <p className="m-hero__sub">
           Deno plugs into the Claude or ChatGPT you already pay for. Say what you want changed in a post, a reel or a
-          launch video, and your AI makes the edit, working from your evidence, your voice and licensed media.
+          launch video, and your AI makes the edit in the format that fits you, working from your evidence, your voice
+          and licensed media.
         </p>
         <InstallBox id="install" />
         <p className="m-mono m-hero__note">Free to start · No card · No AI credits to buy · Never posts for you</p>
@@ -155,6 +172,17 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section id="who" className="m-wrap m-sec">
+        <span className="m-label m-label--amber">Who are you?</span>
+        <h2 className="display m-title">Say who you are once. Every video comes out in your format.</h2>
+        <p className="m-sub">
+          A founder needs a 30 second launch film. A creator needs a 15 second reel cut on the beat. Your answer sets the
+          length, the frame, the pacing, the hook and the captions, and Deno keeps adjusting them to the videos you approve.
+        </p>
+        <PersonaCards />
+        <a href="/docs/personas" className="link-mono" style={{ marginTop: 24, display: 'inline-block' }}>How your format learns →</a>
+      </section>
+
       <section id="how" className="m-wrap m-sec">
         <span className="m-label m-label--peach">How it works</span>
         <h2 className="display m-title">You give the notes. Your AI does the edit.</h2>
@@ -169,7 +197,7 @@ export default function LandingPage() {
           <a href="/docs/prompts" className="m-step m-hit" style={{ background: 'var(--peach)' }}>
             <span className="m-step__n">2</span>
             <h3>Ask in plain words</h3>
-            <p>Your AI reads your idea, your proof and your voice from Deno, then writes the post or builds the video.</p>
+            <p>Your AI reads your idea, your proof, your voice and your format from Deno, then writes the post or builds the video.</p>
             <div className="m-step__eg">&ldquo;Make a 20 second reel about the pain my last validation found.&rdquo;</div>
           </a>
           <a href="/docs/review" className="m-step m-hit" style={{ background: 'var(--blue-soft)' }}>
@@ -185,7 +213,7 @@ export default function LandingPage() {
         <div className="m-wrap m-sec">
           <span className="m-label m-label--lime">What you can make</span>
           <h2 className="display m-title">One launch. Every format it needs.</h2>
-          <p className="m-sub">Each one starts from a ready prompt inside your AI. Pick one, answer five questions once, approve the treatment.</p>
+          <p className="m-sub">Each one starts from a ready prompt inside your AI. Your AI suggests the one that fits who you are. Answer a few questions once, approve the treatment.</p>
           <div className="m-grid m-grid--5" data-play>
             <a href="/videos/formats/saas-launch-32" className="m-make m-hit">
               <div className="m-make__art" style={{ background: 'var(--lime)' }}>
@@ -243,7 +271,7 @@ export default function LandingPage() {
             <span className="m-label m-label--blue">The difference</span>
             <h2 className="display m-title">Everyone has the same AI. Yours knows your proof.</h2>
             <p className="m-sub">A plain chatbot guesses what your customers feel and invents a number to sound sure. With Deno connected, your AI works from what real people posted about your problem, and from what you have actually done.</p>
-            <a href="/docs/tools" className="link-mono" style={{ marginTop: 24 }}>See all 19 tools your AI gets →</a>
+            <a href="/docs/tools" className="link-mono" style={{ marginTop: 24 }}>See all 20 tools your AI gets →</a>
           </div>
           <div className="m-compare">
             <div className="m-compare__row m-compare__row--head"><div>YOUR AI ALONE</div><div>YOUR AI + DENO</div></div>
@@ -253,7 +281,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="m-grid m-grid--4" style={{ marginTop: 64 }}>
-          <a href="/docs/tools" className="m-stat m-hit" style={{ background: 'var(--green-soft)' }}><b data-count="19">19</b><span>tools your AI can call, plus 5 ready prompts</span></a>
+          <a href="/docs/tools" className="m-stat m-hit" style={{ background: 'var(--green-soft)' }}><b data-count="20">20</b><span>tools your AI can call, plus 5 ready prompts</span></a>
           <a href="/docs/rulebook" className="m-stat m-hit" style={{ background: 'var(--peach)' }}><b data-count="20">20</b><span>slop patterns flagged at the exact words</span></a>
           <a href="/docs/media" className="m-stat m-hit" style={{ background: 'var(--blue-soft)' }}><b>0</b><span>API keys needed to find footage, images and sound</span></a>
           <a href="/docs/auth" className="m-stat m-hit" style={{ background: 'var(--lime)' }}><b>0</b><span>posts, votes or DMs sent for you. You press send.</span></a>

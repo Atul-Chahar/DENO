@@ -20,6 +20,7 @@ export function SiteFooter() {
             <a href="/#install">Install</a>
             <a href="/#how">How it works</a>
             <a href="/#make">Studio</a>
+            <a href="/for">Who it&apos;s for</a>
             <a href="/videos">Video gallery</a>
             <a href="/#proof">Idea validation</a>
             <a href="/pricing">Pricing</a>

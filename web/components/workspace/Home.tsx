@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CopyButton } from '@/components/CopyButton';
 import { api, type Billing, type Me, type Project, type StudioItemCard } from '@/lib/api';
-import { PERSONAS, personaLabel } from '@/lib/personas';
+import { PERSONAS, findPersona, personaHref, personaLabel } from '@/lib/personas';
 import { MCP_URL, SETUP_PROMPT, STARTER_PROMPTS } from '@/lib/site';
 
 const APPS: { id: string; name: string; can: string; doc: string; match: (client: string) => boolean }[] = [
@@ -86,6 +86,16 @@ export function Home() {
   const isFree = !billing || billing.plan === 'free';
   const meters = (billing?.usage ?? []).filter((u) => u.limit !== null && u.limit > 0);
 
+  // Starter prompts in the founder's own format once they've said who they are.
+  const persona = findPersona(me?.persona);
+  const prompts = persona
+    ? [
+        { tag: 'Video', tone: 'green' as const, text: persona.prompts[0] },
+        { tag: 'Video', tone: 'amber' as const, text: persona.prompts[1] },
+        ...STARTER_PROMPTS.filter((pr) => pr.tag === 'Edit' || pr.tag === 'Posts'),
+      ]
+    : STARTER_PROMPTS;
+
   async function choosePersona(id: string) {
     setPersonaError(null);
     try {
@@ -140,7 +150,9 @@ export function Home() {
             <div className="h-card__head">
               <h2>{me.persona ? `Saved: ${personaLabel(me.persona)}` : 'Who are you?'}</h2>
               <span className="h-hint" style={{ margin: 0 }}>
-                {me.persona ? 'Your AI now makes videos in this format. Change it any time on the Account page.' : 'Pick one. Your AI makes every video in the format that fits you.'}
+                {me.persona ? (
+                  <>Your AI now makes videos in this format and adjusts it as you approve videos. <a href={personaHref(me.persona)} className="link-mono">See your format →</a></>
+                ) : 'Pick one. Your AI makes every video in the format that fits you.'}
               </span>
             </div>
             {!me.persona && (
@@ -229,7 +241,7 @@ export function Home() {
               <div className="h-sec__head"><h2>Say this to your AI next</h2></div>
               <p className="h-hint">Copy a line and paste it into Claude or ChatGPT. Deno fills in your idea, proof and voice.</p>
               <div className="h-prompts">
-                {STARTER_PROMPTS.map((prompt) => (
+                {prompts.map((prompt) => (
                   <div key={prompt.text} className="h-prompt">
                     <span className={`tag ${TONE_TAG[prompt.tone]}`}>{prompt.tag}</span>
                     <span>&ldquo;{prompt.text}&rdquo;</span>

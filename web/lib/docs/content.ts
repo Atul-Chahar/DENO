@@ -6,6 +6,7 @@
  * tool behaviour comes from apps/api/src/deno_api/mcp_server.py, kit commands from plugin/kit/cli.mjs.
  */
 
+import { PERSONAS, lengthText, pacingText } from '@/lib/personas';
 import { CONTACT_EMAIL, INSTALL_CMD, INSTALL_CMD_POSTS, INSTALL_CMD_WIN, MCP_URL, PLUGIN_REPO, SITE_URL } from '@/lib/site';
 
 export type Block =
@@ -126,7 +127,8 @@ export const DOCS: DocPage[] = [
       ] },
       { t: 'h2', text: '1. Ask for the video' },
       { t: 'say', text: 'Make a 20 second vertical reel about the pain my last validation found.' },
-      { t: 'p', text: 'Your Claude asks five questions once (audience, tone, what to show, and so on), then writes a short treatment. Read it and say yes or what to change.' },
+      { t: 'p', text: 'The first time, Claude asks **who you are** (founder, content creator, indie hacker, agency or educator) and saves it. That sets your format: length, frame, pacing, hook and captions. See [Who are you?](/docs/personas).' },
+      { t: 'p', text: 'Then it asks a few questions once (the takeaway, the facts, the sound), each with a suggested answer from your format, and writes a short treatment. Read it and say yes or what to change.' },
       { t: 'h2', text: '2. Claude builds and renders' },
       { t: 'p', text: 'Claude writes the film as HTML where every frame is a function of time, then runs the `studio` command to check it, render it with headless Chromium and ffmpeg, and mix the sound. All of this happens on your computer.' },
       { t: 'h2', text: '3. Review on your dashboard' },
@@ -394,6 +396,37 @@ export const DOCS: DocPage[] = [
     ],
   },
   {
+    slug: 'personas',
+    title: 'Who are you? Your video format',
+    lead: 'Tell Deno who you are once. Your AI then makes every video in the format that fits you, and the format keeps learning.',
+    group: 'Studio',
+    blocks: [
+      { t: 'h2', text: 'Where you answer' },
+      { t: 'ul', items: [
+        'On your dashboard home, the first time you open it.',
+        'Or in Claude Code: the first time you ask for a video, your AI asks "Who are you?" and saves the answer with `set_persona`.',
+        'Change it any time on your **Account** page, or tell your AI.',
+      ] },
+      { t: 'h2', text: 'The five formats' },
+      { t: 'table', head: ['You are', 'Starts from', 'Frame', 'Length', 'Pacing', 'Captions'], rows: PERSONAS.map((p) => [
+        p.label, `\`${p.recipe}\``, p.ratios.join(', '), lengthText(p), pacingText(p), `\`${p.captions}\``,
+      ]) },
+      { t: 'p', text: 'Each format also sets the hook (what happens in the first second), the tone, the sound and the ending. Read them in full on [Who it\'s for](/for).' },
+      { t: 'note', text: 'These are where your AI starts. Ask for something else in a chat ("make it square", "make it 60 seconds") and it does that instead.' },
+      { t: 'h2', text: 'It learns from what you do' },
+      { t: 'ul', items: [
+        'Every video you save counts once; every video you approve counts twice.',
+        'After three, the frame, format, style and caption look you keep choosing become your defaults.',
+        'Your usual length and how fast your videos cut replace the starting numbers.',
+        'Notes like "too slow", "drags" or "lost interest" make the next video faster. "Rushed" or "can\'t read" make it slower. "Too long" and "too short" move the length.',
+        'If what you make looks like another format (say, a founder who only makes reels), your AI offers once to switch.',
+      ] },
+      { t: 'p', text: 'Your **Account** page lists what Deno learned, in plain sentences. Nothing about this leaves your account.' },
+      { t: 'h2', text: 'For AI tools' },
+      { t: 'p', text: '`get_founder_context` returns `persona` with its defaults and `learned` (what moved), or `persona: null` with `persona_choices` until the founder answers. Save the answer with `set_persona`. Playbook: `get_playbook("personas")`.' },
+    ],
+  },
+  {
     slug: 'review',
     title: 'Review and notes',
     lead: 'How you tell your AI what to change, without writing a long message.',
@@ -420,6 +453,7 @@ export const DOCS: DocPage[] = [
       { t: 'p', text: 'Notes by "system" are Deno\'s automated checks: reading time, words per screen, licences and copy gates. Your AI fixes those too.' },
       { t: 'h2', text: 'Taste memory' },
       { t: 'p', text: 'What you ask to fix on the dashboard is kept as your taste. Next time, your AI reads it through `get_founder_context` and avoids the same mistake.' },
+      { t: 'p', text: 'Notes about speed and length also move your format: "too slow" makes the next video cut faster, "too long" makes it shorter. Approving a video counts as "more like this". See [Who are you?](/docs/personas).' },
     ],
   },
   {
