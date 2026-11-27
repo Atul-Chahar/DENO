@@ -1,3 +1,5 @@
+import { CONTACT_EMAIL } from '@/lib/site';
+
 export function SiteFooter() {
   return (
     <footer id="trust" className="site-footer slab m-flat">
@@ -33,7 +35,7 @@ export function SiteFooter() {
             <a href="/legal/privacy">Privacy</a>
             <a href="/legal/terms">Terms</a>
             <a href="/takedown">Takedown</a>
-            <a href="mailto:hello@deno.gtm">Contact</a>
+            <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
           </div>
         </div>
         <div className="site-footer__bottom">

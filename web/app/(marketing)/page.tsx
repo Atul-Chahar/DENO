@@ -1,11 +1,16 @@
+import type { ReactNode } from 'react';
 import { CodeBlock } from '@/components/setup/CodeBlock';
+import { Faq } from '@/components/landing/Faq';
+import { InstallBox } from '@/components/landing/InstallBox';
+import { InstallTerminal } from '@/components/landing/InstallTerminal';
+import { PlayOnView } from '@/components/landing/PlayOnView';
 import { ScrollReveal } from '@/components/landing/ScrollReveal';
 import { SetupPrompt } from '@/components/setup/SetupPrompt';
 import { SetupTabs } from '@/components/setup/SetupTabs';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { PLANS, planHref } from '@/lib/plans';
-import { MCP_URL } from '@/lib/site';
+import { INSTALL_CMD, MCP_URL } from '@/lib/site';
 
 const FRAMES: { t: string; bg?: string; cls?: string; pin?: boolean }[] = [
   { t: '00:00', cls: 'm-frame--ink' },
@@ -26,12 +31,38 @@ const COMPARE: [string, string][] = [
   ['Forgets your notes next chat', 'Remembers every fix you asked for as your taste'],
 ];
 
-const FAQ: { q: string; a: string }[] = [
+const FAQ: { q: string; a: ReactNode }[] = [
+  {
+    q: 'What does the install command do?',
+    a: (
+      <>
+        It checks for Claude Code (and offers Anthropic&apos;s official installer if it is missing), adds the Deno plugin,
+        puts a <span className="m-inline">studio</span> command on your computer, downloads the video renderer
+        (Chromium, plus ffmpeg if you have none) into <span className="m-inline">~/.deno-studio</span>, and opens your
+        browser so you can sign in. Nothing installs system-wide, and it is safe to run again.{' '}
+        <a href="/install.sh" className="link-mono" target="_blank" rel="noopener">Read the script →</a>
+      </>
+    ),
+  },
+  { q: 'Do I need a Deno account first?', a: 'No. When your browser opens to sign in, you can make a free account right there. No card.' },
+  {
+    q: 'I never use a terminal. Can I still use Deno?',
+    a: 'Yes. Choose "No terminal" at the top of this page. Claude, ChatGPT and Cursor connect from their settings in about a minute, and you can validate ideas and write posts there. Making video needs Claude Code today.',
+  },
   { q: 'Do I need to pay for Claude or ChatGPT too?', a: 'Posts work on a free AI plan. Video is heavy work, so we recommend Claude Pro or Max. Deno never charges you for AI usage.' },
-  { q: 'What is MCP? Do I need to understand it?', a: 'No. MCP is the standard way AI apps connect to other products. You paste one prompt or one address, sign in, and your AI can use Deno.' },
   { q: 'Where do my videos go?', a: 'They stay on your computer. Deno stores a poster image and a contact sheet so you can review, plus your notes.' },
   { q: 'Will Deno post for me?', a: 'Never. Deno does not post, vote or message. You copy the post and press send yourself.' },
-  { q: 'Can I use it without Claude Code?', a: 'Yes. Validation, posts and content plans work in claude.ai, Claude Desktop, ChatGPT and the Deno dashboard. Making video needs Claude Code today.' },
+  { q: 'What is MCP? Do I need to understand it?', a: 'No. MCP is the standard way AI apps connect to other products. The installer or one settings page does it for you, and you sign in once.' },
+  {
+    q: 'How do I update or remove it?',
+    a: (
+      <>
+        Run the same command again to update. To remove it, run{' '}
+        <span className="m-inline">claude plugin uninstall deno-studio@deno</span>, then delete the{' '}
+        <span className="m-inline">~/.deno-studio</span> folder and <span className="m-inline">~/.local/bin/studio</span>.
+      </>
+    ),
+  },
 ];
 
 const TEASER = PLANS.filter((p) => p.id !== 'launch');
@@ -41,27 +72,23 @@ export default function LandingPage() {
     <>
       <SiteHeader />
 
-      <section className="m-wrap m-hero">
+      <section className="m-wrap m-hero m-hero--v2">
         <a href="/docs/quickstart" className="m-pill">
           <span className="m-pill__new">NEW</span>
-          <span>Deno now works inside Claude and ChatGPT</span>
-          <span className="m-pill__go">Set up in 2 minutes →</span>
+          <span>One command installs Deno in Claude Code</span>
+          <span className="m-pill__go">See the guide →</span>
         </a>
         <h1 className="display m-hero__title">Edit your marketing by talking to your AI.</h1>
         <p className="m-hero__sub">
           Deno plugs into the Claude or ChatGPT you already pay for. Say what you want changed in a post, a reel or a
-          launch video. Your AI makes the edit. Deno gives it your evidence, your voice and licensed media, and stops
-          anything that reads as AI.
+          launch video, and your AI makes the edit, working from your evidence, your voice and licensed media.
         </p>
-        <div className="m-hero__actions">
-          <a href="/auth?mode=signup" className="btn btn--lime btn--lg btn--raised">Connect your AI. It&apos;s free</a>
-          <a href="/docs/quickstart" className="btn btn--ghost btn--lg">Read the setup guide</a>
-        </div>
-        <p className="m-mono m-hero__note">No card · No AI credits to buy · Never posts for you</p>
+        <InstallBox id="install" />
+        <p className="m-mono m-hero__note">Free to start · No card · No AI credits to buy · Never posts for you</p>
       </section>
 
       <section className="m-wrap m-mock-wrap" aria-label="Example: editing a launch reel">
-        <div className="m-mock">
+        <div className="m-mock" data-play>
           <div className="m-chat">
             <div className="m-chat__head">
               <span>YOUR AI · CLAUDE CODE</span>
@@ -108,12 +135,12 @@ export default function LandingPage() {
       <section className="m-works" aria-label="Works inside">
         <div className="m-wrap m-works__row">
           <span className="m-mono">Works inside</span>
-          <span className="m-works__app">Claude Code</span>
-          <span className="m-works__app">Claude Desktop</span>
-          <span className="m-works__app">claude.ai</span>
-          <span className="m-works__app">ChatGPT</span>
-          <span className="m-works__app">Cursor</span>
-          <span className="m-works__more">and any app that speaks MCP</span>
+          <a href="/docs/claude-code" className="m-works__app">Claude Code</a>
+          <a href="/docs/claude" className="m-works__app">Claude Desktop</a>
+          <a href="/docs/claude" className="m-works__app">claude.ai</a>
+          <a href="/docs/chatgpt" className="m-works__app">ChatGPT</a>
+          <a href="/docs/cursor" className="m-works__app">Cursor</a>
+          <a href="/docs/other-clients" className="m-works__more">and any app that speaks MCP →</a>
         </div>
       </section>
 
@@ -121,12 +148,12 @@ export default function LandingPage() {
         <span className="m-label m-label--peach">How it works</span>
         <h2 className="display m-title">You give the notes. Your AI does the edit.</h2>
         <p className="m-sub">No new editor to learn and no timeline to drag. The work happens in the chat you already use, and every version lands on your Deno dashboard.</p>
-        <div className="m-grid m-grid--3">
+        <div className="m-grid m-grid--3" data-play>
           <div className="m-step" style={{ background: 'var(--green-soft)' }}>
             <span className="m-step__n">1</span>
-            <h3>Connect once</h3>
-            <p>Paste one prompt into Claude or ChatGPT and sign in to Deno. There is no API key to copy.</p>
-            <div className="m-step__eg m-step__eg--code">{MCP_URL}</div>
+            <h3>Install once</h3>
+            <p>Paste one line into your terminal, or add Deno in Claude or ChatGPT settings. Sign in once. There is no API key to copy.</p>
+            <div className="m-step__eg m-step__eg--code">{INSTALL_CMD}</div>
           </div>
           <div className="m-step" style={{ background: 'var(--peach)' }}>
             <span className="m-step__n">2</span>
@@ -148,7 +175,7 @@ export default function LandingPage() {
           <span className="m-label m-label--lime">What you can make</span>
           <h2 className="display m-title">One launch. Every format it needs.</h2>
           <p className="m-sub">Each one starts from a ready prompt inside your AI. Pick one, answer five questions once, approve the treatment.</p>
-          <div className="m-grid m-grid--5">
+          <div className="m-grid m-grid--5" data-play>
             <div className="m-make">
               <div className="m-make__art" style={{ background: 'var(--lime)' }}>
                 <svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="#101613"><path d="M7 4v16l13-8z" /></svg>
@@ -215,8 +242,8 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="m-grid m-grid--4" style={{ marginTop: 64 }}>
-          <div className="m-stat" style={{ background: 'var(--green-soft)' }}><b>19</b><span>tools your AI can call, plus 5 ready prompts</span></div>
-          <div className="m-stat" style={{ background: 'var(--peach)' }}><b>20</b><span>slop patterns flagged at the exact words</span></div>
+          <div className="m-stat" style={{ background: 'var(--green-soft)' }}><b data-count="19">19</b><span>tools your AI can call, plus 5 ready prompts</span></div>
+          <div className="m-stat" style={{ background: 'var(--peach)' }}><b data-count="20">20</b><span>slop patterns flagged at the exact words</span></div>
           <div className="m-stat" style={{ background: 'var(--blue-soft)' }}><b>0</b><span>API keys needed to find footage, images and sound</span></div>
           <div className="m-stat" style={{ background: 'var(--lime)' }}><b>0</b><span>posts, votes or DMs sent for you. You press send.</span></div>
         </div>
@@ -224,7 +251,7 @@ export default function LandingPage() {
 
       <section id="proof" className="m-band m-band--tint">
         <div className="m-wrap m-sec m-split">
-          <div className="m-verdict">
+          <div className="m-verdict" data-play>
             <div className="m-verdict__head"><span>EXAMPLE VERDICT</span><span style={{ color: 'var(--muted)' }}>89 POSTS READ</span></div>
             <div className="m-verdict__main">
               <span className="display" style={{ fontSize: 64 }}>PIVOT</span>
@@ -253,7 +280,7 @@ export default function LandingPage() {
             <p className="m-sub" style={{ color: '#1E2A22', maxWidth: 520 }}>Most AI video tools charge per render. Deno doesn&apos;t. The thinking runs on the Claude or ChatGPT plan you already have, and the rendering runs on your own computer. You pay one flat price for what only Deno has.</p>
             <a href="/pricing" className="btn btn--ink" style={{ marginTop: 28 }}>See pricing</a>
           </div>
-          <div className="m-ledger">
+          <div className="m-ledger" data-play>
             <div><span>The writing and editing</span><b>Your AI plan</b></div>
             <div><span>Rendering the video</span><b>Your computer</b></div>
             <div><span>Your video files</span><b>Stay on your disk</b></div>
@@ -262,10 +289,33 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="setup" className="m-band">
+      <section id="setup" className="m-band m-band--ink">
+        <div className="m-wrap m-sec m-split">
+          <div>
+            <span className="m-label m-label--lime">Set up in 2 minutes</span>
+            <h2 className="display m-title">One command. Then just ask.</h2>
+            <p className="m-sub">
+              The installer does the fiddly parts for you: the plugin, the renderer and the sign-in. Run it again any time
+              to update. It skips whatever is already done.
+            </p>
+            <ul className="m-checks">
+              <li>Nothing installs system-wide. The renderer lives in <span className="m-inline">~/.deno-studio</span>.</li>
+              <li>You sign in from your browser. No password or key goes in the terminal.</li>
+              <li>Your videos render and stay on your own computer.</li>
+            </ul>
+            <div className="m-hero__actions">
+              <a href="#install" className="btn btn--lime">Copy the command</a>
+              <a href="/install.sh" className="btn btn--ghost" target="_blank" rel="noopener">Read the script</a>
+            </div>
+          </div>
+          <InstallTerminal />
+        </div>
+      </section>
+
+      <section id="connect" className="m-band">
         <div className="m-wrap m-sec">
-          <span className="m-label m-label--green">Set up in 2 minutes</span>
-          <h2 className="display m-title">Paste one prompt. Your AI does the rest.</h2>
+          <span className="m-label m-label--green">Every other way to connect</span>
+          <h2 className="display m-title m-title--sm">Prefer your AI to set it up? Paste one prompt.</h2>
           <SetupPrompt />
           <p className="m-mono m-byhand">Or do it by hand</p>
           <SetupTabs />
@@ -307,27 +357,27 @@ export default function LandingPage() {
       <section id="faq" className="m-band">
         <div className="m-wrap m-sec m-split m-split--top">
           <h2 className="display m-title m-title--sm" style={{ marginTop: 0, flex: '1 1 320px' }}>Asked often, answered plainly</h2>
-          <div className="m-faq" style={{ flex: '2 1 560px' }}>
-            {FAQ.map((item) => (
-              <div key={item.q}><h3>{item.q}</h3><p>{item.a}</p></div>
-            ))}
+          <div style={{ flex: '2 1 560px' }}>
+            <Faq items={FAQ} />
           </div>
         </div>
       </section>
 
       <section className="m-wrap m-cta">
         <div className="m-cta__box">
-          <h2 className="display m-cta__title">Connect tonight. Ship the launch video this week.</h2>
+          <h2 className="display m-cta__title">Install tonight. Ship the launch video this week.</h2>
           <p>Free to start, no card, and your AI plan does the heavy lifting.</p>
+          <div className="m-cta__cmd"><CodeBlock code={INSTALL_CMD} /></div>
           <div className="m-hero__actions">
-            <a href="/auth?mode=signup" className="btn btn--lime btn--lg">Connect your AI. It&apos;s free</a>
-            <a href="/docs" className="btn btn--ghost btn--lg">Read the docs</a>
+            <a href="#install" className="btn btn--lime btn--lg">Other systems and apps</a>
+            <a href="/docs/quickstart" className="btn btn--ghost btn--lg">Read the setup guide</a>
           </div>
         </div>
       </section>
 
       <SiteFooter />
       <ScrollReveal />
+      <PlayOnView />
     </>
   );
 }

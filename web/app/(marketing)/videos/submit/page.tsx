@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { CopyButton } from '@/components/CopyButton';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
-import { PLUGIN_REPO } from '@/lib/site';
+import { CONTACT_EMAIL, PLUGIN_REPO } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Publish your AI-made video — Deno',
@@ -24,7 +24,7 @@ Review rounds it took (optional):
 I made this video, or I have the maker's permission to list it.`;
 
 const issueUrl = `https://github.com/${PLUGIN_REPO}/issues/new?title=${encodeURIComponent('Gallery: <your video title>')}&body=${encodeURIComponent(FORM)}`;
-const mailUrl = `mailto:hello@deno.gtm?subject=${encodeURIComponent('Gallery submission')}&body=${encodeURIComponent(FORM)}`;
+const mailUrl = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Gallery submission')}&body=${encodeURIComponent(FORM)}`;
 
 export default function SubmitVideoPage() {
   return (
@@ -92,7 +92,7 @@ export default function SubmitVideoPage() {
           <div><h3>Whose videos can be listed?</h3><p>Yours, or one whose maker said yes. Every entry credits its maker and links to the original post.</p></div>
           <div><h3>Does it have to be made with Deno?</h3><p>No. Videos made with Deno Studio are marked as such; others are listed as Community.</p></div>
           <div><h3>What is not listed?</h3><p>Videos with invented numbers or fake quotes, media you do not have the right to use, and anything that is not marketing for a real product or project.</p></div>
-          <div><h3>How do I remove mine?</h3><p>Write to <a href="mailto:hello@deno.gtm">hello@deno.gtm</a> or use the <a href="/takedown">takedown page</a>. We take it down and do not ask why.</p></div>
+          <div><h3>How do I remove mine?</h3><p>Write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> or use the <a href="/takedown">takedown page</a>. We take it down and do not ask why.</p></div>
         </div>
       </section>
 
