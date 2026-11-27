@@ -535,3 +535,23 @@ details[open] > summary .m-faq__mark::after { transform: translate(-50%, -50%) r
   .site-header__actions .btn { padding: 10px 14px; font-size: 14px; }
   [id] { scroll-margin-top: 12px; }
 }
+
+/* ---- Cards that are links: lift on hover, like the gallery cards ---- */
+.m-hit { display: flex; color: inherit; text-decoration: none; cursor: pointer; transition: transform .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease); }
+.m-ledger.m-hit, .m-verdict.m-hit { display: block; }
+.m-hit:hover { transform: translate(-3px, -3px); box-shadow: 6px 6px 0 var(--ink); }
+.m-hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.m-verdict.m-hit:hover { box-shadow: 9px 9px 0 var(--ink); }
+.m-make.m-hit:hover { box-shadow: 6px 6px 0 var(--lime); background: #202A25; }
+.m-make.m-hit:focus-visible { outline-color: var(--lime); }
+.m-make.m-hit .m-make__meta { transition: color .15s var(--ease); }
+.m-make.m-hit:hover .m-make__meta { color: var(--lime); }
+.m-stat.m-hit::after { content: 'Learn more →'; margin-top: auto; padding-top: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); opacity: 0; transition: opacity .15s var(--ease); }
+.m-stat.m-hit:hover::after, .m-stat.m-hit:focus-visible::after { opacity: 1; }
+.m-step.m-hit h3 { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 4px; transition: text-decoration-color .15s var(--ease); }
+.m-step.m-hit:hover h3 { text-decoration-color: currentColor; }
+.m-chat__calls--link { color: var(--on-dark-soft); text-decoration: none; }
+.m-chat__calls--link:hover span { color: var(--on-dark); text-decoration: underline; text-underline-offset: 3px; }
+.m-ulink { color: inherit; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; transition: text-decoration-color .15s var(--ease); }
+.m-ulink:hover { text-decoration-color: currentColor; }
+@media (prefers-reduced-motion: reduce) { .m-hit:hover { transform: none; } }

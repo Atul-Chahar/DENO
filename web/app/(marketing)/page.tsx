@@ -92,23 +92,23 @@ export default function LandingPage() {
           <div className="m-chat">
             <div className="m-chat__head">
               <span>YOUR AI · CLAUDE CODE</span>
-              <span className="m-chat__ok">deno connected</span>
+              <a href="#install" className="m-chat__ok m-ulink">deno connected</a>
             </div>
             <div className="m-chat__body">
               <div className="m-chat__me">The hook is slow. Cut scene 3 and make the first line land inside 2 seconds.</div>
-              <div className="m-chat__calls">
+              <a href="/docs/tools" className="m-chat__calls m-chat__calls--link">
                 <div><b>✓</b><span>deno · Read review notes · 3 open</span></div>
                 <div><b>✓</b><span>deno · Check copy against Deno&apos;s gates · pass</span></div>
                 <div><b>✓</b><span>studio render · on your machine</span></div>
                 <div><b>✓</b><span>deno · Save a video version · v4</span></div>
-              </div>
+              </a>
               <div className="m-chat__ai">Done. Scene 3 is gone and the hook lands at 1.8 s. Version 4 is on your Deno dashboard with all three notes answered.</div>
             </div>
           </div>
 
           <div className="m-review">
             <div className="m-review__head">
-              <span>DENO REVIEW · LAUNCH REEL</span>
+              <a href="/docs/review" className="m-ulink">DENO REVIEW · LAUNCH REEL</a>
               <span className="m-review__ver">V4 · VIA CLAUDE</span>
             </div>
             <div className="m-frames">
@@ -149,24 +149,24 @@ export default function LandingPage() {
         <h2 className="display m-title">You give the notes. Your AI does the edit.</h2>
         <p className="m-sub">No new editor to learn and no timeline to drag. The work happens in the chat you already use, and every version lands on your Deno dashboard.</p>
         <div className="m-grid m-grid--3" data-play>
-          <div className="m-step" style={{ background: 'var(--green-soft)' }}>
+          <a href="#install" className="m-step m-hit" style={{ background: 'var(--green-soft)' }}>
             <span className="m-step__n">1</span>
             <h3>Install once</h3>
             <p>Paste one line into your terminal, or add Deno in Claude or ChatGPT settings. Sign in once. There is no API key to copy.</p>
             <div className="m-step__eg m-step__eg--code">{INSTALL_CMD}</div>
-          </div>
-          <div className="m-step" style={{ background: 'var(--peach)' }}>
+          </a>
+          <a href="/docs/prompts" className="m-step m-hit" style={{ background: 'var(--peach)' }}>
             <span className="m-step__n">2</span>
             <h3>Ask in plain words</h3>
             <p>Your AI reads your idea, your proof and your voice from Deno, then writes the post or builds the video.</p>
             <div className="m-step__eg">&ldquo;Make a 20 second reel about the pain my last validation found.&rdquo;</div>
-          </div>
-          <div className="m-step" style={{ background: 'var(--blue-soft)' }}>
+          </a>
+          <a href="/docs/review" className="m-step m-hit" style={{ background: 'var(--blue-soft)' }}>
             <span className="m-step__n">3</span>
             <h3>Review, then say what&apos;s off</h3>
             <p>Press play on your dashboard and type a note. It pins to that frame. Your AI reads the notes and fixes them one by one.</p>
             <div className="m-step__eg"><span className="m-chip m-chip--red">00:04</span><span>&ldquo;Logo is too small here.&rdquo;</span></div>
-          </div>
+          </a>
         </div>
       </section>
 
@@ -176,23 +176,23 @@ export default function LandingPage() {
           <h2 className="display m-title">One launch. Every format it needs.</h2>
           <p className="m-sub">Each one starts from a ready prompt inside your AI. Pick one, answer five questions once, approve the treatment.</p>
           <div className="m-grid m-grid--5" data-play>
-            <div className="m-make">
+            <a href="/videos/formats/saas-launch-32" className="m-make m-hit">
               <div className="m-make__art" style={{ background: 'var(--lime)' }}>
                 <svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="#101613"><path d="M7 4v16l13-8z" /></svg>
               </div>
               <h3>Launch video</h3>
               <p>The film for your launch day, with sound mixed and captions timed.</p>
-              <span className="m-make__meta">16:9 · CLAUDE CODE</span>
-            </div>
-            <div className="m-make">
+              <span className="m-make__meta">16:9 · CLAUDE CODE · SEE IT →</span>
+            </a>
+            <a href="/videos/formats/vertical-feature-15" className="m-make m-hit">
               <div className="m-make__art" style={{ background: 'var(--ink-2)' }}>
                 <div style={{ width: '22%', aspectRatio: '9 / 16', background: 'var(--flare)' }} />
               </div>
               <h3>Vertical reel</h3>
               <p>A short hook for Reels, Shorts and TikTok, cut to the beat.</p>
-              <span className="m-make__meta">9:16 · CLAUDE CODE</span>
-            </div>
-            <div className="m-make">
+              <span className="m-make__meta">9:16 · CLAUDE CODE · SEE IT →</span>
+            </a>
+            <a href="/videos/formats/explainer-30" className="m-make m-hit">
               <div className="m-make__art" style={{ background: 'var(--blue-soft)', alignItems: 'flex-end', gap: 4, padding: 14 }}>
                 {[30, 70, 45, 90, 55, 35, 75].map((h, i) => (
                   <div key={i} style={{ width: 6, height: `${h}%`, background: 'var(--blue)' }} />
@@ -200,9 +200,9 @@ export default function LandingPage() {
               </div>
               <h3>Explainer with voiceover</h3>
               <p>Your script, read by a voice that runs on your machine or your own ElevenLabs key.</p>
-              <span className="m-make__meta">16:9 · CLAUDE CODE</span>
-            </div>
-            <div className="m-make">
+              <span className="m-make__meta">16:9 · CLAUDE CODE · SEE IT →</span>
+            </a>
+            <a href="/videos/formats/carousel-8" className="m-make m-hit">
               <div className="m-make__art" style={{ background: 'var(--peach)' }}>
                 <div style={{ width: '20%', aspectRatio: '4 / 5', background: 'var(--ink)' }} />
                 <div style={{ width: '20%', aspectRatio: '4 / 5', background: 'var(--paper)', border: '1px solid var(--ink)' }} />
@@ -210,9 +210,9 @@ export default function LandingPage() {
               </div>
               <h3>LinkedIn carousel</h3>
               <p>Still pages in your brand colours, each line checked against the slop rules.</p>
-              <span className="m-make__meta">4:5 · CLAUDE CODE</span>
-            </div>
-            <div className="m-make">
+              <span className="m-make__meta">4:5 · CLAUDE CODE · SEE IT →</span>
+            </a>
+            <a href="/docs/posts" className="m-make m-hit">
               <div className="m-make__art" style={{ background: 'var(--amber-soft)', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4, padding: 14, alignItems: 'stretch' }}>
                 {['var(--ink)', 'var(--amber)', '', 'var(--ink)', '', 'var(--amber)', 'var(--ink)'].map((c, i) => (
                   <div key={i} style={c ? { background: c } : { border: '1px solid var(--ink)' }} />
@@ -220,8 +220,8 @@ export default function LandingPage() {
               </div>
               <h3>A week of posts</h3>
               <p>LinkedIn, Reddit, X and Hacker News drafts in your voice, saved to your calendar.</p>
-              <span className="m-make__meta">TEXT · ANY AI APP</span>
-            </div>
+              <span className="m-make__meta">TEXT · ANY AI APP · SEE IT →</span>
+            </a>
           </div>
         </div>
       </section>
@@ -242,16 +242,16 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="m-grid m-grid--4" style={{ marginTop: 64 }}>
-          <div className="m-stat" style={{ background: 'var(--green-soft)' }}><b data-count="19">19</b><span>tools your AI can call, plus 5 ready prompts</span></div>
-          <div className="m-stat" style={{ background: 'var(--peach)' }}><b data-count="20">20</b><span>slop patterns flagged at the exact words</span></div>
-          <div className="m-stat" style={{ background: 'var(--blue-soft)' }}><b>0</b><span>API keys needed to find footage, images and sound</span></div>
-          <div className="m-stat" style={{ background: 'var(--lime)' }}><b>0</b><span>posts, votes or DMs sent for you. You press send.</span></div>
+          <a href="/docs/tools" className="m-stat m-hit" style={{ background: 'var(--green-soft)' }}><b data-count="19">19</b><span>tools your AI can call, plus 5 ready prompts</span></a>
+          <a href="/docs/rulebook" className="m-stat m-hit" style={{ background: 'var(--peach)' }}><b data-count="20">20</b><span>slop patterns flagged at the exact words</span></a>
+          <a href="/docs/media" className="m-stat m-hit" style={{ background: 'var(--blue-soft)' }}><b>0</b><span>API keys needed to find footage, images and sound</span></a>
+          <a href="/docs/auth" className="m-stat m-hit" style={{ background: 'var(--lime)' }}><b>0</b><span>posts, votes or DMs sent for you. You press send.</span></a>
         </div>
       </section>
 
       <section id="proof" className="m-band m-band--tint">
         <div className="m-wrap m-sec m-split">
-          <div className="m-verdict" data-play>
+          <a href="/docs/validate" className="m-verdict m-hit" data-play>
             <div className="m-verdict__head"><span>EXAMPLE VERDICT</span><span style={{ color: 'var(--muted)' }}>89 POSTS READ</span></div>
             <div className="m-verdict__main">
               <span className="display" style={{ fontSize: 64 }}>PIVOT</span>
@@ -263,7 +263,7 @@ export default function LandingPage() {
               <div><span className="m-kept">KEPT</span><span>21 claims checked against the post they cite</span></div>
               <div><span className="m-dropped">DROPPED</span><span style={{ color: 'var(--muted)' }}>Claims the judge could not verify</span></div>
             </div>
-          </div>
+          </a>
           <div>
             <span className="m-label m-label--amber">Where the proof comes from</span>
             <h2 className="display m-title m-title--sm">First, find out if the idea is worth marketing.</h2>
@@ -280,12 +280,12 @@ export default function LandingPage() {
             <p className="m-sub" style={{ color: '#1E2A22', maxWidth: 520 }}>Most AI video tools charge per render. Deno doesn&apos;t. The thinking runs on the Claude or ChatGPT plan you already have, and the rendering runs on your own computer. You pay one flat price for what only Deno has.</p>
             <a href="/pricing" className="btn btn--ink" style={{ marginTop: 28 }}>See pricing</a>
           </div>
-          <div className="m-ledger" data-play>
+          <a href="/pricing" className="m-ledger m-hit" data-play>
             <div><span>The writing and editing</span><b>Your AI plan</b></div>
             <div><span>Rendering the video</span><b>Your computer</b></div>
             <div><span>Your video files</span><b>Stay on your disk</b></div>
             <div className="m-ledger__us"><span>Evidence, voice, rules, media, review</span><b>Deno</b></div>
-          </div>
+          </a>
         </div>
       </section>
 
