@@ -524,9 +524,9 @@ details[open] > summary .m-faq__mark::after { transform: translate(-50%, -50%) r
   .m-term__caret, .m-term__wait { animation: none; }
 }
 
-/* Header on phones: brand and button on one line, the links in one row you can swipe, and not sticky
-   (a wrapped sticky header covered a third of the screen). */
-@media (max-width: 760px) {
+/* Header below laptop width: brand and button on one line, the links in one row you can swipe, and not
+   sticky (a wrapped sticky header covered a third of a phone screen). */
+@media (max-width: 980px) {
   .site-header { position: static; }
   .site-header__row { min-height: 0; padding-top: 10px; padding-bottom: 6px; gap: 8px 12px; }
   .site-nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 calc(var(--gutter) - 12px); scrollbar-width: none; }
@@ -555,3 +555,4 @@ details[open] > summary .m-faq__mark::after { transform: translate(-50%, -50%) r
 .m-ulink { color: inherit; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; transition: text-decoration-color .15s var(--ease); }
 .m-ulink:hover { text-decoration-color: currentColor; }
 @media (prefers-reduced-motion: reduce) { .m-hit:hover { transform: none; } }
+.site-header__login { padding: 12px 4px; }
