@@ -6,7 +6,8 @@
  * tool behaviour comes from apps/api/src/deno_api/mcp_server.py, kit commands from plugin/kit/cli.mjs.
  */
 
-import { MCP_URL, PLUGIN_REPO, SITE_URL } from '@/lib/site';
+import { PERSONAS, lengthText, pacingText } from '@/lib/personas';
+import { CONTACT_EMAIL, INSTALL_CMD, INSTALL_CMD_POSTS, INSTALL_CMD_WIN, MCP_URL, PLUGIN_REPO, SITE_URL } from '@/lib/site';
 
 export type Block =
   | { t: 'p'; text: string }
@@ -73,7 +74,7 @@ export const DOCS: DocPage[] = [
       { t: 'cards', items: [
         { title: 'Quickstart', text: 'Connect your AI in about two minutes.', href: '/docs/quickstart' },
         { title: 'Your first video', text: 'From prompt to a reviewed reel.', href: '/docs/first-video' },
-        { title: 'Tool reference', text: 'All 19 tools your AI gets.', href: '/docs/tools' },
+        { title: 'Tool reference', text: 'All 20 tools your AI gets.', href: '/docs/tools' },
       ] },
     ],
   },
@@ -89,7 +90,7 @@ export const DOCS: DocPage[] = [
       { t: 'ul', items: [
         'A free Deno account. [Create one](/auth?mode=signup).',
         'An AI app: Claude Code, Claude Desktop, claude.ai, ChatGPT or Cursor.',
-        'For video only: Claude Code, Node 22 or newer, and ffmpeg.',
+        'For video: Claude Code and Node 22 or newer. The one-line installer adds the rest.',
       ] },
       { t: 'h2', text: 'Step 1. Connect your AI app' },
       { t: 'p', text: 'The setup prompt above does this for you. To do it by hand, pick the app you use.' },
@@ -126,7 +127,8 @@ export const DOCS: DocPage[] = [
       ] },
       { t: 'h2', text: '1. Ask for the video' },
       { t: 'say', text: 'Make a 20 second vertical reel about the pain my last validation found.' },
-      { t: 'p', text: 'Your Claude asks five questions once (audience, tone, what to show, and so on), then writes a short treatment. Read it and say yes or what to change.' },
+      { t: 'p', text: 'The first time, Claude asks **who you are** (founder, content creator, indie hacker, agency or educator) and saves it. That sets your format: length, frame, pacing, hook and captions. See [Who are you?](/docs/personas).' },
+      { t: 'p', text: 'Then it asks a few questions once (the takeaway, the facts, the sound), each with a suggested answer from your format, and writes a short treatment. Read it and say yes or what to change.' },
       { t: 'h2', text: '2. Claude builds and renders' },
       { t: 'p', text: 'Claude writes the film as HTML where every frame is a function of time, then runs the `studio` command to check it, render it with headless Chromium and ffmpeg, and mix the sound. All of this happens on your computer.' },
       { t: 'h2', text: '3. Review on your dashboard' },
@@ -145,19 +147,29 @@ export const DOCS: DocPage[] = [
     lead: 'The full setup: posts, validation and video. Claude Code is the only app that can render video today.',
     group: 'Connect your AI',
     blocks: [
-      { t: 'h2', text: 'Install the plugin' },
-      { t: 'p', text: 'Type these two lines inside Claude Code.' },
-      { t: 'code', code: `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install deno-studio@deno` },
-      { t: 'p', text: 'The plugin adds the Deno MCP server, seven skills (video, sound, captions, voice, stills, posts, review), three agents (director, scene-builder, reviewer) and the local `studio` command.' },
-      { t: 'h2', text: 'Finish in a terminal' },
-      { t: 'code', code: 'studio doctor --install\nstudio login' },
-      { t: 'ul', items: [
-        '`studio doctor --install` checks for Node 22+ and ffmpeg and installs what the renderer needs into `~/.deno-studio/`.',
-        '`studio login` opens your browser so you can sign in to Deno.',
+      { t: 'h2', text: 'Install with one command' },
+      { t: 'p', text: 'Open a terminal (on a Mac: the Terminal app) and paste this line. It works on macOS, Linux and WSL.' },
+      { t: 'code', code: INSTALL_CMD },
+      { t: 'p', text: 'On Windows, paste this into PowerShell instead:' },
+      { t: 'code', code: INSTALL_CMD_WIN },
+      { t: 'p', text: 'The installer is safe to run again. Each step skips what is already done. [Read the script](/install.sh) before you run it if you like. In order, it:' },
+      { t: 'ol', items: [
+        'Checks for Claude Code, and offers to install it with Anthropic\'s official installer if it is missing.',
+        'Adds the `deno-studio` plugin: the Deno MCP server, seven skills (video, sound, captions, voice, stills, posts, review), three agents (director, scene-builder, reviewer) and the `studio` command.',
+        'Puts `studio` in `~/.local/bin` so it also works in a normal terminal.',
+        'Installs what the renderer needs (Chromium, plus ffmpeg if you have none) into `~/.deno-studio/`. About 150 MB. Nothing system-wide.',
+        'Opens your browser once so you can sign in to Deno. You never type a password or a key into the terminal.',
       ] },
+      { t: 'p', text: 'Then open Claude Code, type `/mcp`, pick **deno** and choose **Authenticate**.' },
+      { t: 'note', text: 'Video needs Node 22 or newer. If you do not have it, the installer tells you the command for your system and still sets up posts and validation.' },
+      { t: 'h2', text: 'Or install by hand' },
+      { t: 'p', text: 'Type these two lines inside Claude Code:' },
+      { t: 'code', code: `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install deno-studio@deno` },
+      { t: 'p', text: 'Then ask Claude to run `studio doctor --install` and `studio login` for you. The `studio` command is only on the path inside Claude Code unless you used the installer.' },
       { t: 'h2', text: 'Posts only, no video' },
-      { t: 'p', text: 'If you do not need video, skip the plugin and add just the server:' },
-      { t: 'code', code: `claude mcp add --transport http deno ${MCP_URL}` },
+      { t: 'p', text: 'If you do not need video, connect just the server:' },
+      { t: 'code', code: INSTALL_CMD_POSTS },
+      { t: 'p', text: 'That is the same as running `claude mcp add --transport http --scope user deno ' + MCP_URL + '` yourself.' },
       { t: 'p', text: 'Then run `/mcp` inside Claude Code and sign in to Deno.' },
       ...CHECK,
       { t: 'h2', text: 'Updating' },
@@ -240,7 +252,7 @@ export const DOCS: DocPage[] = [
     blocks: [
       { t: 'ul', items: [
         `**Address:** \`${MCP_URL}\``,
-        '**19 tools**, **5 prompts** and one resource, `deno://playbooks/{topic}`.',
+        '**20 tools**, **5 prompts** and one resource, `deno://playbooks/{topic}`.',
         '**Stateless.** Every call stands alone, so there is no session to keep alive.',
         '**Your data only.** Every call runs as the signed-in founder. A founder can never read another founder\'s data.',
       ] },
@@ -273,7 +285,7 @@ export const DOCS: DocPage[] = [
   {
     slug: 'tools',
     title: 'Tools',
-    lead: 'The 19 tools your AI gets. You never call them yourself; your AI picks the right one.',
+    lead: 'The 20 tools your AI gets. You never call them yourself; your AI picks the right one.',
     group: 'MCP reference',
     blocks: [
       { t: 'p', text: '"Changes data" means the tool saves something to your Deno account or uses part of a monthly limit. The others only read.' },
@@ -340,11 +352,13 @@ export const DOCS: DocPage[] = [
     group: 'Studio',
     blocks: [
       { t: 'h2', text: 'Requirements' },
-      { t: 'ul', items: ['Claude Code', 'Node 22 or newer', 'ffmpeg', 'A Claude Pro or Max plan is recommended'] },
+      { t: 'ul', items: ['Claude Code (the installer can add it)', 'Node 22 or newer', 'ffmpeg (the installer adds its own copy if you have none)', 'A Claude Pro or Max plan is recommended'] },
       { t: 'h2', text: 'Install' },
-      { t: 'code', code: `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install deno-studio@deno` },
-      { t: 'p', text: 'Then in a terminal:' },
-      { t: 'code', code: 'studio doctor --install\nstudio login' },
+      { t: 'p', text: 'Paste this into a terminal (macOS, Linux, WSL):' },
+      { t: 'code', code: INSTALL_CMD },
+      { t: 'p', text: 'On Windows, in PowerShell:' },
+      { t: 'code', code: INSTALL_CMD_WIN },
+      { t: 'p', text: 'It adds the plugin, puts the `studio` command on your path, installs the renderer and signs you in. See [Connect Claude Code](/docs/claude-code) for each step, or how to do it by hand.' },
       { t: 'h2', text: 'Optional extras' },
       { t: 'ul', items: [
         '`studio doctor --install --voice` adds local voiceover (Kokoro).',
@@ -382,6 +396,37 @@ export const DOCS: DocPage[] = [
     ],
   },
   {
+    slug: 'personas',
+    title: 'Who are you? Your video format',
+    lead: 'Tell Deno who you are once. Your AI then makes every video in the format that fits you, and the format keeps learning.',
+    group: 'Studio',
+    blocks: [
+      { t: 'h2', text: 'Where you answer' },
+      { t: 'ul', items: [
+        'On your dashboard home, the first time you open it.',
+        'Or in Claude Code: the first time you ask for a video, your AI asks "Who are you?" and saves the answer with `set_persona`.',
+        'Change it any time on your **Account** page, or tell your AI.',
+      ] },
+      { t: 'h2', text: 'The five formats' },
+      { t: 'table', head: ['You are', 'Starts from', 'Frame', 'Length', 'Pacing', 'Captions'], rows: PERSONAS.map((p) => [
+        p.label, `\`${p.recipe}\``, p.ratios.join(', '), lengthText(p), pacingText(p), `\`${p.captions}\``,
+      ]) },
+      { t: 'p', text: 'Each format also sets the hook (what happens in the first second), the tone, the sound and the ending. Read them in full on [Who it\'s for](/for).' },
+      { t: 'note', text: 'These are where your AI starts. Ask for something else in a chat ("make it square", "make it 60 seconds") and it does that instead.' },
+      { t: 'h2', text: 'It learns from what you do' },
+      { t: 'ul', items: [
+        'Every video you save counts once; every video you approve counts twice.',
+        'After three, the frame, format, style and caption look you keep choosing become your defaults.',
+        'Your usual length and how fast your videos cut replace the starting numbers.',
+        'Notes like "too slow", "drags" or "lost interest" make the next video faster. "Rushed" or "can\'t read" make it slower. "Too long" and "too short" move the length.',
+        'If what you make looks like another format (say, a founder who only makes reels), your AI offers once to switch.',
+      ] },
+      { t: 'p', text: 'Your **Account** page lists what Deno learned, in plain sentences. Nothing about this leaves your account.' },
+      { t: 'h2', text: 'For AI tools' },
+      { t: 'p', text: '`get_founder_context` returns `persona` with its defaults and `learned` (what moved), or `persona: null` with `persona_choices` until the founder answers. Save the answer with `set_persona`. Playbook: `get_playbook("personas")`.' },
+    ],
+  },
+  {
     slug: 'review',
     title: 'Review and notes',
     lead: 'How you tell your AI what to change, without writing a long message.',
@@ -408,6 +453,7 @@ export const DOCS: DocPage[] = [
       { t: 'p', text: 'Notes by "system" are Deno\'s automated checks: reading time, words per screen, licences and copy gates. Your AI fixes those too.' },
       { t: 'h2', text: 'Taste memory' },
       { t: 'p', text: 'What you ask to fix on the dashboard is kept as your taste. Next time, your AI reads it through `get_founder_context` and avoids the same mistake.' },
+      { t: 'p', text: 'Notes about speed and length also move your format: "too slow" makes the next video cut faster, "too long" makes it shorter. Approving a video counts as "more like this". See [Who are you?](/docs/personas).' },
     ],
   },
   {
@@ -506,7 +552,7 @@ export const DOCS: DocPage[] = [
       ] },
       { t: 'h2', text: 'Studio' },
       { t: 'ul', items: [
-        '**`studio` is not found.** Run `/plugin install deno-studio@deno` again, then open a new terminal.',
+        '**`studio` is not found.** Run the installer again (`' + INSTALL_CMD + '`), then open a new terminal. If it warns that `~/.local/bin` is not on your path, add the line it prints to your shell profile.',
         '**Render fails.** Run `studio doctor`. It names what is missing (Node, ffmpeg, Chromium).',
         '**Upload refused.** Run `studio verify` and fix what it lists, then upload again.',
       ] },
@@ -516,7 +562,7 @@ export const DOCS: DocPage[] = [
         '**"Not enough evidence".** The idea is too broad or too new. Name the customer and the problem more exactly and run again.',
       ] },
       { t: 'h2', text: 'Still stuck' },
-      { t: 'p', text: 'Paste [the full docs](/llms-full.txt) into your AI and describe the problem, or write to hello@deno.gtm.' },
+      { t: 'p', text: `Paste [the full docs](/llms-full.txt) into your AI and describe the problem, or write to ${CONTACT_EMAIL}.` },
     ],
   },
 ];

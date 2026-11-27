@@ -4,6 +4,19 @@ export const MCP_URL = 'https://deno-api-swart.vercel.app/mcp';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://deno-web-eight.vercel.app').replace(/\/$/, '');
 export const PLUGIN_REPO = 'Atul-Chahar/DENO';
 
+/** Where people write to us. Set NEXT_PUBLIC_CONTACT_EMAIL in Vercel to a mailbox that exists. */
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? 'hello@deno.gtm';
+
+/** The one-line installers (web/public/install.sh and install.ps1). */
+export const INSTALL_CMD = `curl -fsSL ${SITE_URL}/install.sh | bash`;
+export const INSTALL_CMD_WIN = `irm ${SITE_URL}/install.ps1 | iex`;
+export const INSTALL_CMD_POSTS = `curl -fsSL ${SITE_URL}/install.sh | bash -s -- --posts-only`;
+export const INSTALL_CMD_POSTS_WIN = `$env:DENO_POSTS_ONLY="1"; irm ${SITE_URL}/install.ps1 | iex`;
+
+/** One-click installs for editors that accept an MCP deeplink. */
+export const CURSOR_INSTALL_URL = `cursor://anysphere.cursor-deeplink/mcp/install?name=deno&config=${encodeURIComponent(btoa(JSON.stringify({ url: MCP_URL })))}`;
+export const VSCODE_INSTALL_URL = `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'deno', type: 'http', url: MCP_URL }))}`;
+
 /**
  * A prompt a founder pastes into any AI agent so the agent sets Deno up by itself.
  * Keep it self-contained: the agent may have no web access, so every step is spelled out here.
@@ -22,17 +35,15 @@ Facts you need
 Step 1. Work out which app you are running in, then follow the matching section. If you are not sure, ask me.
 
 A) Claude Code (you can run shell commands)
-1. Run: claude plugin marketplace add ${PLUGIN_REPO}
-2. Run: claude plugin install deno-studio@deno
-   If those commands are not available, ask me to type these two lines into Claude Code myself:
-   /plugin marketplace add ${PLUGIN_REPO}
-   /plugin install deno-studio@deno
-3. The plugin adds the Deno MCP server, the video skills and a local command called "studio".
-4. Check that Node 22 or newer and ffmpeg are installed (node --version, ffmpeg -version). Tell me what is missing and how to install it on my system.
-5. Run: studio doctor --install
-6. Run: studio login   (this opens my browser; wait while I sign in)
-7. If I only want posts and no video, skip steps 1 to 6 and run instead:
-   claude mcp add --transport http deno ${MCP_URL}
+1. On macOS, Linux or WSL, run:
+   curl -fsSL ${SITE_URL}/install.sh | bash -s -- --yes
+   On Windows PowerShell, run instead:
+   $env:DENO_YES="1"; irm ${SITE_URL}/install.ps1 | iex
+2. The installer adds the deno-studio plugin (the Deno MCP server, the video skills and a local command called "studio"), installs what the video renderer needs into ~/.deno-studio, and opens my browser so I can sign in. Wait while I sign in.
+3. If it says Node 22 or newer is missing, tell me the exact command to install Node on my system, then run the installer again.
+4. If I only want posts and no video, run instead:
+   curl -fsSL ${SITE_URL}/install.sh | bash -s -- --posts-only
+5. When it finishes, tell me to restart Claude Code, type /mcp, pick "deno" and choose Authenticate.
 
 B) Cursor, VS Code, Windsurf or another editor with an MCP config file
 1. Add this server to the MCP config (for Cursor: .cursor/mcp.json in the project, or the global one):
@@ -61,7 +72,10 @@ Add a remote MCP server with the address above (Streamable HTTP, OAuth). If the 
 Step 2. Check that it worked
 Call the Deno tool "list_ideas". If it returns my ideas, or an empty list, the connection works. If the tool is missing, tell me to start a new chat. If sign-in fails, tell me to disconnect Deno in the connector settings and connect again.
 
-Step 3. Tell me what I can do now
+Step 3. Ask who I am (once)
+Ask me "Who are you?" with these choices: founder, content creator, indie hacker / developer, agency / marketer, educator / coach. Save my answer with the Deno tool "set_persona". It sets the format of every video you make for me. If I skip it, move on.
+
+Step 4. Tell me what I can do now
 In three short lines, offer me these and ask which I want first:
 1. Validate a startup idea against real public posts (tool: validate_idea, takes 3 to 4 minutes).
 2. Write a week of posts in my voice and save them to Deno (tools: get_founder_context, create_content_plan, save_draft).

@@ -4,6 +4,7 @@ import { CopyButton } from '@/components/CopyButton';
 import { FormatCard, VideoCard } from '@/components/gallery/Cards';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
+import { PERSONAS, personaHref } from '@/lib/personas';
 import { FORMATS, STYLES, findFormat, findStyle, formatHref, formatPrompt, isStill, videosForFormat } from '@/lib/gallery';
 
 type Params = Promise<{ slug: string }>;
@@ -26,6 +27,7 @@ export default async function FormatPage({ params }: { params: Params }) {
   const made = videosForFormat(f.slug);
   const others = FORMATS.filter((x) => x.slug !== f.slug && (x.ratio === f.ratio || x.style === f.style)).slice(0, 4);
   const otherStyles = STYLES.filter((s) => s.slug !== f.style);
+  const usualFor = PERSONAS.filter((p) => p.recipe === f.slug);
 
   return (
     <>
@@ -41,6 +43,12 @@ export default async function FormatPage({ params }: { params: Params }) {
           <div><dt>Usual style</dt><dd>{style?.title ?? f.style}</dd></div>
           <div><dt>Made in</dt><dd>Claude Code + Deno Studio</dd></div>
           {f.runnable && <div><dt>Starts as</dt><dd>A working film your AI fills in</dd></div>}
+          {usualFor.length > 0 && (
+            <div>
+              <dt>First pick for</dt>
+              <dd>{usualFor.map((p, i) => <span key={p.id}>{i > 0 ? ', ' : ''}<a href={personaHref(p.id)}>{p.label}</a></span>)}</dd>
+            </div>
+          )}
         </dl>
       </section>
 

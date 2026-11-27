@@ -1,0 +1,3 @@
+# The one-line installers are piped straight into a shell: keep their line endings fixed.
+*.sh text eol=lf
+web/public/install.ps1 text eol=crlf

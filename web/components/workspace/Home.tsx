@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { CopyButton } from '@/components/CopyButton';
-import { api, type Billing, type Project, type StudioItemCard } from '@/lib/api';
+import { api, type Billing, type Me, type Project, type StudioItemCard } from '@/lib/api';
+import { PERSONAS, findPersona, personaHref, personaLabel } from '@/lib/personas';
 import { MCP_URL, SETUP_PROMPT, STARTER_PROMPTS } from '@/lib/site';
 
 const APPS: { id: string; name: string; can: string; doc: string; match: (client: string) => boolean }[] = [
@@ -41,13 +42,17 @@ export function Home() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [items, setItems] = useState<StudioItemCard[]>([]);
   const [billing, setBilling] = useState<Billing | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const [personaJustSaved, setPersonaJustSaved] = useState(false);
+  const [personaError, setPersonaError] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const [p, s, b] = await Promise.allSettled([api.listProjects(), api.studioItems(), api.billing()]);
+      const [p, s, b, who] = await Promise.allSettled([api.listProjects(), api.studioItems(), api.billing(), api.me()]);
       if (cancelled) return;
+      if (who.status === 'fulfilled') setMe(who.value);
       setProjects(p.status === 'fulfilled' ? p.value.items : []);
       if (s.status === 'fulfilled') setItems(s.value);
       if (b.status === 'fulfilled') setBilling(b.value);
@@ -80,6 +85,26 @@ export function Home() {
   const idea = (projects ?? []).find((p) => p.latest_run?.verdict) ?? (projects ?? [])[0];
   const isFree = !billing || billing.plan === 'free';
   const meters = (billing?.usage ?? []).filter((u) => u.limit !== null && u.limit > 0);
+
+  // Starter prompts in the founder's own format once they've said who they are.
+  const persona = findPersona(me?.persona);
+  const prompts = persona
+    ? [
+        { tag: 'Video', tone: 'green' as const, text: persona.prompts[0] },
+        { tag: 'Video', tone: 'amber' as const, text: persona.prompts[1] },
+        ...STARTER_PROMPTS.filter((pr) => pr.tag === 'Edit' || pr.tag === 'Posts'),
+      ]
+    : STARTER_PROMPTS;
+
+  async function choosePersona(id: string) {
+    setPersonaError(null);
+    try {
+      setMe(await api.updateMe({ persona: id }));
+      setPersonaJustSaved(true);
+    } catch (err) {
+      setPersonaError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   return (
     <div className="h-shell">
@@ -119,6 +144,31 @@ export function Home() {
           </div>
           <a href="/app" className="btn btn--ghost">Validate a new idea</a>
         </div>
+
+        {me && (!me.persona || personaJustSaved) && (
+          <section className="h-card h-card--raised" aria-label="Who are you?">
+            <div className="h-card__head">
+              <h2>{me.persona ? `Saved: ${personaLabel(me.persona)}` : 'Who are you?'}</h2>
+              <span className="h-hint" style={{ margin: 0 }}>
+                {me.persona ? (
+                  <>Your AI now makes videos in this format and adjusts it as you approve videos. <a href={personaHref(me.persona)} className="link-mono">See your format →</a></>
+                ) : 'Pick one. Your AI makes every video in the format that fits you.'}
+              </span>
+            </div>
+            {!me.persona && (
+              <div className="h-apps">
+                {PERSONAS.map((p) => (
+                  <button key={p.id} type="button" className="h-app h-choice" onClick={() => void choosePersona(p.id)}>
+                    <span className="h-app__top">{p.label}</span>
+                    <span className="h-sub">{p.blurb}</span>
+                    <span className="h-sub">{p.videos}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {personaError && <div className="h-card__body"><span style={{ color: 'var(--red-ink)', fontSize: 14 }}>{personaError}</span></div>}
+          </section>
+        )}
 
         <section className="h-card h-card--raised" aria-label="Your AI apps">
           <div className="h-card__head">
@@ -191,7 +241,7 @@ export function Home() {
               <div className="h-sec__head"><h2>Say this to your AI next</h2></div>
               <p className="h-hint">Copy a line and paste it into Claude or ChatGPT. Deno fills in your idea, proof and voice.</p>
               <div className="h-prompts">
-                {STARTER_PROMPTS.map((prompt) => (
+                {prompts.map((prompt) => (
                   <div key={prompt.text} className="h-prompt">
                     <span className={`tag ${TONE_TAG[prompt.tone]}`}>{prompt.tag}</span>
                     <span>&ldquo;{prompt.text}&rdquo;</span>

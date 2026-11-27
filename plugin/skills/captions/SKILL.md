@@ -15,7 +15,8 @@ description: Create captions for a studio video from its voiceover, footage or t
 
 # Captions
 1. `get_playbook("captions")`; for text behind a person also `get_playbook("behind-subject")`.
-2. Choose a preset by the film's energy and say it in one line to the founder ("bold, word-by-word captions
+2. Start from the persona's caption preset (`get_founder_context` → `persona.captions`, and its
+   `caption_note`); change it only if the founder or the film asks. Choose by the film's energy and say it in one line to the founder ("bold, word-by-word captions
    for a fast reel"): `beast-mode` (loud reels), `billboard` (huge, behind the speaker, for the hook or key
    lines), `sideline` (talking heads, explainers), `butter-serif` (calm founder stories).
 3. `studio captions <audio or footage> --preset <name>` transcribes with word timings (local Whisper). With a

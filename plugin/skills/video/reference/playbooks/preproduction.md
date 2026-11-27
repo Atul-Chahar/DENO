@@ -13,7 +13,8 @@ Ask the founder these in one message, with your suggested answer for each, and a
 4. **Sound.** Their own track, a library track, a synthesized bed, voiceover, or silent with captions.
 5. **One named style** (see `list_styles`). One name beats five adjectives.
 
-Pull `get_founder_context` first: the validated pains, the ICP's own words and the Story Bank answer most of this.
+Pull `get_founder_context` first: the validated pains, the ICP's own words and the Story Bank answer most of this,
+and the founder's `persona` gives the suggested length, ratios, style and sound (playbook `personas`).
 
 ## Listen first
 If there is audio, run `studio beats` (and `studio captions` for voice or lyrics) and tell the founder what you

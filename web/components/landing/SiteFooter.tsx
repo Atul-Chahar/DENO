@@ -1,3 +1,6 @@
+import { StatusDot } from '@/components/landing/StatusDot';
+import { CONTACT_EMAIL } from '@/lib/site';
+
 export function SiteFooter() {
   return (
     <footer id="trust" className="site-footer slab m-flat">
@@ -14,8 +17,10 @@ export function SiteFooter() {
           </div>
           <div className="site-footer__col">
             <div className="display site-footer__heading">Product</div>
+            <a href="/#install">Install</a>
             <a href="/#how">How it works</a>
             <a href="/#make">Studio</a>
+            <a href="/for">Who it&apos;s for</a>
             <a href="/videos">Video gallery</a>
             <a href="/#proof">Idea validation</a>
             <a href="/pricing">Pricing</a>
@@ -26,6 +31,7 @@ export function SiteFooter() {
             <a href="/docs/claude-code">Connect Claude</a>
             <a href="/docs/chatgpt">Connect ChatGPT</a>
             <a href="/docs/tools">Tool reference</a>
+            <a href="/setup-prompt.txt">Setup prompt</a>
             <a href="/llms.txt">llms.txt</a>
           </div>
           <div className="site-footer__col">
@@ -33,11 +39,12 @@ export function SiteFooter() {
             <a href="/legal/privacy">Privacy</a>
             <a href="/legal/terms">Terms</a>
             <a href="/takedown">Takedown</a>
-            <a href="mailto:hello@deno.gtm">Contact</a>
+            <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
           </div>
         </div>
         <div className="site-footer__bottom">
           <span>© 2026 DENO GTM</span>
+          <StatusDot />
           <span>NEVER POSTS · NEVER VOTES · NEVER DMs</span>
         </div>
       </div>

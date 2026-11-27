@@ -2,7 +2,8 @@
 
 The words live once, in packages/studio/src/deno_studio/content/. This writes plugin/skills/<name>/SKILL.md and
 the offline reference copies, so the plugin and the MCP never drift, and web/lib/gallery/formats.json, so the
-public video gallery (docs/23) shows the same formats and styles. CI runs it with --check.
+public video gallery (docs/23) shows the same formats and styles, and web/lib/personas.json, so the site's
+"Who are you?" pages (docs/18 §17) show the defaults the AI follows. CI runs it with --check.
 
     uv run python scripts/build_plugin.py          # write
     uv run python scripts/build_plugin.py --check  # fail if plugin/skills is stale
@@ -14,12 +15,13 @@ import json
 import sys
 from pathlib import Path
 
-from deno_studio import list_docs
+from deno_studio import list_docs, personas
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "plugin" / "skills"
 GALLERY = ROOT / "web" / "lib" / "gallery" / "formats.json"
 RUNNABLE = ROOT / "plugin" / "kit" / "template" / "recipes"
+PERSONAS = ROOT / "web" / "lib" / "personas.json"
 
 PREAMBLE = """> **Deno Studio plugin.** `studio` is this plugin's command (on your PATH while the plugin is enabled; if the
 > shell can't find it, use `node "${CLAUDE_PLUGIN_ROOT}/kit/cli.mjs"`). Deno's MCP tools (get_founder_context,
@@ -72,6 +74,12 @@ def gallery_formats() -> str:
     return json.dumps({"recipes": recipes, "styles": styles}, indent=2, ensure_ascii=False) + "\n"
 
 
+def persona_data() -> str:
+    """The creator personas as data for the website (docs/18 §17), so the site shows what the AI follows."""
+    rows = [{k: v for k, v in p.defaults().items() if k != "playbook"} for p in personas.PERSONAS.values()]
+    return json.dumps({"default": personas.DEFAULT, "personas": rows}, indent=2, ensure_ascii=False) + "\n"
+
+
 def skill_files() -> dict[Path, str]:
     out: dict[Path, str] = {}
     for doc in list_docs("skills"):
@@ -83,6 +91,7 @@ def skill_files() -> dict[Path, str]:
                 f"# {doc.title}\n\n_{doc.summary}_\n\n{doc.body}"
             )
     out[GALLERY] = gallery_formats()
+    out[PERSONAS] = persona_data()
     return out
 
 

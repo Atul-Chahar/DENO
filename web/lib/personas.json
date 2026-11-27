@@ -1,0 +1,162 @@
+{
+  "default": "founder",
+  "personas": [
+    {
+      "id": "founder",
+      "label": "Founder",
+      "blurb": "I'm building a product and need launch and feature videos.",
+      "recipe": "saas-launch-32",
+      "also": [
+        "explainer-30",
+        "changelog-30",
+        "data-story-20"
+      ],
+      "ratios": [
+        "16:9",
+        "1:1"
+      ],
+      "length_s": [
+        20,
+        35
+      ],
+      "shot_s": [
+        2.0,
+        3.0
+      ],
+      "pacing": "Medium: a new shot every 2–3 s; hold the proof shot longer so it can be read.",
+      "hook": "The customer's pain in their own words (from the validation), then real proof on screen.",
+      "tone": "Credible and specific: real numbers, real screens, no hype words.",
+      "captions": "sideline",
+      "caption_note": "Short lines (about 6 words) low in the frame, so the product stays visible.",
+      "style": "living-ui",
+      "sound": "A calm bed or none; the film must work muted.",
+      "ending": "Product name and URL for 2 s.",
+      "ratio": "16:9"
+    },
+    {
+      "id": "creator",
+      "label": "Content creator",
+      "blurb": "I post short videos for my audience on Reels, Shorts and TikTok.",
+      "recipe": "vertical-feature-15",
+      "also": [
+        "explainer-30",
+        "kinetic-lyric-60"
+      ],
+      "ratios": [
+        "9:16"
+      ],
+      "length_s": [
+        10,
+        30
+      ],
+      "shot_s": [
+        1.0,
+        1.5
+      ],
+      "pacing": "Fast: a cut every 1–1.5 s, on the beat; no shot sits still for more than 2 s.",
+      "hook": "A pattern break in the first second: a surprising line, a bold claim they can back, or 'you' talk.",
+      "tone": "Personal and energetic; spoken, first person, like talking to one viewer.",
+      "captions": "beast-mode",
+      "caption_note": "Big, word-by-word captions in the centre safe area, 2–3 words at a time.",
+      "style": "vertical-captions",
+      "sound": "Music with a clear beat; cuts land on beats, the big moment on a downbeat.",
+      "ending": "A loop back to the first frame, or a one-line ask (follow, comment).",
+      "ratio": "9:16"
+    },
+    {
+      "id": "indie_dev",
+      "label": "Indie hacker / developer",
+      "blurb": "I ship tools and side projects and share them with other builders.",
+      "recipe": "repo-promo-20",
+      "also": [
+        "changelog-30",
+        "saas-launch-32"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "length_s": [
+        15,
+        30
+      ],
+      "shot_s": [
+        1.5,
+        2.5
+      ],
+      "pacing": "Medium-fast: show, don't tell; one idea per shot, 1.5–2.5 s each.",
+      "hook": "It working in frame one: the terminal command or the product doing the thing.",
+      "tone": "Dry and honest, builder to builder; numbers only if they are true (stars, users, ms).",
+      "captions": "billboard",
+      "caption_note": "Few words (about 3) as titles over the screen; code stays readable.",
+      "style": "dark-keynote",
+      "sound": "Light: typing and UI sounds, a soft bed or silence.",
+      "ending": "Repo or site URL, plus the install command if there is one.",
+      "ratio": "16:9"
+    },
+    {
+      "id": "agency",
+      "label": "Agency / marketer",
+      "blurb": "I make marketing videos for clients or for the brand I work for.",
+      "recipe": "vertical-feature-15",
+      "also": [
+        "brand-film-18",
+        "showreel-15",
+        "saas-launch-32"
+      ],
+      "ratios": [
+        "9:16",
+        "1:1",
+        "16:9"
+      ],
+      "length_s": [
+        15,
+        20
+      ],
+      "shot_s": [
+        1.0,
+        2.0
+      ],
+      "pacing": "Fast and polished: a cut every 1–2 s, exact timing, nothing left loose.",
+      "hook": "The client's benefit in 3 words, on brand from the first frame.",
+      "tone": "Polished and on brand: the client's colours, fonts and words, never ours.",
+      "captions": "billboard",
+      "caption_note": "Short title captions (about 3 words) in the brand font; one cut per platform ratio.",
+      "style": "swiss-kinetic",
+      "sound": "A licensed track cut to length; logo on the last downbeat.",
+      "ending": "Logo and one call to action; the same ending on every ratio.",
+      "ratio": "9:16"
+    },
+    {
+      "id": "educator",
+      "label": "Educator / coach",
+      "blurb": "I teach: courses, tutorials, coaching, tips.",
+      "recipe": "explainer-30",
+      "also": [
+        "data-story-20",
+        "vertical-feature-15"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "length_s": [
+        30,
+        60
+      ],
+      "shot_s": [
+        3.0,
+        4.0
+      ],
+      "pacing": "Calm: 3–4 s per shot so every step can be read; one idea per scene.",
+      "hook": "A question the viewer has, or 'the mistake most people make'.",
+      "tone": "Clear and patient; plain words, numbered steps, one example.",
+      "captions": "sideline",
+      "caption_note": "Full sentences (about 6–7 words a line) so the lesson works muted.",
+      "style": "flat-explainer",
+      "sound": "Voiceover first; a quiet bed under it.",
+      "ending": "What to do next (try it, the course link) in one line.",
+      "ratio": "16:9"
+    }
+  ]
+}

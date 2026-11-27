@@ -19,22 +19,32 @@ with the `studio` command.
 `studio doctor` checks Node, Chromium and ffmpeg and says how to install anything missing. `studio login` links
 the kit to the founder's Deno account. Tell the founder only what they must do themselves.
 
-## 1. Context
+## 1. Context and persona
 - `list_ideas`, then `get_founder_context(idea_id)`: pains with sources, ICP words, stories with real numbers,
-  brand kit, taste. No brand kit: `set_brand_kit` with their product URL.
-- `get_playbook` for `preproduction`, `timing`, `style`, `contract` and `build-loop`.
+  brand kit, taste, and `persona`. No brand kit: `set_brand_kit` with their product URL.
+- **Persona first.** If `persona` is null, ask "Who are you?" once, before anything else, with the choices in
+  `persona_choices` (founder, content creator, indie hacker / developer, agency / marketer, educator / coach), one
+  line each, and save the answer with `set_persona`. Never ask again. Skipped: use the founder defaults.
+- The persona learns from what they save, approve and ask to fix: `persona.learned` says what moved. If
+  `persona_suggestion` is there, offer that switch once in one line.
+- `get_playbook` for `personas`, `preproduction`, `timing`, `style`, `contract` and `build-loop`.
 - `search_recipes` for a format close to the request; `get_style` for the style you pick.
 
 ## 2. Ask once, then work
-One message with the five pre-production questions, each with your suggested answer. Accept "use your defaults".
+One message with the five pre-production questions, each with your suggested answer taken from the persona:
+its recipe, main ratio (and the other ratios), length, style and sound. Accept "use your defaults". What the founder
+asks for wins over the persona.
+- Follow the persona while you build: seconds per shot (`shot_s`), the hook style for the first second, the tone of
+  every line, the caption preset, and the ending.
 
 ## 3. Treatment (wait for "go")
-`studio init <name> --ratio 9:16 --style <style> --idea <idea_id>`. Write `TREATMENT.md`: logline, look, motif,
+`studio init <name> --ratio <persona ratios, e.g. 9:16,1:1> --style <style> --idea <idea_id>`. Write `TREATMENT.md`: logline, look, motif,
 shots with what each must make the viewer understand, all on-screen copy, facts used. Run every line of copy
 through `check_copy` (kind `on_screen`). Show the founder the treatment in plain words and wait for approval.
 
 ## 3b. Start from a runnable recipe when there is one
-- `studio init <name> --recipe <slug>` creates a film that **already renders**. Runnable today: `saas-launch-32`,
+- `studio init <name> --recipe <slug> --ratio <ratios>` creates a film that **already renders**; the persona's
+  `recipe` is the first one to try. Runnable today: `saas-launch-32`,
   `vertical-feature-15`, `explainer-30`, `changelog-30`, `repo-promo-20`, `data-story-20`. Every shot is a scene in
   `film.json` (`scenes`), drawn by a ready-made block (headline, product screen with a moving camera and cursor,
   before/after wipe, typing terminal, line chart, counting number, points, quote, end card). `studio render --draft` works at once.
