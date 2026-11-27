@@ -28,7 +28,7 @@ from deno_core.storage import Storage, new_path, owns
 from deno_gates import VoiceProfile, number_words_in, numbers_in
 from deno_sources.website import SiteUnavailable
 from deno_studio import brand as brand_mod
-from deno_studio import licences, media, rulebook
+from deno_studio import licences, media, personas, rulebook
 from deno_studio.copycheck import CopyKind, check_video_copy
 from deno_studio.manifest import (
     FilmManifest,
@@ -209,7 +209,27 @@ async def founder_context(scope: UserScope, project_id: uuid.UUID, dashboard: st
     if kit is None:
         ctx["brand_kit_hint"] = "No brand kit yet: call set_brand_kit with the product's website URL."
     ctx["taste"] = await taste(scope)
+    ctx.update(personas.context((profile.studio_prefs or {}).get("persona")))
     return ctx
+
+
+# --------------------------------------------------------------------------- persona (docs/18 §17)
+
+
+def persona_of(profile: Any) -> str | None:
+    """The saved persona id, or None when the founder hasn't answered "Who are you?" yet."""
+    found = personas.get((getattr(profile, "studio_prefs", None) or {}).get("persona"))
+    return found.id if found else None
+
+
+async def set_persona(scope: UserScope, persona_id: str) -> dict[str, Any]:
+    """Save the founder's answer in ``profiles.studio_prefs`` (no migration) and return its defaults."""
+    found = personas.get(persona_id)
+    if found is None:
+        raise InvalidInput(f"persona is one of {', '.join(personas.PERSONA_IDS)}")
+    profile = await scope.ensure_profile()
+    profile.studio_prefs = {**(profile.studio_prefs or {}), "persona": found.id}
+    return found.defaults()
 
 
 async def taste(scope: UserScope) -> dict[str, Any]:

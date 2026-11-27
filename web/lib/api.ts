@@ -475,6 +475,8 @@ export interface Me {
   product_url: string | null;
   timezone: string | null;
   founder_role: string | null;
+  /** Who they are for video defaults (docs/18 §17); null until they answer "Who are you?". */
+  persona: string | null;
   handles: Handle[];
   voice_preset: string | null;
   notification_prefs: Record<string, boolean>;

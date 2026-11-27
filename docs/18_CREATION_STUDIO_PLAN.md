@@ -487,3 +487,37 @@ look that needs it. All content edits go in `packages/studio/src/deno_studio/con
   we can do is make each hour count (items 1–8) and tell founders that a hero film needs several review rounds.
 
 Only #1 is implemented (2026-11-17, docs/22 §11); Atul picks the rest from 16.3.
+
+## 17. Creator personas (2026-11-27, branch `feat/creator-personas`)
+"Who are you?" is asked once and the answer decides how every video is made and edited.
+
+**Stored:** `profiles.studio_prefs["persona"]`, a key in the existing JSONB column. **No migration, no schema
+change** (dev and prod share one database). `null` / missing = not asked yet.
+
+**The five personas** (`packages/studio/src/deno_studio/personas.py` is the single source; playbook `personas`
+holds the words the AI follows):
+
+| id | Label | Recipe (also) | Ratios | Length | Shot length | Hook | Captions | Style |
+|---|---|---|---|---|---|---|---|---|
+| `founder` (default) | Founder | `saas-launch-32` (explainer-30, changelog-30, data-story-20) | 16:9, 1:1 | 20–35 s | 2–3 s | customer's pain in their words, then proof | `sideline` | living-ui |
+| `creator` | Content creator | `vertical-feature-15` (explainer-30, kinetic-lyric-60) | 9:16 | 10–30 s | 1–1.5 s | pattern break in the first second | `beast-mode` | vertical-captions |
+| `indie_dev` | Indie hacker / developer | `repo-promo-20` (changelog-30, saas-launch-32) | 16:9, 9:16 | 15–30 s | 1.5–2.5 s | it working in frame one | `billboard` | dark-keynote |
+| `agency` | Agency / marketer | `vertical-feature-15` (brand-film-18, showreel-15, saas-launch-32) | 9:16, 1:1, 16:9 | 15–20 s | 1–2 s | client's benefit in 3 words | `billboard` | swiss-kinetic |
+| `educator` | Educator / coach | `explainer-30` (data-story-20, vertical-feature-15) | 16:9, 9:16 | 30–60 s | 3–4 s | a question / "the mistake most people make" | `sideline` | flat-explainer |
+
+Each main recipe is runnable in the kit. Each persona also carries tone, caption note, sound and ending lines.
+
+**Where it is asked (one answer):**
+- **Claude Code plugin:** `get_founder_context` returns `persona` (the defaults) or `persona: null` with
+  `persona_hint` and `persona_choices`. The `video` skill asks "Who are you?" before planning and saves it with
+  the new MCP tool **`set_persona`** (20 tools now). The `video`, `captions` and `sound` skills and the
+  `preproduction` playbook take their suggested answers from the persona; the founder's own request wins.
+- **Web:** a "Who are you?" card on `/app/home`, shown until answered; a "Who you are" select on the Account page
+  (`GET/PATCH /api/v1/me` → `persona`; `null` clears it so the AI asks again). Not on the signup page (Supabase's
+  auth screen stays short).
+- MCP prompts `launch_video` and `explainer` no longer hard-code 20 s / 16:9 / 30 s: unset values follow the persona.
+
+Not changed: the kit (`studio init` already takes `--recipe` and `--ratio`, which the skill passes), and the old
+`profiles.founder_role` field (company role, unrelated to video format).
+Tests: `tests/unit/studio/test_personas.py` (recipes runnable, ratios, caption presets match the kit, playbook and
+web list in sync), `tests/unit/api/test_persona.py` (save / clear / refuse), `test_mcp.py` (tool listed, enum).

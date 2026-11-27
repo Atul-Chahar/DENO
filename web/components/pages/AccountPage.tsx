@@ -12,6 +12,7 @@ import {
   type VoiceSample,
 } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
+import { PERSONAS } from '@/lib/personas';
 
 type Tab = 'profile' | 'voice' | 'billing' | 'checkout' | 'notif' | 'security' | 'apps' | 'data';
 
@@ -231,13 +232,14 @@ function ProfileTab({ me, onSaved, onError }: Saver) {
     product_url: me.product_url ?? '',
     timezone: me.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     founder_role: me.founder_role ?? 'solo_founder',
+    persona: me.persona ?? '',
   });
   const [saved, setSaved] = useState(false);
   const zones = TIMEZONES.includes(form.timezone) ? TIMEZONES : [form.timezone, ...TIMEZONES];
 
   async function save() {
     try {
-      onSaved(await api.updateMe({ ...form }));
+      onSaved(await api.updateMe({ ...form, persona: form.persona || null }));
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2200);
     } catch (err) {
@@ -273,6 +275,13 @@ function ProfileTab({ me, onSaved, onError }: Saver) {
           <label className="dv-label">ROLE</label>
           <select className="dv-input" value={form.founder_role} onChange={(e) => setForm({ ...form, founder_role: e.target.value })}>
             {ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="dv-label">WHO YOU ARE · SETS HOW YOUR VIDEOS ARE MADE</label>
+          <select className="dv-input" value={form.persona} onChange={(e) => setForm({ ...form, persona: e.target.value })}>
+            <option value="">Not chosen yet (your AI will ask)</option>
+            {PERSONAS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
         </div>
       </div>

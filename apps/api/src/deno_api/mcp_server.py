@@ -9,7 +9,7 @@ founder through ``UserScope``, so it reads and writes exactly what the dashboard
 Tools (docs/18 §3), kept to about 20 so models pick well:
 - ideas: list_ideas, validate_idea, get_validation, get_report, get_founder_context
 - posts: check_copy, create_content_plan, list_briefs, save_draft
-- studio: set_brand_kit, get_playbook, list_styles, search_recipes, search_media, create_upload, save_video,
+- studio: set_persona, set_brand_kit, get_playbook, list_styles, search_recipes, search_media, create_upload, save_video,
   list_studio, get_review_notes, reply_note
 Heavy work (rendering, audio analysis, captions, voice) runs on the founder's machine with the studio kit.
 """
@@ -49,6 +49,7 @@ from deno_studio import get_doc, list_docs, media, rulebook, search_docs
 log = get_logger(__name__)
 
 MCP_PATH = "/mcp"
+_PERSONA_NOTE = " Anything I didn't say (length, ratio, pacing, captions): use my persona's defaults."
 Group = Literal["read", "write"]
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 INSTRUCTIONS = """Deno validates startup ideas against real public evidence and helps the founder launch them with
@@ -57,6 +58,9 @@ their Deno dashboard.
 
 Start with list_ideas and get_founder_context: the founder's evidenced pains, their ICP's words, their real stories
 and numbers, their voice and brand. Write only from these facts; never invent numbers, quotes or features.
+get_founder_context also returns their persona (founder, content creator, indie hacker, agency, educator): its
+recipe, ratio, length, pacing, hook, tone and caption defaults shape every video. If it is null, ask "Who are you?"
+once and save the answer with set_persona.
 
 Posts: create_content_plan, then save_draft per brief (Deno's anti-slop gates check every draft).
 Video and images: get_playbook and list_styles first, search_media for licensed stock/SFX, then build and render on
@@ -285,8 +289,9 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
     async def get_founder_context(idea_id: str) -> dict[str, Any]:
         """What Deno knows for making this founder's content: the idea, its verdict, the strongest evidenced
         pains and ICP claims (with sources and quotes), their Story Bank (real stories and numbers), their voice
-        samples, the brand kit (colours, fonts, logo) and their taste (what they've asked to fix before). Write
-        only from these facts; don't invent stories or numbers."""
+        samples, the brand kit (colours, fonts, logo), their taste (what they've asked to fix before) and their
+        persona (who they are: recipe, ratio, length, pacing, hook, tone and caption defaults for every video;
+        null until asked, with the choices). Write only from these facts; don't invent stories or numbers."""
 
         async def work(scope: UserScope, _client: str | None) -> dict[str, Any]:
             return await svc.founder_context(scope, _uuid(idea_id, "idea_id"), dashboard)
@@ -494,7 +499,7 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
     async def get_playbook(topic: str = "index") -> dict[str, Any]:
         """Deno Studio's written rules for making video and images that don't look AI-made. topic = one of the
         names listed by topic "index" (e.g. contract, preproduction, timing, motion, typography, style, sound,
-        captions, voice, review, multi-agent, delivery, platforms, stills, hybrid), or a style name. Rules the
+        captions, voice, review, multi-agent, delivery, platforms, stills, hybrid, personas), or a style name. Rules the
         founder turned off in their Rulebook are left out."""
 
         async def work(scope: UserScope, _client: str | None) -> dict[str, Any]:
@@ -543,6 +548,18 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
             return {"recipes": [{**d.card(), "text": d.body} for d in found]}
 
         return await as_founder(work)
+
+    @mcp.tool(title="Save who the founder is")
+    async def set_persona(persona: Literal["founder", "creator", "indie_dev", "agency", "educator"]) -> dict[str, Any]:
+        """Save the founder's answer to "Who are you?" (asked once): founder, creator (content creator),
+        indie_dev (indie hacker / developer), agency (agency or marketer) or educator (educator / coach). Returns
+        that persona's video defaults (recipe, ratios, length, pacing, hook, tone, caption preset, style); follow
+        them unless the founder asks otherwise. Playbook "personas" has the full guide."""
+
+        async def work(scope: UserScope, _client: str | None) -> dict[str, Any]:
+            return {"persona": await svc.set_persona(scope, persona)}
+
+        return await as_founder(work, "write")
 
     @mcp.tool(title="Set the brand kit")
     async def set_brand_kit(
@@ -718,9 +735,10 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         return f"{ask}\n\nFollow this Deno Studio workflow:\n\n{body}"
 
     @mcp.prompt(title="Launch video")
-    def launch_video(idea: str = "my latest idea", length_s: int = 20, ratio: str = "16:9") -> str:
-        """Plan and make a launch film for a validated idea."""
-        return _skill_prompt("video", f"Make a {length_s} s {ratio} launch video for {idea}.")
+    def launch_video(idea: str = "my latest idea", length_s: int | None = None, ratio: str | None = None) -> str:
+        """Plan and make a launch film for a validated idea (length and ratio default to the founder's persona)."""
+        shape = " ".join(x for x in (f"{length_s} s" if length_s else "", ratio or "") if x)
+        return _skill_prompt("video", f"Make a {shape + ' ' if shape else ''}launch video for {idea}.{_PERSONA_NOTE}")
 
     @mcp.prompt(title="Vertical reel")
     def reel(topic: str = "the strongest pain my validation found", length_s: int = 15) -> str:
@@ -728,11 +746,12 @@ def build_mcp(app: FastAPI, settings: Settings) -> tuple[MCPServer[Any], Starlet
         return _skill_prompt("video", f"Make a {length_s} s 9:16 reel about {topic}, with burned-in captions.")
 
     @mcp.prompt(title="Explainer with voiceover")
-    def explainer(idea: str = "my latest idea", length_s: int = 30) -> str:
+    def explainer(idea: str = "my latest idea", length_s: int | None = None) -> str:
         """A narrated explainer: problem, what it is, three steps, proof, name."""
         voice = get_doc("skills", "voice")
         extra = f"\n\n{voice.body}" if voice else ""
-        return _skill_prompt("video", f"Make a {length_s} s narrated explainer for {idea}.") + extra
+        shape = f"{length_s} s " if length_s else ""
+        return _skill_prompt("video", f"Make a {shape}narrated explainer for {idea}.{_PERSONA_NOTE}") + extra
 
     @mcp.prompt(title="LinkedIn carousel")
     def carousel(topic: str = "the pains my validation found", pages: int = 8) -> str:

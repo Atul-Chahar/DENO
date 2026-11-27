@@ -29,6 +29,9 @@
 .h-app { padding: 18px 20px; border-right: var(--hair); border-bottom: var(--hair); display: flex; flex-direction: column; gap: 8px; }
 .h-app__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .h-app span.h-sub { font-size: 13.5px; color: var(--muted); }
+.h-choice { background: none; border-top: 0; border-left: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.h-choice:hover, .h-choice:focus-visible { background: var(--lime); }
+.h-choice:hover span.h-sub, .h-choice:focus-visible span.h-sub { color: var(--ink); }
 .h-addr { padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .h-addr code { flex: 1 1 280px; min-width: 0; background: var(--ink); color: var(--paper); font-family: var(--mono); font-size: 13px; padding: 11px 14px; overflow-x: auto; white-space: nowrap; }
 .h-agent { padding: 16px 20px; border-top: var(--rule); background: var(--ink); color: var(--on-dark); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
