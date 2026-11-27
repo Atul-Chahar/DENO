@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { CodeBlock } from '@/components/setup/CodeBlock';
 import { Faq } from '@/components/landing/Faq';
@@ -65,12 +66,22 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
 ];
 
+const SHARE_TITLE = 'Deno — Edit your marketing by talking to your AI';
+const SHARE_TEXT = 'Your AI writes and edits your posts, reels and launch videos from real evidence, in your voice. One command installs Deno in Claude Code.';
+
+export const metadata: Metadata = {
+  openGraph: { type: 'website', siteName: 'Deno', title: SHARE_TITLE, description: SHARE_TEXT, url: '/' },
+  twitter: { card: 'summary_large_image', title: SHARE_TITLE, description: SHARE_TEXT },
+};
+
 const TEASER = PLANS.filter((p) => p.id !== 'launch');
 
 export default function LandingPage() {
   return (
     <>
+      <a href="#install" className="m-skip">Skip to the install command</a>
       <SiteHeader />
+      <main>
 
       <section className="m-wrap m-hero m-hero--v2">
         <a href="/docs/quickstart" className="m-pill">
@@ -375,6 +386,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      </main>
       <SiteFooter />
       <ScrollReveal />
       <PlayOnView />

@@ -556,3 +556,16 @@ details[open] > summary .m-faq__mark::after { transform: translate(-50%, -50%) r
 .m-ulink:hover { text-decoration-color: currentColor; }
 @media (prefers-reduced-motion: reduce) { .m-hit:hover { transform: none; } }
 .site-header__login { padding: 12px 4px; }
+
+/* ---- Footer status line (components/landing/StatusDot.tsx) ---- */
+.m-status { display: inline-flex; align-items: center; gap: 8px; }
+.m-status i { width: 8px; height: 8px; background: var(--on-dark-dim); }
+.m-status--checking i { animation: denoPulse 1s infinite; }
+.m-status--ok i { background: var(--lime); }
+.m-status--down i { background: var(--flare); }
+
+/* ---- Keyboard: a skip link, and a focus ring you can see on dark panels ---- */
+.m-skip { position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--lime); color: var(--ink); border: var(--rule); padding: 10px 14px; font-weight: 700; }
+.m-skip:focus { top: 12px; }
+.m-band--ink :focus-visible, .m-install :focus-visible, .m-mock :focus-visible, .m-cta__box :focus-visible,
+.m-term :focus-visible, .site-footer :focus-visible { outline-color: var(--lime); }

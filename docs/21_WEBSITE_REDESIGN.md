@@ -95,6 +95,9 @@ with the command.
 Motion: `components/landing/PlayOnView.tsx` arms `[data-play]` blocks and plays them in view; without JS or
 with reduced motion everything simply shows. Sound: `web/lib/sound.ts` (Web Audio, no files), only on clicks
 (copy, tab, FAQ), off switch in the install box, remembered per device.
+Also: a generated share image (`app/(marketing)/opengraph-image.tsx`) with Open Graph / X tags on the home page;
+a footer status dot that reads `/status.json` (the API's `/readyz`, cached 60 s); a skip link and a `<main>`
+landmark; lime focus rings on dark panels; footer links to Install and the setup prompt.
 Ideas not built yet: put the launch film on the hero once it is approved; a short screen recording of the real
-installer; a "Copy for my AI" button on every docs page; a status line on the site from `/readyz`.
+installer.
 
