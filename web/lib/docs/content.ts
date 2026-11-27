@@ -6,7 +6,7 @@
  * tool behaviour comes from apps/api/src/deno_api/mcp_server.py, kit commands from plugin/kit/cli.mjs.
  */
 
-import { MCP_URL, PLUGIN_REPO, SITE_URL } from '@/lib/site';
+import { CONTACT_EMAIL, INSTALL_CMD, INSTALL_CMD_POSTS, INSTALL_CMD_WIN, MCP_URL, PLUGIN_REPO, SITE_URL } from '@/lib/site';
 
 export type Block =
   | { t: 'p'; text: string }
@@ -89,7 +89,7 @@ export const DOCS: DocPage[] = [
       { t: 'ul', items: [
         'A free Deno account. [Create one](/auth?mode=signup).',
         'An AI app: Claude Code, Claude Desktop, claude.ai, ChatGPT or Cursor.',
-        'For video only: Claude Code, Node 22 or newer, and ffmpeg.',
+        'For video: Claude Code and Node 22 or newer. The one-line installer adds the rest.',
       ] },
       { t: 'h2', text: 'Step 1. Connect your AI app' },
       { t: 'p', text: 'The setup prompt above does this for you. To do it by hand, pick the app you use.' },
@@ -145,19 +145,29 @@ export const DOCS: DocPage[] = [
     lead: 'The full setup: posts, validation and video. Claude Code is the only app that can render video today.',
     group: 'Connect your AI',
     blocks: [
-      { t: 'h2', text: 'Install the plugin' },
-      { t: 'p', text: 'Type these two lines inside Claude Code.' },
-      { t: 'code', code: `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install deno-studio@deno` },
-      { t: 'p', text: 'The plugin adds the Deno MCP server, seven skills (video, sound, captions, voice, stills, posts, review), three agents (director, scene-builder, reviewer) and the local `studio` command.' },
-      { t: 'h2', text: 'Finish in a terminal' },
-      { t: 'code', code: 'studio doctor --install\nstudio login' },
-      { t: 'ul', items: [
-        '`studio doctor --install` checks for Node 22+ and ffmpeg and installs what the renderer needs into `~/.deno-studio/`.',
-        '`studio login` opens your browser so you can sign in to Deno.',
+      { t: 'h2', text: 'Install with one command' },
+      { t: 'p', text: 'Open a terminal (on a Mac: the Terminal app) and paste this line. It works on macOS, Linux and WSL.' },
+      { t: 'code', code: INSTALL_CMD },
+      { t: 'p', text: 'On Windows, paste this into PowerShell instead:' },
+      { t: 'code', code: INSTALL_CMD_WIN },
+      { t: 'p', text: 'The installer is safe to run again. Each step skips what is already done. [Read the script](/install.sh) before you run it if you like. In order, it:' },
+      { t: 'ol', items: [
+        'Checks for Claude Code, and offers to install it with Anthropic\'s official installer if it is missing.',
+        'Adds the `deno-studio` plugin: the Deno MCP server, seven skills (video, sound, captions, voice, stills, posts, review), three agents (director, scene-builder, reviewer) and the `studio` command.',
+        'Puts `studio` in `~/.local/bin` so it also works in a normal terminal.',
+        'Installs what the renderer needs (Chromium, plus ffmpeg if you have none) into `~/.deno-studio/`. About 150 MB. Nothing system-wide.',
+        'Opens your browser once so you can sign in to Deno. You never type a password or a key into the terminal.',
       ] },
+      { t: 'p', text: 'Then open Claude Code, type `/mcp`, pick **deno** and choose **Authenticate**.' },
+      { t: 'note', text: 'Video needs Node 22 or newer. If you do not have it, the installer tells you the command for your system and still sets up posts and validation.' },
+      { t: 'h2', text: 'Or install by hand' },
+      { t: 'p', text: 'Type these two lines inside Claude Code:' },
+      { t: 'code', code: `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install deno-studio@deno` },
+      { t: 'p', text: 'Then ask Claude to run `studio doctor --install` and `studio login` for you. The `studio` command is only on the path inside Claude Code unless you used the installer.' },
       { t: 'h2', text: 'Posts only, no video' },
-      { t: 'p', text: 'If you do not need video, skip the plugin and add just the server:' },
-      { t: 'code', code: `claude mcp add --transport http deno ${MCP_URL}` },
+      { t: 'p', text: 'If you do not need video, connect just the server:' },
+      { t: 'code', code: INSTALL_CMD_POSTS },
+      { t: 'p', text: 'That is the same as running `claude mcp add --transport http --scope user deno ' + MCP_URL + '` yourself.' },
       { t: 'p', text: 'Then run `/mcp` inside Claude Code and sign in to Deno.' },
       ...CHECK,
       { t: 'h2', text: 'Updating' },
@@ -340,11 +350,13 @@ export const DOCS: DocPage[] = [
     group: 'Studio',
     blocks: [
       { t: 'h2', text: 'Requirements' },
-      { t: 'ul', items: ['Claude Code', 'Node 22 or newer', 'ffmpeg', 'A Claude Pro or Max plan is recommended'] },
+      { t: 'ul', items: ['Claude Code (the installer can add it)', 'Node 22 or newer', 'ffmpeg (the installer adds its own copy if you have none)', 'A Claude Pro or Max plan is recommended'] },
       { t: 'h2', text: 'Install' },
-      { t: 'code', code: `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install deno-studio@deno` },
-      { t: 'p', text: 'Then in a terminal:' },
-      { t: 'code', code: 'studio doctor --install\nstudio login' },
+      { t: 'p', text: 'Paste this into a terminal (macOS, Linux, WSL):' },
+      { t: 'code', code: INSTALL_CMD },
+      { t: 'p', text: 'On Windows, in PowerShell:' },
+      { t: 'code', code: INSTALL_CMD_WIN },
+      { t: 'p', text: 'It adds the plugin, puts the `studio` command on your path, installs the renderer and signs you in. See [Connect Claude Code](/docs/claude-code) for each step, or how to do it by hand.' },
       { t: 'h2', text: 'Optional extras' },
       { t: 'ul', items: [
         '`studio doctor --install --voice` adds local voiceover (Kokoro).',
@@ -506,7 +518,7 @@ export const DOCS: DocPage[] = [
       ] },
       { t: 'h2', text: 'Studio' },
       { t: 'ul', items: [
-        '**`studio` is not found.** Run `/plugin install deno-studio@deno` again, then open a new terminal.',
+        '**`studio` is not found.** Run the installer again (`' + INSTALL_CMD + '`), then open a new terminal. If it warns that `~/.local/bin` is not on your path, add the line it prints to your shell profile.',
         '**Render fails.** Run `studio doctor`. It names what is missing (Node, ffmpeg, Chromium).',
         '**Upload refused.** Run `studio verify` and fix what it lists, then upload again.',
       ] },
@@ -516,7 +528,7 @@ export const DOCS: DocPage[] = [
         '**"Not enough evidence".** The idea is too broad or too new. Name the customer and the problem more exactly and run again.',
       ] },
       { t: 'h2', text: 'Still stuck' },
-      { t: 'p', text: 'Paste [the full docs](/llms-full.txt) into your AI and describe the problem, or write to hello@deno.gtm.' },
+      { t: 'p', text: `Paste [the full docs](/llms-full.txt) into your AI and describe the problem, or write to ${CONTACT_EMAIL}.` },
     ],
   },
 ];

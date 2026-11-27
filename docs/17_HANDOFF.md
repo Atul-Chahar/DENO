@@ -1,6 +1,6 @@
 # 17 — Handoff: where we are and what's next
 
-Last updated **2026-11-27** (creator personas, docs/18 §17). Read this first in a new chat, after `CLAUDE.md`.
+Last updated **2026-11-27** (creator personas, docs/18 §17; landing v2 + one-line installer, docs/21 §8). Read this first in a new chat, after `CLAUDE.md`.
 Before acting on anything below, re-check it live (`gh pr list`, `git log origin/main`, `vercel env ls`):
 this file can be a few hours stale.
 
@@ -41,6 +41,23 @@ tests, tsc, eslint, plugin build. **Not checked:** the home card and Account sel
 account (no local secrets), and a full video run in Claude Code with a persona. The landing page still says
 "19 tools" (`web/app/(marketing)/page.tsx`); left alone because PR #46 rewrites that page: fix it after #46 merges.
 Founders get the new skills after merge with `/plugin marketplace update deno`.
+
+### 2026-11-27: landing v2 and the one-line installer (branch `feat/landing-v2`, docs/21 §8)
+**One command installs everything:** `curl -fsSL https://deno-web-eight.vercel.app/install.sh | bash`
+(Windows: `irm …/install.ps1 | iex`). Files: `web/public/install.sh`, `install.ps1`. It checks Claude Code
+(and offers Anthropic's installer), adds the plugin, writes a `studio` command to `~/.local/bin`, runs
+`studio doctor --install` and `studio login`. Flags: `--posts-only`, `--no-login`, `--no-deps`, `--yes`.
+This fixes a real bug: the docs told founders to run `studio` "in a normal terminal", but the plugin only puts it
+on the PATH inside Claude Code. Tested on Linux in an isolated `CLAUDE_CONFIG_DIR` and `HOME` (fresh install with the renderer step, re-run,
+posts-only, piped through bash, missing plugin, bad flag). **Not tested:** `install.ps1` (no Windows here), macOS,
+the browser sign-in step (needs a keyboard). PR previews sit behind Vercel login, so `curl … | bash` against a
+preview URL gets a login page; test the installer on production after merge.
+Landing page: install box in the hero (auto-picks Windows, posts-only switch, "No terminal" tab with one-click
+Cursor / VS Code deeplinks), an animated install terminal, chat mock and cards that play on scroll, count-up
+stats, FAQ that opens in place, quiet Web Audio click sounds with an on/off speaker button, a compact header
+below 980 px; cards, steps, stats, the example verdict and the ledger are links to the matching docs/gallery. Header button is now "Install Deno" → `/#install`. Docs, SetupTabs and `SETUP_PROMPT` use the installer.
+**Pending (Atul):** `hello@deno.gtm` is not a real address (`.gtm` is not a domain). Every contact link now reads
+`CONTACT_EMAIL` in `web/lib/site.ts`; set Vercel env `NEXT_PUBLIC_CONTACT_EMAIL` on `deno-web` to a real inbox.
 
 ### 2026-11-16: website redesign (branch `feat/site-mcp-studio-redesign`, docs/21)
 New landing page ("Edit your marketing by talking to your AI"), `/pricing` (Free / Launch $29 / Studio $49 /

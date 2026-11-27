@@ -42,7 +42,7 @@ export function SiteHeader({ active = 'home' }: { active?: Section }) {
           ) : (
             <>
               <a href="/auth" className="site-header__login">Log in</a>
-              <a href="/auth?mode=signup" className="btn btn--lime btn--raised">Connect your AI</a>
+              <a href="/#install" className="btn btn--lime btn--raised">Install Deno</a>
             </>
           )}
         </div>

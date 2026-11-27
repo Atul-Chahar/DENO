@@ -4,7 +4,7 @@ export function CodeBlock({ code }: { code: string }) {
   return (
     <div className="m-code">
       <pre>{code}</pre>
-      <CopyButton text={code} className="btn" />
+      <CopyButton text={code} className="btn" chime />
     </div>
   );
 }
