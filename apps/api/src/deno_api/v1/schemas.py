@@ -258,6 +258,7 @@ class MeOut(BaseModel):
     timezone: str | None = None
     founder_role: str | None = None
     persona: str | None = Field(default=None, description="Who the founder is (docs/18 §17); null until asked")
+    persona_learned: list[str] = Field(default_factory=list, description="What Deno learned from their videos")
     handles: list[Handle] = Field(default_factory=list)
     voice_preset: str | None = None
     notification_prefs: dict[str, bool] = Field(default_factory=dict)

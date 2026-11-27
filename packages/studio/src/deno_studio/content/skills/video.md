@@ -25,6 +25,8 @@ the kit to the founder's Deno account. Tell the founder only what they must do t
 - **Persona first.** If `persona` is null, ask "Who are you?" once, before anything else, with the choices in
   `persona_choices` (founder, content creator, indie hacker / developer, agency / marketer, educator / coach), one
   line each, and save the answer with `set_persona`. Never ask again. Skipped: use the founder defaults.
+- The persona learns from what they save, approve and ask to fix: `persona.learned` says what moved. If
+  `persona_suggestion` is there, offer that switch once in one line.
 - `get_playbook` for `personas`, `preproduction`, `timing`, `style`, `contract` and `build-loop`.
 - `search_recipes` for a format close to the request; `get_style` for the style you pick.
 

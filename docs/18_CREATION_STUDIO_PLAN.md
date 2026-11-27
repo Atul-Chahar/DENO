@@ -519,5 +519,21 @@ Each main recipe is runnable in the kit. Each persona also carries tone, caption
 
 Not changed: the kit (`studio init` already takes `--recipe` and `--ratio`, which the skill passes), and the old
 `profiles.founder_role` field (company role, unrelated to video format).
+### 17.1 The persona learns
+The picked persona is a starting point; how the founder actually works moves it. Stored in
+`profiles.studio_prefs["persona_learned"]` (same JSONB column, no migration; bounded: 8 values per counter, the last
+12 lengths and shot lengths, under 2 KB).
+- **Saved video** (first save of an item, `save_video`): +1 vote for its main ratio (+1 extra for the main cut),
+  recipe, style and caption preset; its length and average shot length (clips, or recipe `scenes`) are recorded.
+- **Approved video** (dashboard Approve): the same, counted twice.
+- **Founder review notes:** "too slow", "drags", "lost interest" (or the `lost-interest` tag) → faster; "rushed",
+  "can't read" → slower; "too long" / "too short" → length. Votes are capped at ±6.
+- `deno_studio.personas.adapt()`: a value with ≥3 votes and a clear lead replaces the default; ≥3 lengths or shot
+  lengths replace the range (median ±20% / ±15%); ≥2 net pace or length votes scale them by 10% each (max 40%).
+- `get_founder_context` → `persona.learned` (plain sentences of what moved), `persona.videos_seen`, and
+  `persona_suggestion` when ≥4 videos match another persona's main recipe and ratio (the AI offers the switch once).
+- `GET /me` → `persona_learned`; the Account page lists it under the "Who you are" select.
+- Learning never blocks a save, approval or note: a broken stored value is logged and skipped.
+
 Tests: `tests/unit/studio/test_personas.py` (recipes runnable, ratios, caption presets match the kit, playbook and
 web list in sync), `tests/unit/api/test_persona.py` (save / clear / refuse), `test_mcp.py` (tool listed, enum).

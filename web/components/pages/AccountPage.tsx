@@ -283,6 +283,20 @@ function ProfileTab({ me, onSaved, onError }: Saver) {
             <option value="">Not chosen yet (your AI will ask)</option>
             {PERSONAS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
+          {form.persona && form.persona === me.persona && (
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+              {me.persona_learned && me.persona_learned.length > 0 ? (
+                <>
+                  <strong style={{ color: 'var(--ink)' }}>Learned from your videos:</strong>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                    {me.persona_learned.map((line) => <li key={line}>{line}</li>)}
+                  </ul>
+                </>
+              ) : (
+                'Deno adjusts this as you save, approve and review videos.'
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div style={{ padding: '0 clamp(22px,3vw,40px) clamp(22px,3vw,40px)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>

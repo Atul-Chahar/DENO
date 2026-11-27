@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import uuid
 from collections import Counter
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -209,7 +210,8 @@ async def founder_context(scope: UserScope, project_id: uuid.UUID, dashboard: st
     if kit is None:
         ctx["brand_kit_hint"] = "No brand kit yet: call set_brand_kit with the product's website URL."
     ctx["taste"] = await taste(scope)
-    ctx.update(personas.context((profile.studio_prefs or {}).get("persona")))
+    prefs = profile.studio_prefs or {}
+    ctx.update(personas.context(prefs.get("persona"), prefs.get(personas.LEARN_KEY)))
     return ctx
 
 
@@ -229,7 +231,29 @@ async def set_persona(scope: UserScope, persona_id: str) -> dict[str, Any]:
         raise InvalidInput(f"persona is one of {', '.join(personas.PERSONA_IDS)}")
     profile = await scope.ensure_profile()
     profile.studio_prefs = {**(profile.studio_prefs or {}), "persona": found.id}
-    return found.defaults()
+    block: dict[str, Any] = personas.context(found.id, profile.studio_prefs.get(personas.LEARN_KEY))["persona"]
+    return block
+
+
+def persona_learned(profile: Any) -> list[str]:
+    """Plain-English lines for what Deno has learned about how this founder makes videos (empty until it has)."""
+    prefs = getattr(profile, "studio_prefs", None) or {}
+    found = personas.get(prefs.get("persona"))
+    if found is None:
+        return []
+    return personas.adapt(found, prefs.get(personas.LEARN_KEY))[1]
+
+
+async def learn(scope: UserScope, step: Callable[[dict[str, Any] | None], dict[str, Any]]) -> None:
+    """Update ``studio_prefs["persona_learned"]`` (docs/18 §17.1). Learning never blocks the work it watches."""
+    profile = await scope.ensure_profile()
+    prefs = dict(profile.studio_prefs or {})
+    try:
+        prefs[personas.LEARN_KEY] = step(prefs.get(personas.LEARN_KEY))
+    except (TypeError, ValueError, AttributeError):  # a bad stored value must not stop a save or a note
+        log.warning("persona_learn_failed", exc_info=True)
+        return
+    profile.studio_prefs = prefs
 
 
 async def taste(scope: UserScope) -> dict[str, Any]:
@@ -436,6 +460,9 @@ async def save_version(
         duration=film.duration or None,
         client_name=client_name,
     )
+    if item_id is None:  # a new video counts once; its later versions are the same choice
+        dumped = film.model_dump(mode="json", by_alias=True)
+        await learn(scope, lambda learned: personas.observe_film(learned, dumped, weight=1))
     # Timed findings become system notes on the scrubber, so the founder sees them before watching.
     for f in findings:
         if f.get("t") is not None:
@@ -591,6 +618,7 @@ async def add_note(
         author="founder",
         **loc,
     )
+    await learn(scope, lambda learned: personas.observe_note(learned, text, clean_tags))
     if clean_tags:
         profile = await scope.ensure_profile()
         prefs = dict(profile.studio_prefs or {})
@@ -656,6 +684,8 @@ async def approve(scope: UserScope, item_id: uuid.UUID) -> m.StudioItem:
         raise Conflict("An asset in this version has no commercial licence or credit. Replace it, then approve.")
     item.status = StudioStatus.APPROVED
     item.approved_at = datetime.now(UTC)
+    if item.kind == StudioKind.VIDEO:  # approved = "more like this": counts double
+        await learn(scope, lambda learned: personas.observe_film(learned, dict(ver.manifest or {}), weight=2))
     return item
 
 

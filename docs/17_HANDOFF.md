@@ -34,7 +34,9 @@ Production env (`deno-api`) has: `NVIDIA_NIM_API_KEY`, `WEB_SEARCH_PROVIDER`, `T
 once, on `/app/home` or by the `video` skill in Claude Code, and saved in `profiles.studio_prefs.persona`
 (**no migration**: an existing JSONB column). Each persona sets the recipe, ratios, length, pacing, hook, tone,
 caption preset and style the AI suggests; the skills follow it unless the founder asks otherwise. Change it on the
-Account page. New MCP tool `set_persona` (20 tools); `get_founder_context` returns the persona. Checked: all unit
+Account page. **It learns** (§17.1): videos saved (+1) and approved (+2) move the recipe, ratio, style, caption,
+length and pacing defaults after 3 votes; review notes like "too slow" or "too long" nudge pacing and length;
+stored in `studio_prefs.persona_learned`, shown on the Account page. New MCP tool `set_persona` (20 tools); `get_founder_context` returns the persona. Checked: all unit
 tests, tsc, eslint, plugin build. **Not checked:** the home card and Account select against a real signed-in
 account (no local secrets), and a full video run in Claude Code with a persona. The landing page still says
 "19 tools" (`web/app/(marketing)/page.tsx`); left alone because PR #46 rewrites that page: fix it after #46 merges.

@@ -60,7 +60,8 @@ Start with list_ideas and get_founder_context: the founder's evidenced pains, th
 and numbers, their voice and brand. Write only from these facts; never invent numbers, quotes or features.
 get_founder_context also returns their persona (founder, content creator, indie hacker, agency, educator): its
 recipe, ratio, length, pacing, hook, tone and caption defaults shape every video. If it is null, ask "Who are you?"
-once and save the answer with set_persona.
+once and save the answer with set_persona. The persona learns from the videos they save, approve and review
+(persona.learned says what changed).
 
 Posts: create_content_plan, then save_draft per brief (Deno's anti-slop gates check every draft).
 Video and images: get_playbook and list_styles first, search_media for licensed stock/SFX, then build and render on

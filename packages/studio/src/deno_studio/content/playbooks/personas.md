@@ -15,6 +15,16 @@ every pre-production question. What the founder asks for in this conversation al
 - Save the answer with `set_persona`. Never ask again; they can change it on the Account page or by telling you.
 - If they skip it, use the founder defaults and don't save anything.
 
+## It learns
+- The persona is a starting point. Every video the founder saves counts once and every video they approve counts
+  twice: the recipe, ratio, style and caption preset they keep choosing become the new defaults (after 3 votes),
+  and their typical length and shot length replace the persona's.
+- Review notes move it too: "too slow", "drags" or "lost interest" make the pacing faster; "rushed" or "can't read"
+  make it slower; "too long" or "too short" move the length.
+- `persona.learned` lists what moved, in plain words. Mention it once when it matters ("You usually go vertical, so
+  I've planned 9:16 first"), never as a report.
+- `persona_suggestion`: what they make looks like another persona. Offer the switch once, in one line; don't push.
+
 ## Founder
 - Start from `saas-launch-32`; `explainer-30` for a new audience, `changelog-30` for updates.
 - 16:9 main cut (X, LinkedIn, landing page), 1:1 for feeds. 20–35 s.

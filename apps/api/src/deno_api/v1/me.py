@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from deno_api.auth import AuthUser, current_user
 from deno_api.deps import Scope
-from deno_api.studio_service import persona_of
+from deno_api.studio_service import persona_learned, persona_of
 from deno_api.v1.billing import settings_of, stripe_client
 from deno_api.v1.schemas import Handle, MeOut, MeUpdate
 from deno_core.db import models as m
@@ -54,6 +54,7 @@ def _me_out(scope_user_id: Any, email: str | None, profile: Any) -> MeOut:
         timezone=profile.timezone,
         founder_role=profile.founder_role,
         persona=persona_of(profile),
+        persona_learned=persona_learned(profile),
         handles=_stored_handles(profile.handles),
         voice_preset=profile.voice_preset,
         notification_prefs={k: bool(v) for k, v in (profile.notification_prefs or {}).items()},
